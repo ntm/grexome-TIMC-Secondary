@@ -14,13 +14,13 @@
 # full path to finalFilter.pl, unfortunately hard-coded for now
 # but with several possibbilities
 my $filterBin;
-my @possibleFilterBins = ("/home/nthierry/PierreRay/Grexome/SecondaryAnalyses/9_finalFilters.pl",
-			  "/home/nthierry/VariantCalling/GrexomeFauve/SecondaryAnalyses/9_finalFilters.pl");
+my @possibleFilterBins = ("/home/nthierry/PierreRay/Grexome/SecondaryAnalyses/8_finalFilters.pl",
+			  "/home/nthierry/VariantCalling/GrexomeFauve/SecondaryAnalyses/8_finalFilters.pl");
 foreach my $f (@possibleFilterBins) {
     (-f $f) && ($filterBin = "perl $f") && last;
 }
 ($filterBin) || 
-    die "Sorry, can't find 9_finalFilters.pl, update \@possibleFilterBins\n";
+    die "Sorry, can't find 8_finalFilters.pl, update \@possibleFilterBins\n";
 
 (@ARGV == 3) || die "needs 3 args: PICK (boolean), an inDir and a non-existant outDir\n";
 my ($pick, $inDir, $outDir) = @ARGV;
