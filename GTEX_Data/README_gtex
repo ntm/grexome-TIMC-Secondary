@@ -1,0 +1,32 @@
+06/04/2018
+
+I'll use the expression atlas file, so easy: just change
+$gtexFile.
+
+I also changed $favoriteTissue to an array so we can have testis AND ovary.
+
+DONE.
+
+
+#################################
+04/04/2018
+NTM
+
+
+In 7_addGTEX/ I'm actually adding expression data from The Human Protein Atlas, 
+"122 human individuals representing 32 different tissues".
+
+Instead I actually want to add the GTEX latest release:
+"450 donors and over 9600 RNA-seq samples across 51 tissue sites and 2 cell lines".
+
+Data can be DL'd (after logging into google!) from:
+https://www.gtexportal.org/home/datasets/
+I DL'd "This file contains the median TPM by tissue":
+GTEx_Analysis_2016-01-15_v7_RNASeQCv1.1.8_gene_median_tpm.gct.gz
+
+
+Now I see this dataset is also available on Expression Atlas, nice because
+it's the same format as I used previously. It's dataset E-MTAB-5214 , 
+DL'd and renamed to E-MTAB-5214-query-results.tpms.tsv :
+https://www.ebi.ac.uk/gxa/experiments-content/E-MTAB-5214/resources/ExperimentDownloadSupplier.RnaSeqBaseline/tpms.tsv
+
