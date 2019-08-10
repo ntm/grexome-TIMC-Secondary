@@ -3,27 +3,29 @@
 # 25/03/2018
 # NTM
 
-# Take 2 arguments: $inDir $outDir
-# $inDir must contain cohort TSVs as produced by extractCohorts.pl;
+# Take 3 arguments: $metadata $inDir $outDir
+# $metadata is the patient_summary xlsx file (with grexomeID etc columns);
+# $inDir must contain cohort TSVs as produced by extractCohorts.pl,
+# possibly filtered with finalFilters.pl;
 # $outDir doesn't exist, it will be created and filled with one TSV
-# per sample.
-# For a sample, we only print lines where this sample has a non-HR 
-# genotype: this genotype is printed in a new column GENOTYPE, 
-# inserted right after ALT.
+# per sample (as long as it is genotyped in an infile). 
+# Filenames will include patientID/specimenID.
+# For a sample, we only print lines from its cohort file and where 
+# it has an HV or HET genotype: this genotype is printed in a new 
+# column GENOTYPE, inserted right after SYMBOL.
 # Also the HV, NEGCTRL_HV, HET etc... columns are not printed.
-# For every cohort, we must have a $cohort.list file in current
-# dir with the list of samples.
 #
-# NOTE: the fact that ALT is the 3rd column, and that HV et al
-# are the last 6 columns, is HARD-CODED!
+# NOTE: the fact that HV et al are the last 6 columns (allowing for 
+# one more column with filter logs) is hard-coded.
 # If this isn't true the script dies.
 
 use strict;
 use warnings;
+use Spreadsheet::XLSX;
 
 
-(@ARGV == 2) || die "needs 2 args: an inDir and a non-existant outDir\n";
-my ($inDir, $outDir) = @ARGV;
+(@ARGV == 3) || die "needs 3 args: a metadata XLSX, an inDir and a non-existant outDir\n";
+my ($metadata, $inDir, $outDir) = @ARGV;
 (-d $inDir) ||
     die "inDir $inDir doesn't exist or isn't a directory\n";
 opendir(INDIR, $inDir) ||
@@ -32,51 +34,129 @@ opendir(INDIR, $inDir) ||
     die "found argument $outDir but it already exists, remove it or choose another name.\n";
 mkdir($outDir) || die "cannot mkdir outDir $outDir\n";
 
+#########################################################
+# parse metadata file
+
+# key==cohort name, value is an arrayref of all grexomes from this cohort
+my %cohort2grexomes = ();
+
+# key==grexome, value is patientID if it exists, specimenID otherwise
+my %grexome2patient = ();
+
+(-f $metadata) ||
+    die "E: the supplied metadata file doesn't exist\n";
+{
+    my $workbook = Spreadsheet::XLSX->new("$metadata");
+    (defined $workbook) ||
+	die "E when parsing xlsx\n";
+    ($workbook->worksheet_count() == 1) ||
+	die "E parsing xlsx: expecting a single worksheet, got ".$workbook->worksheet_count()."\n";
+    my $worksheet = $workbook->worksheet(0);
+    my ($colMin, $colMax) = $worksheet->col_range();
+    my ($rowMin, $rowMax) = $worksheet->row_range();
+    # check the column titles and grab indexes of our columns of interest
+    my ($grexCol, $cohortCol, $specimenCol, $patientCol) = (-1,-1,-1,-1);
+    foreach my $col ($colMin..$colMax) {
+	my $cell = $worksheet->get_cell($rowMin, $col);
+	($cell->value() eq "grexomeID") && ($grexCol = $col);
+	($cell->value() eq "pathology") && ($cohortCol = $col);
+	($cell->value() eq "specimenID") && ($specimenCol = $col);
+	($cell->value() eq "patientID") && ($patientCol = $col);
+    }
+    ($grexCol >= 0) ||
+	die "E parsing xlsx: no column title is grexomeID\n";
+    ($cohortCol >= 0) ||
+	die "E parsing xlsx: no col title is pathology\n";
+    ($specimenCol >= 0) ||
+	die "E parsing xlsx: no column title is specimenID\n";
+      ($patientCol >= 0) ||
+	  die "E parsing xlsx: no column title is patientID\n";
+    
+    foreach my $row ($rowMin+1..$rowMax) {
+	my $grexome = $worksheet->get_cell($row, $grexCol)->value;
+	# skip "none" lines
+	($grexome eq "none") && next;
+	my $cohort = $worksheet->get_cell($row, $cohortCol)->value;
+	(defined $cohort2grexomes{$cohort}) || ($cohort2grexomes{$cohort} = []);
+	push(@{$cohort2grexomes{$cohort}}, $grexome);
+	my $patient = $worksheet->get_cell($row, $specimenCol)->value;
+	if ($worksheet->get_cell($row, $patientCol)) {
+	    my $tmp = $worksheet->get_cell($row, $patientCol)->value;
+	    $tmp =~ s/^\s+//;
+	    $tmp =~ s/\s+$//;
+	    ($tmp) && ($patient = $tmp);
+	}
+	$grexome2patient{$grexome} = $patient;
+    }
+}
+
+#########################################################
+# read infiles
 
 while (my $inFile = readdir(INDIR)) {
-    ($inFile =~ (/^(\w+)\.csv/)) || next;
-    my $cohort = $1;
+    ($inFile =~ (/^([^\.]+)\.(.*csv)$/)) || next;
+    my ($cohort,$fileEnd) = ($1,$2);
+    # $fileEnd allows for .filtered , .pick etc...
+
+    # SYMBOL column 
+    my $symbolCol = -1;
 
     open(IN, "$inDir/$inFile") ||
 	die "cannot open cohort datafile $inDir/$inFile\n";
     my $header = <IN>;
     chomp($header);
-    ($header =~ s/^(POSITION\tREF\tALT\t)/$1GENOTYPE\t/) ||
-	die "cannot add GENOTYPE to header of inFile $inFile\n";
+    my @header = split(/\t/,$header);
+    foreach my $i (0..$#header) {
+	if ($header[$i] eq "SYMBOL") {
+	    $symbolCol = $i;
+	    $header[$i] .= "\tGENOTYPE";
+	    last;
+	}
+    }
+    ($symbolCol >= 0) || 
+	die "E: couldn't find SYMBOL in header of infile $inFile\n";
+    $header = join("\t",@header);
     ($header =~ s/\tHV\tNEGCTRL_HV\tHET\tNEGCTRL_HET\tOTHER\tNEGCTRL_OTHER$//) ||
-	die "cannot remove HV HET OTHER from header of inFile $inFile\n";
-    # hash of filehandles open for writing, one for each sample
+	($header =~ s/\tHV\tNEGCTRL_HV\tHET\tNEGCTRL_HET\tOTHER\tNEGCTRL_OTHER\tmax_ctrl_hv=[^\t]+$//) ||
+	die "cannot remove HV HET OTHER from header of inFile $inFile\n$header\n";
+
+    # hash of filehandles open for writing, one for each grexome
     # from this cohort
-    # key is the sample id
     my %outFHs;
-    (-f "$cohort.list") || die "cannot find file $cohort.list\n";
-    open(COHORT, "$cohort.list") ||
-	die "cannot open cohort file $cohort.list\n" ;
-    while (my $sample = <COHORT>) {
-	chomp($sample);
-	my $outFile = "$outDir/$cohort.$sample.csv";
+    # also keep a hash to clean up files for grexomes we didn't genotype
+    # in the inFiles, key==grexome, value is the outFilename but key
+    # will be deleted from hash if we write some data for it
+    my %grexome2out;
+
+    ($cohort2grexomes{$cohort}) || 
+	die "cohort $cohort parsed from filename of infile $inFile is not in $metadata\n";
+    foreach my $grexome (@{$cohort2grexomes{$cohort}}) {
+	my $patient = $grexome2patient{$grexome};
+	my $outFile = "$outDir/$cohort.$grexome.$patient.$fileEnd";
+	$grexome2out{$grexome} = $outFile;
 	open (my $FH, "> $outFile") || die "cannot open $outFile for writing";
 	print $FH "$header\n";
-	$outFHs{$sample} = $FH ;
+	$outFHs{$grexome} = $FH ;
     }
-    close(COHORT);
 
     # now read the data
     while (my $line = <IN>) {
 	chomp($line);
 	my @fields = split(/\t/, $line, -1) ;
-	my $toPrintStart = join("\t",@fields[0..2])."\t";
-	my $toPrintEnd = join("\t",@fields[3..($#fields-6)])."\n";
+	my $toPrintStart = join("\t",@fields[0..$symbolCol])."\t";
+	my $toPrintEnd = join("\t",@fields[($symbolCol+1)..($#fields-6)])."\n";
 
-	foreach my $i ($#fields-5,$#fields-3,$#fields-1) {
-	    foreach my $realGenoData (split(/\|/,$fields[$i])) {
-		($realGenoData =~ s/^([^~]+)~//) || 
-		    die "cannot grab realGeno from $realGenoData\n";
-		my $realGeno = $1;
-		# replace / with \ for excel :-( 
-		$realGeno =~ s~/~\\~ ;
-		foreach my $sample (split(/,/,$realGenoData)) {
-		    print { $outFHs{$sample} } "$toPrintStart$realGeno\t$toPrintEnd" ;
+	foreach my $i ($#fields-5,$#fields-3) {
+	    if ($fields[$i]) {
+		($fields[$i] =~ /^([^~]+)~([^~\|]+)$/) || 
+		    die "cannot parse HV/HET data $fields[$i] from infile $inFile\n";
+		my ($geno,$grexomes) = ($1,$2);
+		# actually, just use HV or HET for geno, the actual allele is in ALLELE_NUM
+		($i == $#fields-5) && ($geno = "HV");
+		($i == $#fields-3) && ($geno = "HET");
+		foreach my $grexome (split(/,/,$grexomes)) {
+		    ($grexome2out{$grexome}) && delete($grexome2out{$grexome});
+		    print { $outFHs{$grexome} } "$toPrintStart$geno\t$toPrintEnd" ;
 		}
 	    }
 	}
@@ -84,6 +164,9 @@ while (my $inFile = readdir(INDIR)) {
     close(IN);
     foreach my $fh (values %outFHs) {
 	close($fh);
+    }
+    foreach my $grex (keys %grexome2out) {
+	unlink($grexome2out{$grex});
     }
 }
 closedir(INDIR);
