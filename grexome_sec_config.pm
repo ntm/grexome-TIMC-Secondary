@@ -20,7 +20,7 @@ sub vep_bin {
 
 # number of jobs that VEP can run in parallel (--fork)
 sub vep_jobs {
-    return(6);
+    return(4);
 }
 
 # full path to human genome fasta, for VEP --hgvs
