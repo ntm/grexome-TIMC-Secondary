@@ -3,7 +3,7 @@
 package grexome_sec_config;
 require Exporter;
 our @ISA = qw(Exporter) ;
-our @EXPORT_OK = qw(vep_bin vep_jobs genome_fasta vep_plugins gtexFile);
+our @EXPORT_OK = qw(vep_bin vep_jobs genome_fasta vep_plugins vep_cacheFile gtexFile);
 
 use strict;
 use warnings;
@@ -32,6 +32,17 @@ sub genome_fasta {
     }
     # none of the @possibleGenomes exist
     die "E: genome_fasta in grexome_sec_config.pm can't find a genome fasta file\n";
+}
+
+# full path to the VEP cache file
+sub vep_cacheFile {
+    # works on fauve and luxor, file is actually currently on luxor
+    my @possiblePaths = ("/data/nthierry/PierreRay/RunSecondaryAnalyses/",
+			 "/home/nthierry/sshMounts/luxor/data/nthierry/PierreRay/RunSecondaryAnalyses/");
+    foreach my $path (@possiblePaths) {
+	(-d $path) && return("$path/VEP_cache");
+    }
+    die "E: vep_cacheFile can't find an existing dir in possiblePaths\n";
 }
 
 # full --plugin string with all VEP plugins we want to use and
