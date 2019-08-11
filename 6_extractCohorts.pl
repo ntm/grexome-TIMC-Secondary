@@ -5,7 +5,7 @@
 
 # Take as argument a $metadata xlsx file, and an $outDir that doesn't
 # exist, and read on stdin a fully annotated TSV file;
-# make $outDir and create in it one TSV file per cohort.
+# make $outDir and create in it one gzipped TSV file per cohort.
 # The cohorts are defined in $metadata.
 # For each sample, any identified causal (mutation in a) gene is grabbed
 # from $metadata.
@@ -149,8 +149,8 @@ foreach my $notConR (@notControls) {
 # hash of filehandles open for writing, one for each cohort
 my %outFHs;
 foreach my $cohort (@cohorts) {
-    my $outFile = "$outDir/$cohort.csv";
-    open (my $FH, "> $outFile") || die "cannot open $outFile for writing";
+    my $outFile = "$outDir/$cohort.csv.gz";
+    open (my $FH, "| gzip -c --fast > $outFile") || die "cannot gzip-open $outFile for writing";
     $outFHs{$cohort} = $FH ;
 }
 

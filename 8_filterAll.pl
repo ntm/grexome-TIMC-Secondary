@@ -6,11 +6,12 @@
 
 # Takes 3 arguments: $pick $inDir $outDir
 # - $pick is 0 or 1, if true we apply --pick as a filter;
-# - $inDir must contain cohort or sample TSVs as produced by extractCohorts.pl
-#   or extractSamples.pl;
+# - $inDir must contain cohort or sample TSVs (possibly gzipped) as 
+#   produced by extractCohorts.pl or extractSamples.pl;
 # - $outDir doesn't exist, it will be created and filled with one TSV
-#   per infile, adding .filtered or $filtered.pick to the filename.
-
+#   per infile (never gzipped), adding .filtered or .filtered.pick to 
+#   the filename.
+#
 # full path to finalFilter.pl, unfortunately hard-coded for now
 # but with several possibbilities
 my $filterBin;
@@ -34,10 +35,22 @@ opendir(INDIR, $inDir) ||
 mkdir($outDir) || die "cannot mkdir outDir $outDir\n";
 
 while (my $inFile = readdir(INDIR)) {
-    ($inFile =~ (/^(.+)\.csv/)) || next;
-    my $fileStart = $1;
+    ($inFile =~ /^\./) && next;
+    my ($fileStart,$gz);
+    if ($inFile =~ (/^(.+)\.csv$/)) {
+	$fileStart = $1;
+    }
+    elsif ($inFile =~ (/^(.+)\.csv\.gz$/)) {
+	$fileStart = $1;
+	$gz = 1;
+    }
+    else {
+	warn "W: cannot parse filename of inFile $inFile, skipping it\n";
+	next;
+    }
 
-    my $outFile = $fileStart.".filtered";
+    my $outFile = $fileStart ;
+    ($outFile =~ /\.filtered/) || ($outFile .= ".filtered");
     ($pick) && ($outFile .= ".pick");
     $outFile .= ".csv";
     
@@ -45,7 +58,13 @@ while (my $inFile = readdir(INDIR)) {
     # using defaults for AFs 
     # $com .= " --max_af_gnomad 0.01 --max_af_1kg 0.03 --max_af_esp 0.05"
     ($pick) && ($com .= " --pick");
-    $com .= " < $inDir/$inFile > $outDir/$outFile";
+    if ($gz) {
+	$com = "gunzip -c $inDir/$inFile | $com ";
+    }
+    else {
+	$com = "cat $inDir/$inFile | $com ";
+    }
+    $com .= " > $outDir/$outFile";
     warn scalar(localtime)." : starting $com\n";
     system($com);
     warn scalar(localtime)." : finished $com\n";

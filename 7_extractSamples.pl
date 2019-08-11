@@ -6,7 +6,7 @@
 # Take 3 arguments: $metadata $inDir $outDir
 # $metadata is the patient_summary xlsx file (with grexomeID etc columns);
 # $inDir must contain cohort TSVs as produced by extractCohorts.pl,
-# possibly filtered with finalFilters.pl;
+# possibly filtered with finalFilters.pl, and possibly gzipped;
 # $outDir doesn't exist, it will be created and filled with one TSV
 # per sample (as long as it is genotyped in an infile). 
 # Filenames will include patientID/specimenID.
@@ -79,9 +79,9 @@ my %grexome2patient = ();
 	my $cohort = $worksheet->get_cell($row, $cohortCol)->value;
 	(defined $cohort2grexomes{$cohort}) || ($cohort2grexomes{$cohort} = []);
 	push(@{$cohort2grexomes{$cohort}}, $grexome);
-	my $patient = $worksheet->get_cell($row, $specimenCol)->value;
+	my $patient = $worksheet->get_cell($row, $specimenCol)->unformatted();
 	if ($worksheet->get_cell($row, $patientCol)) {
-	    my $tmp = $worksheet->get_cell($row, $patientCol)->value;
+	    my $tmp = $worksheet->get_cell($row, $patientCol)->unformatted();
 	    $tmp =~ s/^\s+//;
 	    $tmp =~ s/\s+$//;
 	    ($tmp) && ($patient = $tmp);
@@ -94,15 +94,27 @@ my %grexome2patient = ();
 # read infiles
 
 while (my $inFile = readdir(INDIR)) {
-    ($inFile =~ (/^([^\.]+)\.(.*csv)$/)) || next;
-    my ($cohort,$fileEnd) = ($1,$2);
-    # $fileEnd allows for .filtered , .pick etc...
+    ($inFile =~ /^\./) && next;
+    my ($cohort,$fileEnd,$gz);
+    if ($inFile =~ (/^([^\.]+)\.(.*csv)$/)) {
+	# $fileEnd allows for .filtered , .pick etc...
+	($cohort,$fileEnd) = ($1,$2);
+    }
+    elsif ($inFile =~ (/^([^\.]+)\.(.*csv)\.gz$/)) {
+	($cohort,$fileEnd) = ($1,$2);
+	$gz = 1;
+    }
+    else {
+	warn "W: cannot parse filename of inFile $inDir/$inFile, skipping it\n";
+    }
 
     # SYMBOL column 
     my $symbolCol = -1;
 
-    open(IN, "$inDir/$inFile") ||
-	die "cannot open cohort datafile $inDir/$inFile\n";
+    my $inFull = "$inDir/$inFile";
+    ($gz) && ($inFull = "gunzip -c $inFull | ");
+    open(IN, $inFull) ||
+	die "cannot (gunzip-?)open cohort datafile $inDir/$inFile (as $inFull)\n";
     my $header = <IN>;
     chomp($header);
     my @header = split(/\t/,$header);
@@ -117,11 +129,12 @@ while (my $inFile = readdir(INDIR)) {
 	die "E: couldn't find SYMBOL in header of infile $inFile\n";
     $header = join("\t",@header);
     ($header =~ s/\tHV\tNEGCTRL_HV\tHET\tNEGCTRL_HET\tOTHER\tNEGCTRL_OTHER$//) ||
-	($header =~ s/\tHV\tNEGCTRL_HV\tHET\tNEGCTRL_HET\tOTHER\tNEGCTRL_OTHER\tmax_ctrl_hv=[^\t]+$//) ||
+	($header =~ s/\tHV\tNEGCTRL_HV\tHET\tNEGCTRL_HET\tOTHER\tNEGCTRL_OTHER(\tmax_ctrl_hv=[^\t]+)$/$1/) ||
 	die "cannot remove HV HET OTHER from header of inFile $inFile\n$header\n";
 
     # hash of filehandles open for writing, one for each grexome
     # from this cohort
+    # will be gzipped if infiles were
     my %outFHs;
     # also keep a hash to clean up files for grexomes we didn't genotype
     # in the inFiles, key==grexome, value is the outFilename but key
@@ -133,8 +146,11 @@ while (my $inFile = readdir(INDIR)) {
     foreach my $grexome (@{$cohort2grexomes{$cohort}}) {
 	my $patient = $grexome2patient{$grexome};
 	my $outFile = "$outDir/$cohort.$grexome.$patient.$fileEnd";
+	($gz) && ($outFile .= ".gz");
 	$grexome2out{$grexome} = $outFile;
-	open (my $FH, "> $outFile") || die "cannot open $outFile for writing";
+	my $outFull = " > $outFile";
+	($gz) && ($outFull = " | gzip -c --fast $outFull");
+	open (my $FH, $outFull) || die "cannot (gzip-?)open $outFile for writing (as $outFull)\n";
 	print $FH "$header\n";
 	$outFHs{$grexome} = $FH ;
     }
