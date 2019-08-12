@@ -12,7 +12,7 @@
 # Filenames will include patientID/specimenID.
 # For a sample, we only print lines from its cohort file and where 
 # it has an HV or HET genotype: this genotype is printed in a new 
-# column GENOTYPE, inserted right after SYMBOL.
+# column GENOTYPE, inserted right after KNOWN_CANDIDATE_GENE.
 # Also the HV, NEGCTRL_HV, HET etc... columns are not printed.
 #
 # NOTE: the fact that HV et al are the last 6 columns (allowing for 
@@ -108,8 +108,8 @@ while (my $inFile = readdir(INDIR)) {
 	warn "W: cannot parse filename of inFile $inDir/$inFile, skipping it\n";
     }
 
-    # SYMBOL column 
-    my $symbolCol = -1;
+    # KNOWN_CANDIDATE_GENE column 
+    my $knownCandidateCol = -1;
 
     my $inFull = "$inDir/$inFile";
     ($gz) && ($inFull = "gunzip -c $inFull | ");
@@ -119,14 +119,14 @@ while (my $inFile = readdir(INDIR)) {
     chomp($header);
     my @header = split(/\t/,$header);
     foreach my $i (0..$#header) {
-	if ($header[$i] eq "SYMBOL") {
-	    $symbolCol = $i;
+	if ($header[$i] eq "KNOWN_CANDIDATE_GENE") {
+	    $knownCandidateCol = $i;
 	    $header[$i] .= "\tGENOTYPE";
 	    last;
 	}
     }
-    ($symbolCol >= 0) || 
-	die "E: couldn't find SYMBOL in header of infile $inFile\n";
+    ($knownCandidateCol >= 0) || 
+	die "E: couldn't find KNOWN_CANDIDATE_GENE in header of infile $inFile\n";
     $header = join("\t",@header);
     ($header =~ s/\tHV\tNEGCTRL_HV\tHET\tNEGCTRL_HET\tOTHER\tNEGCTRL_OTHER$//) ||
 	($header =~ s/\tHV\tNEGCTRL_HV\tHET\tNEGCTRL_HET\tOTHER\tNEGCTRL_OTHER(\tmax_ctrl_hv=[^\t]+)$/$1/) ||
@@ -159,8 +159,8 @@ while (my $inFile = readdir(INDIR)) {
     while (my $line = <IN>) {
 	chomp($line);
 	my @fields = split(/\t/, $line, -1) ;
-	my $toPrintStart = join("\t",@fields[0..$symbolCol])."\t";
-	my $toPrintEnd = join("\t",@fields[($symbolCol+1)..($#fields-6)])."\n";
+	my $toPrintStart = join("\t",@fields[0..$knownCandidateCol])."\t";
+	my $toPrintEnd = join("\t",@fields[($knownCandidateCol+1)..($#fields-6)])."\n";
 
 	foreach my $i ($#fields-5,$#fields-3) {
 	    if ($fields[$i]) {

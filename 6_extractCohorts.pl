@@ -20,12 +20,16 @@
 # - if a sample from $cohort has an identified $causalGene, this sample is
 #   removed from the HV/HET columns, except in lines where SYMBOL==$causalGene.
 #
+# A new KNOWN_CANDIDATE_GENE column is inserted right after SYMBOL:
+# it holds value 1 if SYMBOL is a known candidate gene for this cohort
+# (as specified in %knownCandidateGenes), it stays empty otherwise.
+#
 # New COUNT_$cohort_$geno and COUNT_NEGCTRL_$geno columns are created
 # for each  GENO (HV, HET, OTHER, HR) in that order.
 # These columns contain the total number of samples listed in the
 # corresponding GENO column (except for HR, which has no GENO column).
 # For HR we count all samples (ie don't care about @notControls or $causalGene).
-# The COUNTs are inserted right after the SYMBOL column.
+# The COUNTs are inserted right after the new KNOWN_CANDIDATE_GENE column.
 #
 # Lines where no samples from the cohort are HV|HET (for this alt allele)
 # are skipped. We rely on the fact that vcf2tsv.pl moved HV/HET genotypes
@@ -45,6 +49,118 @@ my @notControls = (["Flag","Astheno"],
 		   ["Azoo","Ovo"],
 		   ["Globo","Macro","Terato"]);
 
+# %knownCandidateGenes: key==$cohort, value is a hashref whose keys 
+# are HUGO gene names and values are 1
+# For Azoo: starting from GenesCandidats/Liste\ de\ gènes\ AZO\ NTM_25-06-19.xlsx
+# which I got from Zine, when Zine's file had several alternative names I picked
+# the name that I could grep in some VEP output.
+# %knownCandidateGenes will also be populated with every gene listed as "causal"
+# for some patient in $metadata.
+# If Pierre or Zine provide lists for other cohorts they can just be added here.
+# The lists should be mostly OK but the code doesn't sanity-check them: if a name
+# has a typo then so be it (for now).
+my %knownCandidateGenes = (
+    "Azoo" => {
+	"AHRR" => 1,
+	"MYBL1" => 1,
+	"APOB" => 1,
+	"AR" => 1,
+	"ATM" => 1,
+	"BOULE" => 1,
+	"CCDC155" => 1,
+	"CCDC157" => 1,
+	"CHFR" => 1,
+	"CREM" => 1,
+	"GJA1" => 1,
+	"NR0B1" => 1,
+	"DAZL" => 1,
+	"DDX25" => 1,
+	"DMC1" => 1,
+	"DMRT1" => 1,
+	"DNMT3L" => 1,
+	"E2F1" => 1,
+	"ENTPD6" => 1,
+	"FANCM" => 1,
+	"FHL5" => 1,
+	"FKBP6" => 1,
+	"FSHR" => 1,
+	"H2AX" => 1,
+	"HORMAD1" => 1,
+	"HSF2" => 1,
+	"IP6K1" => 1,
+	"KLHL10" => 1,
+	"M1AP" => 1,
+	"MAGEB4" => 1,
+	"MEI1" => 1,
+	"MEI4" => 1,
+	"MEIOB" => 1,
+	"MLH1" => 1,
+	"MLH3" => 1,
+	"MSH4" => 1,
+	"MSH5" => 1,
+	"YBX2" => 1,
+	"YBX3" => 1,
+	"DDX4" => 1,
+	"NANOS2" => 1,
+	"NANOS3" => 1,
+	"NLRP3" => 1,
+	"NPAS2" => 1,
+	"PARP2" => 1,
+	"PLK4" => 1,
+	"PMS2" => 1,
+	"PRDM9" => 1,
+	"PSMC3IP" => 1,
+	"RBMY" => 1,
+	"RBMXL2" => 1,
+	"REC8" => 1,
+	"RHOXF2" => 1,
+	"SEPTIN12" => 1,
+	"SMC1B" => 1,
+	"SNRPA1" => 1,
+	"SOHLH1" => 1,
+	"SOHLH2" => 1,
+	"SOX30" => 1,
+	"SPATA48" => 1,
+	"SPINK2" => 1,
+	"SPO11" => 1,
+	"STRA8" => 1,
+	"STX2" => 1,
+	"SYCE1" => 1,
+	"SYCE2" => 1,
+	"SYCE3" => 1,
+	"SYCP1" => 1,
+	"SYCP2" => 1,
+	"SYCP3" => 1,
+	"TAF4B" => 1,
+	"TAF7L" => 1,
+	"TDRD6" => 1,
+	"TDRD9" => 1,
+	"TEX11" => 1,
+	"TEX14" => 1,
+	"TEX15" => 1,
+	"TRIM37" => 1,
+	"TSPY" => 1,
+	"TSSK6" => 1,
+	"UBE2B" => 1,
+	"UBR2" => 1,
+	"USP9Y" => 1,
+	"USP26" => 1,
+	"UTP14C" => 1,
+	"UTY" => 1,
+	"WNK3" => 1,
+	"ZMYND15" => 1,
+	"ZNF230" => 1,
+	"MCM8" => 1,
+	"STAG3" => 1,
+	"RBM5" => 1,
+	"CLDN11" => 1,
+	"PIWIL2" => 1,
+	"PIWIL4" => 1,
+	"PIWIL1" => 1 }
+    );
+
+
+#########################################################
 
 (@ARGV == 2) || die "needs two args: a metadata xlsx and a non-existing outDir\n";
 my ($metadata, $outDir) = @ARGV;
@@ -115,6 +231,9 @@ my %causalSeen = ();
 	    $causal =~ s/\s+$//;
 	    $sample2causal{$grexome} = $causal;
 	    $causalSeen{$causal} = 0;
+	    # add to knownCandidateGenes
+	    (defined $knownCandidateGenes{$cohort}) || ($knownCandidateGenes{$cohort} = {});
+	    $knownCandidateGenes{$cohort}->{$causal} = 1;
 	}
     }
     @cohorts = sort(keys(%cohorts));
@@ -191,7 +310,8 @@ foreach my $cohort (@cohorts) {
     foreach my $i (1..$#headers) {
 	if ($i == $symbolCol) {
 	    $toPrint .= "\t$headers[$i]";
-	    # COUNTs go right after SYMBOL
+	    # KNOWN_CANDIDATE_GENE and COUNTs go right after SYMBOL
+	    $toPrint .= "\tKNOWN_CANDIDATE_GENE";
 	    foreach my $geno (@genoCategories) {
 		$toPrint .= "\tCOUNT_$cohort"."_$geno";
 	    }
@@ -298,7 +418,11 @@ while (my $line = <STDIN>) {
 	my $toPrint = "$fields[0]";
 	foreach my $i (1..$#fields) {
 	    if ($i == $symbolCol) {
-		$toPrint .= "\t$fields[$i]";
+		$toPrint .= "\t$fields[$i]\t";
+		if (($knownCandidateGenes{$cohort}) && ($knownCandidateGenes{$cohort}->{$fields[$i]})) {
+		    $toPrint .= "1";
+		}
+		# else leave empty
 		# print all COUNTs
 		$toPrint .= "\t".join("\t",@counts);
 	    }
