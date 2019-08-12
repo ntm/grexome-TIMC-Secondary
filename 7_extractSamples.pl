@@ -171,6 +171,9 @@ while (my $inFile = readdir(INDIR)) {
 		($i == $#fields-5) && ($geno = "HV");
 		($i == $#fields-3) && ($geno = "HET");
 		foreach my $grexome (split(/,/,$grexomes)) {
+		    # sanity: eg we don't want infile to have gone through addPatientIDs.pl
+		    ($grexome =~ /^grexome\d\d\d\d$/) ||
+			die "E: inFile $inFile has a genotype call for a grexome I can't recognize: $grexome\n";
 		    ($grexome2out{$grexome}) && delete($grexome2out{$grexome});
 		    print { $outFHs{$grexome} } "$toPrintStart$geno\t$toPrintEnd" ;
 		}
