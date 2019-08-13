@@ -50,15 +50,15 @@ my @notControls = (["Flag","Astheno"],
 		   ["Globo","Macro","Terato"]);
 
 # %knownCandidateGenes: key==$cohort, value is a hashref whose keys 
-# are HUGO gene names and values are 1
+# are gene names and values are 1
 # For Azoo: starting from GenesCandidats/Liste\ de\ gènes\ AZO\ NTM_25-06-19.xlsx
 # which I got from Zine, when Zine's file had several alternative names I picked
 # the name that I could grep in some VEP output.
 # %knownCandidateGenes will also be populated with every gene listed as "causal"
 # for some patient in $metadata.
 # If Pierre or Zine provide lists for other cohorts they can just be added here.
-# The lists should be mostly OK but the code doesn't sanity-check them: if a name
-# has a typo then so be it (for now).
+# I use %knownCandidatesSeen (defined below) to sanity-check the lists: any gene 
+# name that is never seen will be reported to stderr (and probably a typo needs fixing).
 my %knownCandidateGenes = (
     "Azoo" => {
 	"AHRR" => 1,
@@ -66,7 +66,7 @@ my %knownCandidateGenes = (
 	"APOB" => 1,
 	"AR" => 1,
 	"ATM" => 1,
-	"BOULE" => 1,
+	"BOLL" => 1, # BOULE in Zine's file
 	"CCDC155" => 1,
 	"CCDC157" => 1,
 	"CHFR" => 1,
@@ -84,7 +84,7 @@ my %knownCandidateGenes = (
 	"FHL5" => 1,
 	"FKBP6" => 1,
 	"FSHR" => 1,
-	"H2AX" => 1,
+	"H2AFX" => 1, # H2AX is the new HUGO name but current ensembl uses H2AFX
 	"HORMAD1" => 1,
 	"HSF2" => 1,
 	"IP6K1" => 1,
@@ -114,7 +114,7 @@ my %knownCandidateGenes = (
 	"RBMXL2" => 1,
 	"REC8" => 1,
 	"RHOXF2" => 1,
-	"SEPTIN12" => 1,
+	"SEPT12" => 1, # SEPTIN12 is the new HUGO name but current ensembl uses SEPT12
 	"SMC1B" => 1,
 	"SNRPA1" => 1,
 	"SOHLH1" => 1,
@@ -139,7 +139,7 @@ my %knownCandidateGenes = (
 	"TEX14" => 1,
 	"TEX15" => 1,
 	"TRIM37" => 1,
-	"TSPY" => 1,
+	"TSPY1" => 1, # TSPY in Zine's file
 	"TSSK6" => 1,
 	"UBE2B" => 1,
 	"UBR2" => 1,
@@ -178,11 +178,6 @@ my %sample2cohort = ();
 my @cohorts = ();
 # causal gene, key==sample id, value == HGNC gene name
 my %sample2causal = ();
-# for sanity: $causalSeen{$gene} is set to 0 for every causal gene,
-# value changed to 1 when we see that gene. At the end if a causal 
-# gene was never seen there is probably a typo in the xlsx.
-my %causalSeen = ();
-
 
 (-f $metadata) ||
     die "E: the supplied metadata file doesn't exist\n";
@@ -230,7 +225,6 @@ my %causalSeen = ();
 	    $causal =~ s/^\s+//;
 	    $causal =~ s/\s+$//;
 	    $sample2causal{$grexome} = $causal;
-	    $causalSeen{$causal} = 0;
 	    # add to knownCandidateGenes
 	    (defined $knownCandidateGenes{$cohort}) || ($knownCandidateGenes{$cohort} = {});
 	    $knownCandidateGenes{$cohort}->{$causal} = 1;
@@ -239,6 +233,14 @@ my %causalSeen = ();
     @cohorts = sort(keys(%cohorts));
 }
 
+# for sanity-checking known candidate genes:
+# fill this now so we also check the causal genes from $metadata
+my %knownCandidatesSeen;
+foreach my $c (keys(%knownCandidateGenes)) {
+    foreach my $gene (keys(%{$knownCandidateGenes{$c}})) {
+	$knownCandidatesSeen{$gene} = 0;
+    }
+}
 
 #########################################################
 # check @notControls cohort names and store in %notControls hash
@@ -344,8 +346,6 @@ while (my $line = <STDIN>) {
 
     # $symbol doesn't depend on cohorts
     my $symbol = $fields[$symbolCol];
-    (defined $causalSeen{$symbol}) && ($causalSeen{$symbol}=1);
-
     
   COHORT:
     foreach my $cohort (@cohorts) {
@@ -421,6 +421,7 @@ while (my $line = <STDIN>) {
 		$toPrint .= "\t$fields[$i]\t";
 		if (($knownCandidateGenes{$cohort}) && ($knownCandidateGenes{$cohort}->{$fields[$i]})) {
 		    $toPrint .= "1";
+		    $knownCandidatesSeen{$fields[$i]} = 1;
 		}
 		# else leave empty
 		# print all COUNTs
@@ -440,9 +441,9 @@ while (my $line = <STDIN>) {
 }
 
 # sanity
-foreach my $gene (keys(%causalSeen)) {
-    ($causalSeen{$gene}) ||
-	warn "W: causal gene $gene mentioned in $metadata was never seen, most likely a typo in $metadata\n";
+foreach my $gene (keys(%knownCandidatesSeen)) {
+    ($knownCandidatesSeen{$gene}) ||
+	warn "W: \"known candidate gene\" $gene was never seen, probably a typo in $metadata or in extractCohers.pl->\%knownCandidateGenes\n";
 }
 
 foreach my $fh (values %outFHs) {
