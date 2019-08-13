@@ -344,73 +344,97 @@ while (my $line = <STDIN>) {
     chomp($line);
     my @fields = split(/\t/, $line, -1) ;
 
-    # $symbol doesn't depend on cohorts
-    my $symbol = $fields[$symbolCol];
-    
-  COHORT:
-    foreach my $cohort (@cohorts) {
-	# build array of 8 counts for $cohort: HV,HET,OTHER,HR and again for NEGCTRLs
+    # for each cohort, build @counts and @genos:
+    # @counts is an array of 8 counts for $cohort: HV,HET,OTHER,HR and again for NEGCTRLs
+    # @genos is an array of 6 GENO columns: HV,NEGCTRL_HV,HET,NEGCTRL_HET,OTHER,NEGCTRL_OTHER
+    # These are stored as arrayrefs in @countsAll and @genosAll respectively,
+    # one arrayref per cohort, using the same indexes as @cohorts
+    my @countsAll;
+    my @genosAll;
+    foreach my $i (0..$#cohorts) {
 	my @counts = (0) x 8;
-	# also build array of 6 GENO columns: HV,NEGCTRL_HV,HET,NEGCTRL_HET,OTHER,NEGCTRL_OTHER
+	$countsAll[$i] = \@counts;
 	my @genos = ("") x 6;
+	$genosAll[$i] = \@genos;
+    }
 
-	# parse data
-	foreach my $gi (0..3) {
-	    my @genoData = split(/\|/,$fields[$genoCols[$gi]]);
-	    # sanity: at most one genotype except for OTHER column
-	    (@genoData <= 1) || ($gi==2) || 
-		die "E: more than one genoData for genotype $genoCols[$gi], impossible. Line:\n$line\n";
-	    foreach my $genoData (@genoData) {
-		($genoData =~ /^(\d+\/\d+)~([^~\|]+)$/) ||
-		    die "E: cannot parse GENOS data $genoData in line:\n$line\n";
-		# $geno is the genotype (eg 1/1 or 0/2)
-		my $geno = $1;
-		my @samples = split(/,/,$2);
-		# @goodSamples will hold samples that should be counted for $cohort
-		# @badSamples will hold samples that should be counted as NEGCTRLs for $cohort
-		my @goodSamples = ();
-		my @badSamples = ();
-		foreach my $sample (@samples) {
-		    if ($sample2cohort{$sample} eq $cohort) {
+    # parse data
+    foreach my $gi (0..3) {
+	my @genoData = split(/\|/,$fields[$genoCols[$gi]]);
+	# sanity: at most one genotype except for OTHER column
+	(@genoData <= 1) || ($gi==2) || 
+	    die "E: more than one genoData for genotype $genoCols[$gi], impossible. Line:\n$line\n";
+	foreach my $genoData (@genoData) {
+	    ($genoData =~ /^(\d+\/\d+)~([^~\|]+)$/) ||
+		die "E: cannot parse GENOS data $genoData in line:\n$line\n";
+	    # $geno is the genotype (eg 1/1 or 0/2)
+	    my $geno = $1;
+	    my @samples = split(/,/,$2);
+	    
+	    # $goodSamples[$i] is an arrayref, will hold samples that should be 
+	    # counted for $cohorts[$i] (in geno category $gi <= 2)
+	    # $badSamples[$i] also arrayref, will hold samples that should be
+	    # counted as NEGCTRLs for $cohorts[$i] (in geno category $gi <= 2)
+	    my @goodSamples;
+	    my @badSamples;
+	    foreach my $ci (0..$#cohorts) {
+		push(@goodSamples, []);
+		push(@badSamples, []);
+	    }
+	    # for HR ($gi==3) it's similar but we don't need to store the samples, just their count
+	    my @goodHrCount = (0) x scalar(@cohorts);
+	    my @badHrCount = (0) x scalar(@cohorts);
+
+
+	    foreach my $sample (@samples) {
+		foreach my $cohorti (0..$#cohorts) {
+		    if ($sample2cohort{$sample} eq $cohorts[$cohorti]) {
 			# $sample belongs to cohort
-			if (($gi >= 2) || (! defined $sample2causal{$sample}) || ($sample2causal{$sample} eq $symbol)) {
-			    # we are not in HV|HET or sample has no causal gene or it's the current gene
-			    push(@goodSamples,$sample);
+			if (($gi >= 2) || (! defined $sample2causal{$sample}) || ($sample2causal{$sample} eq $fields[$symbolCol])) {
+			    # we are not in HV|HET, or we are HV/HET but sample has no causal gene or it's the current gene
+			    if ($gi == 3) { $goodHrCount[$cohorti]++; }
+			    else { push(@{$goodSamples[$cohorti]},$sample); }
 			}
 			# else ignore this sample == NOOP
 		    }
-		    elsif (($gi==3) || (! defined ${$notControls{$cohort}}{$sample2cohort{$sample}})) {
-			# sample is from another cohort that can be used as control 
-			# for $cohort, or we are in HR (where all samples are counted)
-			push(@badSamples,$sample);
+		    elsif (($gi==3) || (! defined ${$notControls{$cohorts[$cohorti]}}{$sample2cohort{$sample}})) {
+			# $sample belongs to another cohort, and we are in HR (where all samples
+			# are counted) or that other cohort can be used as control for $cohort
+			if ($gi == 3) { $badHrCount[$cohorti]++; }
+			else { push(@{$badSamples[$cohorti]},$sample); }
 		    }
 		    # else sample is from a different cohort but it's in @notControls: NOOP
 		}
-		
-		# OK, store counts and GENOs (careful with indexes)
-		if (@goodSamples) {
-		    $counts[$gi] += scalar(@goodSamples);
-		    if ($gi < 3) {
-			# don't store the GENO for HR ie gi==3
-			($genos[$gi * 2]) && ($genos[$gi * 2] .= '|');
-			$genos[$gi * 2] .= "$geno~".join(',',@goodSamples);
+	    }
+	    
+	    # OK, store counts and GENOs (careful with indexes)
+	    foreach my $cohorti (0..$#cohorts) {
+		if ($gi < 3) {
+		    if (@{$goodSamples[$cohorti]}) {
+			$countsAll[$cohorti]->[$gi] += scalar(@{$goodSamples[$cohorti]});
+			($genosAll[$cohorti]->[$gi * 2]) && ($genosAll[$cohorti]->[$gi * 2] .= '|');
+			$genosAll[$cohorti]->[$gi * 2] .= "$geno~".join(',',@{$goodSamples[$cohorti]});
+		    }
+		    if (@{$badSamples[$cohorti]}) {
+			$countsAll[$cohorti]->[$gi + 4] += scalar(@{$badSamples[$cohorti]});
+			($genosAll[$cohorti]->[1 + $gi * 2]) && ($genosAll[$cohorti]->[1 + $gi * 2] .= '|');
+			$genosAll[$cohorti]->[1 + $gi * 2] .= "$geno~".join(',',@{$badSamples[$cohorti]});
 		    }
 		}
-		if (@badSamples) {
-		    $counts[$gi + 4] += scalar(@badSamples);
-		    if ($gi < 3) {
-			($genos[1 + $gi * 2]) && ($genos[1 + $gi * 2] .= '|');
-			$genos[1 + $gi * 2] .= "$geno~".join(',',@badSamples);
-		    }
+		else {
+		    # $gi==3, just use the counts
+		    $countsAll[$cohorti]->[$gi] += $goodHrCount[$cohorti];
+		    $countsAll[$cohorti]->[$gi + 4] += $badHrCount[$cohorti];
 		}
 	    }
+	}
+    }
 
-	    # if we just finished with HV and HET but there's no sample in either,
-	    # we can skip this line in this cohort
-	    if (($gi == 1) && ($counts[0] == 0) && ($counts[1] == 0)) {
-		next COHORT;
-	    }
-	    # otherwise: parse OTHER and HR data
+    # print data for every cohort where we have at least one HV or HET sample
+    foreach my $cohorti (0..$#cohorts) {
+	if (($countsAll[$cohorti]->[0] == 0) && ($countsAll[$cohorti]->[1] == 0)) {
+	    # no HV/HET in this cohort, skip
+	    next;
 	}
 
 	# OK we have some data to print for $cohort
@@ -419,24 +443,24 @@ while (my $line = <STDIN>) {
 	foreach my $i (1..$#fields) {
 	    if ($i == $symbolCol) {
 		$toPrint .= "\t$fields[$i]\t";
-		if (($knownCandidateGenes{$cohort}) && ($knownCandidateGenes{$cohort}->{$fields[$i]})) {
+		if (($knownCandidateGenes{$cohorts[$cohorti]}) && ($knownCandidateGenes{$cohorts[$cohorti]}->{$fields[$i]})) {
 		    $toPrint .= "1";
 		    $knownCandidatesSeen{$fields[$i]} = 1;
 		}
 		# else leave empty
 		# print all COUNTs
-		$toPrint .= "\t".join("\t",@counts);
+		$toPrint .= "\t".join("\t",@{$countsAll[$cohorti]});
 	    }
 	    elsif ($i == $genoCols[0]) {
 		# HV -> print all 6 GENO columns
-		# NOTE: we rely on the fact that the GENOs are consecutive and start with HV
-		$toPrint .= "\t".join("\t",@genos);
+		# NOTE: we rely on the fact that the GENOs are consecutive and start with HV (checked)
+		$toPrint .= "\t".join("\t",@{$genosAll[$cohorti]});
 	    }
 	    elsif (! grep(/^$i$/, @genoCols)) {
 		$toPrint .= "\t$fields[$i]";
 	    }
 	}
-	print { $outFHs{$cohort} } "$toPrint\n";
+	print { $outFHs{$cohorts[$cohorti]} } "$toPrint\n";
     }
 }
 
