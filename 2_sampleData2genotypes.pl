@@ -21,7 +21,14 @@
 # and allow hemizygous GTs (eg "1"), replace by HOMO (eg "1/1")
 #
 # UPDATE 09/08/2019: remove ALTs that don't appear in a genotype
-# (and renumber remaining ALTs in the called genotypes).
+# (and renumber remaining ALTs in the called genotypes). 
+# UPDATE 14/08/2019: also re-normalize the variants. I don't check for
+# collisions (ie if POS got increased by removing leading common bases, it
+# might end up at same coord as a subsequent line), but a collision can
+# only occur if two REFs overlapped in the input VCF... so the collision
+# was already there (even if not explicit with identical POS).
+# NOTE: If input variants were normalized, re-normalization should only occur
+# when we remove unused ALTs.
 # This is an initial cleanup of multiallelic sites: for example with 
 # grexomes_0050-0520, 48.4% of sites with 2 ALTs will become monoallelic.
 
@@ -80,17 +87,13 @@ while(my $line = <STDIN>) {
 
     my @data = split(/\t/, $line);
     (@data >= 10) || die "no sample data in line?\n$line\n";
-    # first 4 fields are just copied
-    my $lineToPrintStart = shift(@data);
-    foreach my $i (1..3) {
-	$lineToPrintStart .= "\t".shift(@data);
-    }
-    # save ALTs independantly, for cleaning multiallelics
-    my $alts = shift(@data);
+    # first 5 fields are saved: we may need to modify POS, REF 
+    # and ALT when removing unused ALTs and re-normalizing variants
+    my ($chr,$pos,$varid,$ref,$alts) = splice(@data,0,5);
     my @alts = split(/,/,$alts);
     # next 3 are just copied
-    my $lineToPrintEnd = shift(@data);
-    foreach my $i (6,7) {
+    my $lineToPrintEnd = "";
+    foreach my $i (5..7) {
 	$lineToPrintEnd .= "\t".shift(@data);
     }
 
@@ -170,8 +173,68 @@ while(my $line = <STDIN>) {
 	    push(@newAlts,$alts[$i]);
 	}
     }
-    # build line to print with fixed ALTs
-    my $lineToPrint = "$lineToPrintStart\t".join(',',@newAlts)."\t$lineToPrintEnd";
+
+    # normalize new ALTs:
+    # 1. if length >= 2 for REF and all ALTS, and if REF and all ALTs have 
+    #    common ending bases, remove them (keeping at least 1 base everywhere).
+    while ($ref =~ /\w(\w)$/) {
+	# ref has at least 2 chars
+	my $lastRef = $1;
+	my $removeLast = 1;
+	foreach my $alt (@newAlts) {
+	    if ($alt !~ /\w$lastRef$/) {
+		# this alt is length one or doesn't end with $lastRef
+		$removeLast = 0;
+		last;
+	    }
+	}
+	if ($removeLast) {
+	    # OK remove last base from REF and all @alts
+	    ($ref =~ s/$lastRef$//) || 
+		die "WTF can't remove $lastRef from end of ref $ref\n";
+	    foreach my $i (0..$#newAlts) {
+		($newAlts[$i] =~ s/$lastRef$//) || 
+		    die "WTF can't remove $lastRef from end of newAlt $i == $newAlts[$i]\n";
+	    }
+	}
+	else {
+	    # can't remove $lastRef, get out of while loop
+	    last;
+	}
+    }
+    # 2. if length >= 2 for REF and all ALTS, and if REF and all ALTs have 
+    #    common starting bases, remove them (keeping at least 1 base everywhere)
+    #    and adjust POS.
+    while ($ref =~ /^(\w)\w/) {
+	# ref has at least 2 chars
+	my $firstRef = $1;
+	my $removeFirst = 1;
+	foreach my $alt (@newAlts) {
+	    if ($alt !~ /^$firstRef\w/) {
+		# this alt is length one or doesn't start with $firstRef
+		$removeFirst = 0;
+		last;
+	    }
+	}
+	if ($removeFirst) {
+	    # OK remove first base from REF and all @alts
+	    ($ref =~ s/^$firstRef//) || 
+		die "WTF can't remove $firstRef from start of ref $ref\n";
+	    foreach my $i (0..$#newAlts) {
+		($newAlts[$i] =~ s/^$firstRef//) || 
+		    die "WTF can't remove $firstRef from start of alt $i == $newAlts[$i]\n";
+	    }
+	    # increment POS
+	    $pos++;
+	}
+	else {
+	    # can't remove $firstRef, get out of while loop
+	    last;
+	}
+    }
+
+    # build line to print with fixed POS,REF,ALTs
+    my $lineToPrint = "$chr\t$pos\t$varid\t$ref\t".join(',',@newAlts)."$lineToPrintEnd";
 
     # HV
     $lineToPrint .= "\t";
@@ -191,7 +254,7 @@ while(my $line = <STDIN>) {
     # remove last | if needed (not needed if there are no HVs)
     $lineToPrint =~ s/\|$// ;
 
-   # HET == 0/*
+    # HET == 0/*
     $lineToPrint .= "\t";
     foreach my $geno (keys %geno2samples) {
 	($geno eq '0/0') && next; # skip HR
