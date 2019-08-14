@@ -39,6 +39,7 @@
 use strict;
 use warnings;
 use Spreadsheet::XLSX;
+use POSIX qw(strftime);
 
 
 # @notControls: array of arrayrefs, each arrayref holds cohorts that
@@ -168,6 +169,10 @@ my ($metadata, $outDir) = @ARGV;
 (-e $outDir) && 
     die "found argument $outDir but it already exists, remove it or choose another name.\n";
 mkdir($outDir) || die "cannot mkdir outDir $outDir\n";
+
+my $now = strftime("%F %T", localtime);
+warn "I: $now - starting to run: ".join(" ", $0, @ARGV)."\n";
+
 
 #########################################################
 # parse metadata file
@@ -449,3 +454,6 @@ foreach my $gene (keys(%knownCandidatesSeen)) {
 foreach my $fh (values %outFHs) {
     close($fh);
 }
+
+$now = strftime("%F %T", localtime);
+warn "I: $now - DONE running: ".join(" ", $0, @ARGV)."\n";
