@@ -17,6 +17,7 @@
 
 use strict;
 use warnings;
+use POSIX qw(strftime);
 # Storable for the cache
 use Storable;
 
@@ -30,6 +31,8 @@ my ($tmpDir) = @ARGV;
 (-e $tmpDir) && die "E: tmpDir $tmpDir exists, please rm -r $tmpDir or use another tmpDir as arg\n";
 mkdir($tmpDir) || die "E: cannot create tmpDir $tmpDir\n";
 
+my $now = strftime("%F %T", localtime);
+warn "I: $now - starting to run: ".join(" ", $0, @ARGV)."\n";
 
 ##########################################################################
 # parse VCF on stdin.
@@ -98,6 +101,10 @@ close(VCF4VEP);
 close(VCFCACHE);
 
 
+$now = strftime("%F %T", localtime);
+warn "I: $now - $0 finished parsing stdin and splitting it into $tmpDir files\n";
+
+
 ##########################################################################
 # run VEP on $vcf4vep, producing $vcfFromVep
 my $vcfFromVep = "$tmpDir/vcfFromVep.vcf.gz";
@@ -125,6 +132,8 @@ $vepCommand .= " -o STDOUT" ;
 
 system("gunzip -c $vcf4vep | $vepCommand | gzip -c --fast > $vcfFromVep") ;
 
+$now = strftime("%F %T", localtime);
+warn "I: $now - $0 finished running VEP on the new variants\n";
 
 ##########################################################################
 # merge $vcfFromVep and $vcfFromCache, printing resulting VCF to stdout;
@@ -230,3 +239,7 @@ unlink($vcf4vep) || die "cannot unlink tmpfile vcf4vep $vcf4vep\n";
 unlink($vcfFromCache) || die "cannot unlink tmpfile vcfFromCache $vcfFromCache\n";
 unlink($vcfFromVep) || die "cannot unlink tmpfile vcfFromVep $vcfFromVep\n";
 rmdir($tmpDir) || die "cannot rmdir tmpdir $tmpDir\n";
+
+
+$now = strftime("%F %T", localtime);
+warn "I: $now - DONE running: ".join(" ", $0, @ARGV)."\n";
