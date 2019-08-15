@@ -23,6 +23,7 @@
 use strict;
 use warnings;
 use Getopt::Long;
+use POSIX qw(strftime);
 
 # default values for args
 my $minDP = 0;
@@ -33,6 +34,11 @@ GetOptions ("minDP=i" => \$minDP,
             "minGQX=i"   => \$minGQX,
             "minFracVarReads=f"  => \$minFracVarReads)
     or die("Error in command line arguments\n");
+
+
+my $now = strftime("%F %T", localtime);
+warn "I: $now - starting to run: ".join(" ", $0, @ARGV)."\n";
+
 
 # parse header, just copy it
 while(my $line = <STDIN>) {
@@ -167,4 +173,6 @@ while(my $line = <STDIN>) {
     ($keepLine) && (print "$lineToPrint\n");
 }
 
+$now = strftime("%F %T", localtime);
+warn "I: $now - DONE running: ".join(" ", $0, @ARGV)."\n";
 
