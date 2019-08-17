@@ -46,8 +46,8 @@ use POSIX qw(strftime);
 # should NOT be used as neg controls for each other.
 # The cohort names must match the "pathology" column of the $metadata xlsx
 # (this is checked).
-my @notControls = (["Flag","Astheno"],
-		   ["Azoo","Ovo"],
+my @notControls = (["Flag","Astheno","Headless"],
+		   ["Azoo","Ovo","Macro","IOP"],
 		   ["Globo","Macro","Terato"]);
 
 # %knownCandidateGenes: key==$cohort, value is a hashref whose keys 
@@ -259,14 +259,11 @@ foreach my $notConR (@notControls) {
     foreach my $cohort (@$notConR) {
 	(grep($cohort eq $_, @cohorts)) ||
 	    die "E in extractCohorts: cohort $cohort from notControls is not in cohorts @cohorts\n";
-	(defined $notControls{$cohort}) &&
-	    die "E in extractCohorts: cohort $cohort from notControls present twice?!\n";
-	my %notCtmp;
+	(defined $notControls{$cohort}) || ($notControls{$cohort} = {});
 	foreach my $notC (@$notConR) {
 	    ($notC eq $cohort) && next;
-	    $notCtmp{$notC} = 1;
+	    $notControls{$cohort}->{$notC} = 1;
 	}
-	$notControls{$cohort} = \%notCtmp;
     }
 }
 
