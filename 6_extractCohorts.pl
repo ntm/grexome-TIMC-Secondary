@@ -3,9 +3,10 @@
 # 25/03/2018
 # NTM
 
-# Take as argument a $metadata xlsx file, and an $outDir that doesn't
-# exist, and read on stdin a fully annotated TSV file;
-# make $outDir and create in it one gzipped TSV file per cohort.
+# Takes as arguments a $metadata xlsx file, a $candidatesFile
+#  xlsx file, and an $outDir that doesn't exist; 
+# reads on stdin a fully annotated TSV file;
+# makes $outDir and creates in it one gzipped TSV file per cohort.
 # The cohorts are defined in $metadata.
 # For each sample, any identified causal (mutation in a) gene is grabbed
 # from $metadata.
@@ -15,14 +16,20 @@
 # For each $cohort, the GENO columns HV/HET/OTHER/HR are modified as follows:
 # - the HR GENO column is removed (but samples are COUNTed, see below).
 # - we make new NEGCTRL_* columns placed immediately after the HV/HET/OTHER columns.
-# - NEGCTRL_* columns list all samples falling in that GENO category from other
-#   cohorts, except those defined in @notControls.
-# - if a sample from $cohort has an identified $causalGene, this sample is
-#   removed from the HV/HET columns, except in lines where SYMBOL==$causalGene.
+# - NEGCTRL_* columns list all samples falling in that GENO category and:
+#   * having an identified $causalGene, whatever their cohort (except in lines where 
+#     SYMBOL==$causalGene, see below), or
+#   * belonging to another cohort that isn't defined in @notControls for $cohort.
+# - for samples with an identified $causalGene and lines where SYMBOL==$causalGene,
+#   the sample is dealt with as if it didn't have a $causalGene, ie it stays 
+#   HV/HET/OTHER for his cohort, is ignored in his @notControls cohorts, and 
+#   goes in NEGCTRL_* columns in other cohorts.
 #
 # A new KNOWN_CANDIDATE_GENE column is inserted right after SYMBOL:
-# it holds value 1 if SYMBOL is a known candidate gene for this cohort
-# (as specified in %knownCandidateGenes), it stays empty otherwise.
+# it holds the "Level" value parsed from  $candidatesFile if SYMBOL is a known 
+# candidate gene for this cohort (as specified in $candidatesFile), it 
+# stays empty otherwise. Any $causalGene from $metadata is considered a
+# a known candidate gene with Level=5.
 #
 # New COUNT_$cohort_$geno and COUNT_NEGCTRL_$geno columns are created
 # for each  GENO (HV, HET, OTHER, HR) in that order.
@@ -50,121 +57,11 @@ my @notControls = (["Flag","Astheno","Headless"],
 		   ["Azoo","Ovo","Macro","IOP"],
 		   ["Globo","Macro","Terato"]);
 
-# %knownCandidateGenes: key==$cohort, value is a hashref whose keys 
-# are gene names and values are 1
-# For Azoo: starting from GenesCandidats/Liste\ de\ gènes\ AZO\ NTM_25-06-19.xlsx
-# which I got from Zine, when Zine's file had several alternative names I picked
-# the name that I could grep in some VEP output.
-# %knownCandidateGenes will also be populated with every gene listed as "causal"
-# for some patient in $metadata.
-# If Pierre or Zine provide lists for other cohorts they can just be added here.
-# I use %knownCandidatesSeen (defined below) to sanity-check the lists: any gene 
-# name that is never seen will be reported to stderr (and probably a typo needs fixing).
-my %knownCandidateGenes = (
-    "Azoo" => {
-	"AHRR" => 1,
-	"MYBL1" => 1,
-	"APOB" => 1,
-	"AR" => 1,
-	"ATM" => 1,
-	"BOLL" => 1, # BOULE in Zine's file
-	"CCDC155" => 1,
-	"CCDC157" => 1,
-	"CHFR" => 1,
-	"CREM" => 1,
-	"GJA1" => 1,
-	"NR0B1" => 1,
-	"DAZL" => 1,
-	"DDX25" => 1,
-	"DMC1" => 1,
-	"DMRT1" => 1,
-	"DNMT3L" => 1,
-	"E2F1" => 1,
-	"ENTPD6" => 1,
-	"FANCM" => 1,
-	"FHL5" => 1,
-	"FKBP6" => 1,
-	"FSHR" => 1,
-	"H2AFX" => 1, # H2AX is the new HUGO name but current ensembl uses H2AFX
-	"HORMAD1" => 1,
-	"HSF2" => 1,
-	"IP6K1" => 1,
-	"KLHL10" => 1,
-	"M1AP" => 1,
-	"MAGEB4" => 1,
-	"MEI1" => 1,
-	"MEI4" => 1,
-	"MEIOB" => 1,
-	"MLH1" => 1,
-	"MLH3" => 1,
-	"MSH4" => 1,
-	"MSH5" => 1,
-	"YBX2" => 1,
-	"YBX3" => 1,
-	"DDX4" => 1,
-	"NANOS2" => 1,
-	"NANOS3" => 1,
-	"NLRP3" => 1,
-	"NPAS2" => 1,
-	"PARP2" => 1,
-	"PLK4" => 1,
-	"PMS2" => 1,
-	"PRDM9" => 1,
-	"PSMC3IP" => 1,
-	"RBMY" => 1,
-	"RBMXL2" => 1,
-	"REC8" => 1,
-	"RHOXF2" => 1,
-	"SEPT12" => 1, # SEPTIN12 is the new HUGO name but current ensembl uses SEPT12
-	"SMC1B" => 1,
-	"SNRPA1" => 1,
-	"SOHLH1" => 1,
-	"SOHLH2" => 1,
-	"SOX30" => 1,
-	"SPATA48" => 1,
-	"SPINK2" => 1,
-	"SPO11" => 1,
-	"STRA8" => 1,
-	"STX2" => 1,
-	"SYCE1" => 1,
-	"SYCE2" => 1,
-	"SYCE3" => 1,
-	"SYCP1" => 1,
-	"SYCP2" => 1,
-	"SYCP3" => 1,
-	"TAF4B" => 1,
-	"TAF7L" => 1,
-	"TDRD6" => 1,
-	"TDRD9" => 1,
-	"TEX11" => 1,
-	"TEX14" => 1,
-	"TEX15" => 1,
-	"TRIM37" => 1,
-	"TSPY1" => 1, # TSPY in Zine's file
-	"TSSK6" => 1,
-	"UBE2B" => 1,
-	"UBR2" => 1,
-	"USP9Y" => 1,
-	"USP26" => 1,
-	"UTP14C" => 1,
-	"UTY" => 1,
-	"WNK3" => 1,
-	"ZMYND15" => 1,
-	"ZNF230" => 1,
-	"MCM8" => 1,
-	"STAG3" => 1,
-	"RBM5" => 1,
-	"CLDN11" => 1,
-	"PIWIL2" => 1,
-	"PIWIL4" => 1,
-	"PIWIL1" => 1 }
-    );
-
 
 #########################################################
 
-(@ARGV == 2) || die "needs two args: a metadata xlsx and a non-existing outDir\n";
-my ($metadata, $outDir) = @ARGV;
+(@ARGV == 3) || die "needs three args: a patient metadata xlsx, a candidateGenes xlsx, and a non-existing outDir\n";
+my ($metadata, $candidatesFile, $outDir) = @ARGV;
 
 (-e $outDir) && 
     die "found argument $outDir but it already exists, remove it or choose another name.\n";
@@ -175,7 +72,64 @@ warn "I: $now - starting to run: ".join(" ", $0, @ARGV)."\n";
 
 
 #########################################################
-# parse metadata file
+# parse known candidate genes file
+
+# %knownCandidateGenes: key==$cohort, value is a hashref whose keys 
+# are gene names and values are the "Level" from $candidatesFile,
+# or 5 if the gene is "Causal" for a $cohort patient in $metadata.
+# I use %knownCandidatesSeen (defined below) to sanity-check the lists: any gene 
+# name that is never seen will be reported to stderr (and probably a typo needs fixing).
+my %knownCandidateGenes = ();
+
+(-f $candidatesFile) ||
+    die "E: the supplied candidates file $candidatesFile doesn't exist\n";
+{
+    my $workbook = Spreadsheet::XLSX->new("$candidatesFile");
+    (defined $workbook) ||
+	die "E when parsing xlsx\n";
+    ($workbook->worksheet_count() == 1) ||
+	die "E parsing xlsx: expecting a single worksheet, got ".$workbook->worksheet_count()."\n";
+    my $worksheet = $workbook->worksheet(0);
+    my ($colMin, $colMax) = $worksheet->col_range();
+    my ($rowMin, $rowMax) = $worksheet->row_range();
+    # check the column titles and grab indexes of our columns of interest
+    my ($pathoCol, $geneCol,$levelCol) = (-1,-1,-1);
+    foreach my $col ($colMin..$colMax) {
+	my $cell = $worksheet->get_cell($rowMin, $col);
+	($cell->value() eq "pathology") &&
+	    ($pathoCol = $col);
+	($cell->value() eq "Candidate gene") &&
+	    ($geneCol = $col);
+	($cell->value() eq "Level") &&
+	    ($levelCol = $col);
+     }
+    ($pathoCol >= 0) ||
+	die "E parsing xlsx: no col title is pathology\n";
+    ($geneCol >= 0) ||
+	die "E parsing xlsx: no col title is Candidate gene\n";
+    ($levelCol >= 0) ||
+	die "E parsing xlsx: no col title is Level\n";
+    
+    foreach my $row ($rowMin+1..$rowMax) {
+	my $cohort = $worksheet->get_cell($row, $pathoCol)->value;
+	my $gene = $worksheet->get_cell($row, $geneCol)->value;
+	my $level = $worksheet->get_cell($row, $levelCol)->value;
+
+	# clean up $gene
+	$gene =~ s/^\s+//;
+	$gene =~ s/\s+$//;
+
+	(defined $knownCandidateGenes{$cohort}) ||
+	    ($knownCandidateGenes{$cohort} = {});
+	(defined $knownCandidateGenes{$cohort}->{$gene}) && 
+	    die "E parsing candidatesFile xlsx: have 2 lines with same gene $gene and pathology $cohort\n";
+	$knownCandidateGenes{$cohort}->{$gene} = $level;
+    }
+}
+
+
+#########################################################
+# parse patient metadata file
 
 # key==sample id, value is the $cohort this sample belongs to
 my %sample2cohort = ();
@@ -230,9 +184,9 @@ my %sample2causal = ();
 	    $causal =~ s/^\s+//;
 	    $causal =~ s/\s+$//;
 	    $sample2causal{$grexome} = $causal;
-	    # add to knownCandidateGenes
+	    # add to knownCandidateGenes with level 5
 	    (defined $knownCandidateGenes{$cohort}) || ($knownCandidateGenes{$cohort} = {});
-	    $knownCandidateGenes{$cohort}->{$causal} = 1;
+	    $knownCandidateGenes{$cohort}->{$causal} = 5;
 	}
     }
     @cohorts = sort(keys(%cohorts));
@@ -421,8 +375,8 @@ while (my $line = <STDIN>) {
 	foreach my $i (1..$#fields) {
 	    if ($i == $symbolCol) {
 		$toPrint .= "\t$fields[$i]\t";
-		if (($knownCandidateGenes{$cohort}) && ($knownCandidateGenes{$cohort}->{$fields[$i]})) {
-		    $toPrint .= "1";
+		if (($knownCandidateGenes{$cohort}) && (my $level = $knownCandidateGenes{$cohort}->{$fields[$i]})) {
+		    $toPrint .= $level;
 		    $knownCandidatesSeen{$fields[$i]} = 1;
 		}
 		# else leave empty
@@ -445,7 +399,7 @@ while (my $line = <STDIN>) {
 # sanity
 foreach my $gene (keys(%knownCandidatesSeen)) {
     ($knownCandidatesSeen{$gene}) ||
-	warn "W: \"known candidate gene\" $gene was never seen, probably a typo in $metadata or in extractCohers.pl->\%knownCandidateGenes\n";
+	warn "W: \"known candidate gene\" $gene was never seen, probably a typo in $metadata or in $candidatesFile\n";
 }
 
 foreach my $fh (values %outFHs) {
