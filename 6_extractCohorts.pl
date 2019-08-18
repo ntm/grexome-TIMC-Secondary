@@ -329,18 +329,27 @@ while (my $line = <STDIN>) {
 		foreach my $sample (@samples) {
 		    if ($sample2cohort{$sample} eq $cohort) {
 			# $sample belongs to cohort
-			if (($gi >= 2) || (! defined $sample2causal{$sample}) || ($sample2causal{$sample} eq $symbol)) {
-			    # we are not in HV|HET or sample has no causal gene or it's the current gene
+			if (($gi == 3) || (! defined $sample2causal{$sample}) || ($sample2causal{$sample} eq $symbol)) {
+			    # we are HR or sample has no causal gene or it's the current gene
 			    push(@goodSamples,$sample);
 			}
-			# else ignore this sample == NOOP
+			else {
+			    # HV/HET/OTHER geno and this sample has a causal gene but not this gene:
+			    # this sample counts as NEGCTRL
+			    push(@badSamples,$sample);
+			}
 		    }
 		    elsif (($gi==3) || (! defined ${$notControls{$cohort}}{$sample2cohort{$sample}})) {
-			# sample is from another cohort that can be used as control 
-			# for $cohort, or we are in HR (where all samples are counted)
+			# sample is HR, or it is from another cohort that can be used as control 
+			# for $cohort
 			push(@badSamples,$sample);
 		    }
-		    # else sample is from a different cohort but it's in @notControls: NOOP
+		    elsif ((defined $sample2causal{$sample}) && ($sample2causal{$sample} ne $symbol)) {
+		    # sample is from a notControls cohort but it has a causal gene (and it's not this gene)
+			push(@badSamples,$sample);
+		    }
+		    # else sample is from a different cohort but it's in @notControls, and it doesn't have
+		    # a causal gene (or it does but it is the current gene): ignore this sample, ie NOOP
 		}
 		
 		# OK, store counts and GENOs (careful with indexes)
