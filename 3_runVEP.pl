@@ -10,8 +10,8 @@
 # 11/08/2019: adding a cache file (VEP is slow).
 # CSQ are taken from the cachefile when the variant is in it,
 # otherwise run VEP and add CSQ to cache.
-# If VEP and/or the VEP cache are updated, script dies and cachefile
-# must be manually removed. It will then be rebuilt from scratch
+# If VEP and/or the VEP cache are updated, script dies and explains that
+# cachefile must be manually removed. It will then be rebuilt from scratch
 # on the next execution.
 
 use strict;
@@ -21,16 +21,74 @@ use POSIX qw(strftime);
 # Storable for the cache
 use Storable;
 
-#use lib '/home/nthierry/PierreRay/Grexome/SecondaryAnalyses/';
-# export PERL5LIB=... before calling script, it's more flexible
-use  grexome_sec_config qw(vep_bin vep_jobs genome_fasta vep_plugins vep_cacheFile);
-
 
 ##########################################################################
 ## hard-coded stuff that shouldn't change much
 
+# full path to our cache file for VEP annotations (this is not the VEP cache!)
+my $cacheFile;
+{
+    # works on fauve and luxor, file is actually currently on luxor
+    my @possiblePaths = ("/data/nthierry/PierreRay/RunSecondaryAnalyses/",
+			 "/home/nthierry/sshMounts/luxor/data/nthierry/PierreRay/RunSecondaryAnalyses/");
+    foreach my $path (@possiblePaths) {
+	(-d $path) && ($cacheFile = "$path/VEP_cache") && last;
+    }
+    # we're OK if the cachefile doesn't exist (first run, it will be created),
+    # but we need a subdir to create it in
+    ($cacheFile) || 
+	die "E in $0 : can't find an existing dir in possiblePaths for cacheFile: @possiblePaths\n";
+}
+
+# vep executable, with path if it's not in PATH
+my $vepBin = "vep";
+
+# number of jobs that VEP can run in parallel (--fork)
+my $vepJobs = 6;
+
+# full path to human genome fasta, for VEP --hgvs
+my $genome;
+{
+    # works on fauve or luxor, add other possibilities here if needed
+    my @possibleGenomes = ("/data/HumanGenome/hs38DH.fa", "/home/nthierry/HumanGenome/hs38DH.fa");
+    foreach my $gen (@possibleGenomes) {
+	(-e $gen) && ($genome = $gen) && last;
+    }
+    ($genome) || die "E in $0 : can't find a genome fasta file\n";
+}
+
+# full --plugin string with all VEP plugins we want to use and
+# associated datafiles (with paths)
+my $vepPlugins = "";
+{
+    # look for a data dir that works both on fauve and luxor
+    my $dataDir = "/data/";
+    (-d "$dataDir/nthierry/") && ($dataDir .= "nthierry/");
+
+    my $plugins = "";
+
+    # CADD - might not be needed if dbNSFP is good (it provides CADD 
+    # among many other things), commenting out for now
+    #my $caddPath = "$dataDir/CADD/";
+    #$plugins .= " --plugin CADD,$caddPath/whole_genome_SNVs.tsv.gz,$caddPath/InDels.tsv.gz ";
+
+    # dbNSFP
+    my $dbNsfpPath = "$dataDir/dbNSFP/";
+    # comma-separated list of fields to retrieve from dbNSFP, there are MANY
+    # possibilities, check the README in $dbNsfpPath
+    my $dbNsfpFields = "MutationTaster_pred,REVEL_rankscore,CADD_raw_rankscore";
+    $plugins .= " --plugin dbNSFP,$dbNsfpPath/dbNSFP4.0a.gz,$dbNsfpFields ";
+
+    # dbscSNV (splicing), data is with dbNSFP (same authors), specify 
+    # assembly GRCh38 as second param because the plugin can't figure it out
+    $plugins .= " --plugin dbscSNV,$dbNsfpPath/dbscSNV1.1_GRCh38.txt.gz,GRCh38 ";
+
+    $vepPlugins = $plugins;
+}
+
+
 # VEP command, reading on stdin and printing to stdout
-my $vepCommand = &vep_bin() ;
+my $vepCommand = $vepBin;
 $vepCommand .= " --offline --format vcf --vcf" ;
 # cache to use: refseq, merged, or ensembl (default)
 # $vepCommand .= " --merged" ;
@@ -43,11 +101,11 @@ $vepCommand .= " --gene_phenotype --af --af_1kg --af_esp --af_gnomad";
 $vepCommand .= " --pubmed --variant_class --check_existing ";
 # commenting out "--domains", it's a bit massive and in non-deterministic order
 # and I don't think anyone looks at it
-$vepCommand .= " --fasta ".&genome_fasta()." --hgvs";
+$vepCommand .= " --fasta $genome --hgvs";
 # plugins:
-$vepCommand .= &vep_plugins();
-# --fork borks when vep_jobs==1
-(&vep_jobs() > 1) && ($vepCommand .= " --fork ".&vep_jobs()) ;
+$vepCommand .= $vepPlugins;
+# --fork borks when $vepJobs==1
+($vepJobs > 1) && ($vepCommand .= " --fork $vepJobs") ;
 # write output to stdout so we can pipe it to another program
 $vepCommand .= " -o STDOUT" ;
 
@@ -83,7 +141,6 @@ my $vcf4vepTest = "$tmpDir/vcf4vepVersionTest.vcf";
 open(VEPTEST, "> $vcf4vepTest") ||
     die "cannot open vcf4vepTest $vcf4vepTest for writing\n";
 
-my $cacheFile = &vep_cacheFile();
 # $cache is a hashref. key=="chr:pos:ref:alt", value==CSQ
 my $cache = {};
 # grab previously cached data
@@ -109,21 +166,25 @@ open(VEPTEST_OUT, "$vepCommand < $vcf4vepTest |") ||
 while (my $line = <VEPTEST_OUT>) {
     chomp($line);
     if ($line =~ /^##VEP=/) {
-	# make sure VEP and cache versions match the cache
+	# make sure VEP version + DBs match the cache
+	# need to remove timestamp
+	my $lineClean = $line;
+	($lineClean =~ s/time="[^"]+" //) ||
+	    die "E in $0: cannot remove timestamp from ##VEP line:\n$line\n";
 	if (defined $cache->{"VEPversion"}) {
 	    my $cacheLine = $cache->{"VEPversion"};
-	    if ($cacheLine ne $line) {
+	    if ($cacheLine ne $lineClean) {
 		# version mismatch, clean up and die
 		close(VCF4VEP);
 		close(VCFCACHE);
 		unlink($vcf4vep,$vcfFromCache,$vcf4vepTest);
 		rmdir($tmpDir) || warn "W: VEP version mismatch but can't rmdir tmpDir $tmpDir\n";
-		die "cached VEP version and ##VEP line from VCF are different:\n$cacheLine\n$line\n".
-		    "if you really want to use this vcf from STDIN you need to remove the cachefile $cacheFile\n";
+		die "cached VEP version and ##VEP line from VCF are different:\n$cacheLine\n$lineClean\n".
+		    "if you really want to use this vcf from STDIN you need to rm $cacheFile (or change the cacheFile in $0)\n";
 	    }
 	}
 	else {
-	    $cache->{"VEPversion"} = $line;
+	    $cache->{"VEPversion"} = $lineClean;
 	}
     }
     elsif ($line =~ /^##INFO=<ID=CSQ/) {
@@ -136,7 +197,7 @@ while (my $line = <VEPTEST_OUT>) {
 		unlink($vcf4vep,$vcfFromCache,$vcf4vepTest);
 		rmdir($tmpDir) || warn "W: INFO-CSQ mismatch but can't rmdir tmpDir $tmpDir\n";
 		die "cacheLine and INFO-CSQ line from VCF are different:\n$cacheLine\n$line\n".
-		    "if you really want to use this vcf from STDIN you need to remove the cachefile $cacheFile\n";
+		    "if you really want to use this vcf from STDIN you need to rm $cacheFile (or change the cacheFile in $0)\n";
 	    }
 	}
 	else {
