@@ -4,7 +4,7 @@
 # NTM
 
 # Take as args a list of "favorite tissues", these should be tissue names
-# as they appear in the header of &gtexFile() (from grexome_se_config.pm)
+# as they appear in the header of $gtexFile.
 # Read on stdin a TSV file as produced by vcf2tsv.pl, 
 # print to stdout a TSV file with added columns holding
 # GTEX TPM values taken from $gtexFile.
@@ -23,22 +23,37 @@
 use strict;
 use warnings;
 
-#use lib '/home/nthierry/PierreRay/Grexome/SecondaryAnalyses/';
-# export PERL5LIB=... before calling script, it's more flexible
-use grexome_sec_config qw(gtexFile);
 
-my @favoriteTissues = @ARGV;
-my $gtexFile = &gtexFile();
+#############################################
+## hard-coded stuff that shouldn't change much
+
+# full path to the GTEX datafile
+my $gtexFile;
+{
+    # works on fauve and luxor
+    my @possiblePaths = ("/home/nthierry/PierreRay/Grexome/SecondaryAnalyses/", 
+			 "/home/nthierry/VariantCalling/GrexomeFauve/SecondaryAnalyses/");
+    foreach my $path (@possiblePaths) {
+	my $gtex = "$path/GTEX_Data/E-MTAB-5214-query-results.tpms.tsv";
+	(-f $gtex) && ($gtexFile = $gtex) && last;
+    }
+    ($gtexFile) || die "E in $0 : can't find a GTEX datafile\n";
+}
 
 # the GTEX columns will be placed just before the $insertBefore column,
 # which must exist (this is checked)
 my $insertBefore = "HV";
 
+
+#############################################
+## parse GTEX file
+
+my @favoriteTissues = @ARGV;
+
 # GTEX data will be stored in hash:
 # key is ENSG, value is a ref to an array holding the TPM values
 my %gtex;
 
-(-f $gtexFile) || die "E: gtex file $gtexFile doesn't exist\n";
 open(GTEX, $gtexFile) || die "E: cannot open gtex file $gtexFile for reading\n";
 # skip header
 foreach my $i (1..4) {
@@ -82,7 +97,12 @@ while ($line=<GTEX>) {
     $gtex{$ensg} = \@data ;
 }
 
-# OK, now parse infile
+close(GTEX);
+
+
+#############################################
+# parse infile
+
 # header: add tissue names just before $insertBefore
 my $header = <STDIN>;
 chomp($header);

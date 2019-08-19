@@ -3,7 +3,7 @@
 package grexome_sec_config;
 require Exporter;
 our @ISA = qw(Exporter) ;
-our @EXPORT_OK = qw(vep_bin vep_jobs genome_fasta vep_plugins vep_cacheFile gtexFile);
+our @EXPORT_OK = qw(vep_bin vep_jobs genome_fasta vep_plugins vep_cacheFile);
 
 use strict;
 use warnings;
@@ -73,20 +73,5 @@ sub vep_plugins {
     return($plugins);
 }
 
-
-########################
-# addGTEX.pl
-
-# full path to the GTEX datafile
-sub gtexFile {
-    # works on fauve and luxor
-    my @possiblePaths = ("/home/nthierry/PierreRay/Grexome/SecondaryAnalyses/", 
-			 "/home/nthierry/VariantCalling/GrexomeFauve/SecondaryAnalyses/");
-    foreach my $path (@possiblePaths) {
-	my $gtex = "$path/GTEX_Data/E-MTAB-5214-query-results.tpms.tsv";
-	(-e $gtex) && (return($gtex)) ;
-    }
-    die "E: gtexFile in grexome_sec_config.pm can't find a GTEX datafile\n";
-}
 
 1;
