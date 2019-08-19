@@ -308,6 +308,8 @@ foreach my $cohorti (0..$#cohorts) {
 	}
     }
     print { $outFHs[$cohorti] } "$toPrint\n";
+    # flush filehandle before starting our eatTmpFiles job
+    $outFHs[$cohorti]->flush();
 }
 
 #########################################################
