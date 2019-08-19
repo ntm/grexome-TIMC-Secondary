@@ -10,13 +10,13 @@
 # 11/08/2019: adding a cache file (VEP is slow).
 # CSQ are taken from the cachefile when the variant is in it,
 # otherwise run VEP and add CSQ to cache.
-# The cachefile must be manually removed if VEP and/or the VEP
-# cache are updated (I am not implementing a timestamp check),
-# it will then be rebuilt from scratch.
-
+# If VEP and/or the VEP cache are updated, script dies and cachefile
+# must be manually removed. It will then be rebuilt from scratch
+# on the next execution.
 
 use strict;
 use warnings;
+use Getopt::Long;
 use POSIX qw(strftime);
 # Storable for the cache
 use Storable;
@@ -24,6 +24,36 @@ use Storable;
 #use lib '/home/nthierry/PierreRay/Grexome/SecondaryAnalyses/';
 # export PERL5LIB=... before calling script, it's more flexible
 use  grexome_sec_config qw(vep_bin vep_jobs genome_fasta vep_plugins vep_cacheFile);
+
+
+##########################################################################
+## hard-coded stuff that shouldn't change much
+
+# VEP command, reading on stdin and printing to stdout
+my $vepCommand = &vep_bin() ;
+$vepCommand .= " --offline --format vcf --vcf" ;
+# cache to use: refseq, merged, or ensembl (default)
+# $vepCommand .= " --merged" ;
+$vepCommand .= " --force_overwrite --no_stats" ;
+$vepCommand .= " --allele_number"; # for knowing which CSQ annotates which ALT
+$vepCommand .= " --canonical --biotype --xref_refseq --flag_pick_allele_gene";
+# instead of --everything we select relevant options (eg not --regulatory)
+$vepCommand .= " --sift b --polyphen b --symbol --numbers --total_length" ;
+$vepCommand .= " --gene_phenotype --af --af_1kg --af_esp --af_gnomad";
+$vepCommand .= " --pubmed --variant_class --check_existing ";
+# commenting out "--domains", it's a bit massive and in non-deterministic order
+# and I don't think anyone looks at it
+$vepCommand .= " --fasta ".&genome_fasta()." --hgvs";
+# plugins:
+$vepCommand .= &vep_plugins();
+# --fork borks when vep_jobs==1
+(&vep_jobs() > 1) && ($vepCommand .= " --fork ".&vep_jobs()) ;
+# write output to stdout so we can pipe it to another program
+$vepCommand .= " -o STDOUT" ;
+
+
+##########################################################################
+## options / params from the command-line
 
 
 (@ARGV == 1) || die "runVep.pl needs a non-existing tmpdir as arg\n";
@@ -47,6 +77,11 @@ my $vcfFromCache = "$tmpDir/vcfFromCache.vcf.gz";
 open(VCFCACHE, "| gzip -c --fast > $vcfFromCache") ||
     die "cannot open gzip pipe to vcfFromCache $vcfFromCache\n";
 
+# a small VCF containing only the headers is also made, for testing
+# the VEP version etc...
+my $vcf4vepTest = "$tmpDir/vcf4vepVersionTest.vcf";
+open(VEPTEST, "> $vcf4vepTest") ||
+    die "cannot open vcf4vepTest $vcf4vepTest for writing\n";
 
 my $cacheFile = &vep_cacheFile();
 # $cache is a hashref. key=="chr:pos:ref:alt", value==CSQ
@@ -57,27 +92,62 @@ if (-f $cacheFile) {
 	die "E: cachefile $cacheFile exists but I can't retrieve hash from it.\n";
 }
 
-
 # header
 while (my $line = <STDIN>) {
+    # header lines go to VCF4VEP and also to VEPTEST
+    print VCF4VEP $line;
+    print VEPTEST $line;
+    # line #CHROM is always last header line
+    ($line =~ /^#CHROM/) && last;
+}
+
+# run VEP on the small test file
+close(VEPTEST);
+open(VEPTEST_OUT, "$vepCommand < $vcf4vepTest |") ||
+    die "cannot run VEP on testfile with:\n$vepCommand < $vcf4vepTest\n";
+# check that the cache matches the VEP and cache versions and has the correct VEP columns
+while (my $line = <VEPTEST_OUT>) {
     chomp($line);
-    if ($line =~ /^##INFO=<ID=CSQ/) {
+    if ($line =~ /^##VEP=/) {
+	# make sure VEP and cache versions match the cache
+	if (defined $cache->{"VEPversion"}) {
+	    my $cacheLine = $cache->{"VEPversion"};
+	    if ($cacheLine ne $line) {
+		# version mismatch, clean up and die
+		close(VCF4VEP);
+		close(VCFCACHE);
+		unlink($vcf4vep,$vcfFromCache,$vcf4vepTest);
+		rmdir($tmpDir) || warn "W: VEP version mismatch but can't rmdir tmpDir $tmpDir\n";
+		die "cached VEP version and ##VEP line from VCF are different:\n$cacheLine\n$line\n".
+		    "if you really want to use this vcf from STDIN you need to remove the cachefile $cacheFile\n";
+	    }
+	}
+	else {
+	    $cache->{"VEPversion"} = $line;
+	}
+    }
+    elsif ($line =~ /^##INFO=<ID=CSQ/) {
 	# make sure the INFO->CSQ fields from file and cache match
 	if (defined $cache->{"INFOCSQ"}) {
 	    my $cacheLine = $cache->{"INFOCSQ"};
-	    ($cacheLine eq $line) ||
+	    if ($cacheLine ne $line) {
+		close(VCF4VEP);
+		close(VCFCACHE);
+		unlink($vcf4vep,$vcfFromCache,$vcf4vepTest);
+		rmdir($tmpDir) || warn "W: INFO-CSQ mismatch but can't rmdir tmpDir $tmpDir\n";
 		die "cacheLine and INFO-CSQ line from VCF are different:\n$cacheLine\n$line\n".
-		"if you really want to use this vcf from STDIN you need to remove the cachefile $cacheFile\n";
+		    "if you really want to use this vcf from STDIN you need to remove the cachefile $cacheFile\n";
+	    }
 	}
 	else {
 	    $cache->{"INFOCSQ"} = $line;
 	}
     }
-    # in any case print header lines to VCF4VEP
-    print VCF4VEP "$line\n";
-    # line #CHROM is always last header line
-    ($line =~ /^#CHROM/) && last;
 }
+close(VEPTEST_OUT);
+unlink($vcf4vepTest);
+
+
 # data
 while (my $line = <STDIN>) {
     chomp($line);
@@ -108,27 +178,6 @@ warn "I: $now - $0 finished parsing stdin and splitting it into $tmpDir files\n"
 ##########################################################################
 # run VEP on $vcf4vep, producing $vcfFromVep
 my $vcfFromVep = "$tmpDir/vcfFromVep.vcf.gz";
-
-my $vepCommand = &vep_bin() ;
-$vepCommand .= " --offline --format vcf --vcf" ;
-# cache to use: refseq, merged, or ensembl (default)
-# $vepCommand .= " --merged" ;
-$vepCommand .= " --force_overwrite --no_stats" ;
-$vepCommand .= " --allele_number"; # for knowing which CSQ annotates which ALT
-$vepCommand .= " --canonical --biotype --xref_refseq --flag_pick_allele_gene";
-# instead of --everything we select relevant options (eg not --regulatory)
-$vepCommand .= " --sift b --polyphen b --symbol --numbers --total_length" ;
-$vepCommand .= " --gene_phenotype --af --af_1kg --af_esp --af_gnomad";
-$vepCommand .= " --pubmed --variant_class --check_existing ";
-# commenting out "--domains", it's a bit massive and in non-deterministic order
-# and I don't think anyone looks at it
-$vepCommand .= " --fasta ".&genome_fasta()." --hgvs";
-# plugins:
-$vepCommand .= &vep_plugins();
-# --fork borks when vep_jobs==1
-(&vep_jobs() > 1) && ($vepCommand .= " --fork ".&vep_jobs()) ;
-# write output to stdout so we can pipe it to another program
-$vepCommand .= " -o STDOUT" ;
 
 system("gunzip -c $vcf4vep | $vepCommand | gzip -c --fast > $vcfFromVep") ;
 
