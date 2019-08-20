@@ -4,8 +4,7 @@
 # 09/07/2019 (but starting from 1_filterBadCalls.pl which is older)
 
 
-# Parses on stdin a Strelka GVCF file with one or more 
-# sample data columns;
+# Parses on stdin a Strelka GVCF file with one or more sample data columns;
 # takes as args:
 # --minDP int (must have DP or DPI >= $minDP),
 # --minGQX int (must have GQX >= $minGQX), 
@@ -17,7 +16,10 @@
 # - non-variant lines are removed;
 # - the variant calls in data columns are replaced by ./. if a condition
 #   is not met, or if previous call was '.' (the Strelka NOCALL);
-# - lines where every sample is now ./. or 0/0 are skipped.
+# - lines where every sample is now ./. or 0/0 are skipped;
+# - AF is added to FORMAT right after GT, and every 0/x or x/x call gets
+#   for AF the fraction of variant reads (rounded to 2 decimals), HR
+#   and x/y calls get '.'
 
 
 use strict;
@@ -49,7 +51,7 @@ my $minFracVarReads = 0;
 # for multi-threading, need to create a tmpDir. It will
 # be removed when we are done and must not pre-exist.
 # To improve performance it should be on a ramdisk.
-my $tmpDir = "tmpdir_mergeGVCFs/";
+my $tmpDir = "tmpdir_filterBadCalls/";
 
 # number of parallel jobs to run
 my $numJobs = 16;
@@ -208,13 +210,16 @@ sub processBatch {
 	(@data >= 10) || die "no sample data in line?\n$line\n";
 	# if no ALT in line, skip immediately
 	($data[4] eq '.') && next;
-	# first 9 fields are just copied, but grab FORMAT string
+	# first 9 fields are copied except AF is added to FORMAT after GT
 	my $lineToPrint = shift(@data);
 	foreach my $i (2..8) {
 	    $lineToPrint .= "\t".shift(@data);
 	}
 	my $format = shift(@data);
-	$lineToPrint .= "\t$format";
+	my $newFormat = $format;
+	($newFormat =~ s/^GT:/GT:AF:/)  || 
+	    die "E: cannot add AF after GT in format: $format\n";
+	$lineToPrint .= "\t$newFormat";
 	# %format: key is a FORMAT key (eg GQX), value is the index of that key in $format
 	my %format;
 	{ 
@@ -272,31 +277,35 @@ sub processBatch {
 	    # is in a HET deletion), makes sense but still, homogenize
 	    $thisData[$format{"GT"}] =~ s~^(\d+)$~$1/$1~;
 
-	    # minFracVarReads doesn't apply to HR
-	    if ($thisData[$format{"GT"}] ne '0/0') {
-		# AD should always be there when something other than HR was called
-		if ((! $thisData[$format{"AD"}]) || ($thisData[$format{"AD"}] =~ /^[\.,]+$/)) {
-		    die "E: GT is not 0/0 but we don't have AD or AD data is blank in:\n$line\nright after:\n$lineToPrint\n";
-		}
-
-		# for minFracVarReads we need GT for the called variant index in AD
-		my ($geno1,$geno2) = split(/\//, $thisData[$format{"GT"}]);
-		((defined $geno1) && (defined $geno2)) ||
-		    die "E: a sample's genotype cannot be split: ".$thisData[$format{"GT"}]."in:\n$line\n";
-		if (($geno1 == 0) || ($geno2 == 0) || ($geno1 == $geno2)) {
-		    # ok we can deal with this
-		    ($geno2 == 0) && ($geno2 = $geno1);
-		    # in all cases $geno2 is now the index of the VAR
-		    my @ads = split(/,/, $thisData[$format{"AD"}]);
-		    my $fracVarReads = $ads[$geno2] / $thisDP ;
-		    if ($fracVarReads < $minFracVarReads) {
-			# fracVarReads too low, change to NOCALL
-			$lineToPrint .= "\t./.";
-			next;
-		    }
-		}
-		# else this GT is VAR1/VAR2, don't try to filter on fracVarReads
+	    # for AF: grab geno
+	    my ($geno1,$geno2) = split(/\//, $thisData[$format{"GT"}]);
+	    ((defined $geno1) && (defined $geno2)) ||
+		die "E: a sample's genotype cannot be split: ".$thisData[$format{"GT"}]."in:\n$line\n";
+	    my $af = '.';
+	    if (($geno1 + $geno2 == 0) || ($geno1 * $geno2 != 0)) {
+		# both genos zero (==HR), or both genos non-zero (x/y):
+		# minFracVarReads doesn't apply, we will add AF='.'
 	    }
+	    else {
+		# 0/x HET or x/x HV, AD should always be there
+		if ((! $thisData[$format{"AD"}]) || ($thisData[$format{"AD"}] =~ /^[\.,]+$/)) {
+		    die "E: GT is HET or HV but we don't have AD or AD data is blank in:\n$line\nright after:\n$lineToPrint\n";
+		}
+		($geno2 == 0) && ($geno2 = $geno1);
+		# in all cases $geno2 is now the index of the VAR
+		my @ads = split(/,/, $thisData[$format{"AD"}]);
+		my $fracVarReads = $ads[$geno2] / $thisDP ;
+		if ($fracVarReads < $minFracVarReads) {
+		    # fracVarReads too low, change to NOCALL
+		    $lineToPrint .= "\t./.";
+		    next;
+		}
+		else {
+		    # keeping, round AF to nearest float with 2 decimals
+		    $af = sprintf("%.2f",$fracVarReads);
+		}
+	    }
+	    ($data =~ s/^([^:]+):/$1:$af:/) || die "cannot add AF $af after the geno in: $data\n";
 
 	    # other filters (eg strandDisc) would go here
 
