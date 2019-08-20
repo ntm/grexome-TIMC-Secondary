@@ -475,8 +475,8 @@ sub processBatch {
 		    my @badSamples = ();
 		    foreach my $sample (@samples) {
 			my $grexome = $sample;
-			# remove trailing [DP;AF] if it's there
-			$grexome =~ s/\[\d+;\d\.\d\d\]$//;
+			# remove trailing [DP;AF] if it's there (allowing AF > 1 for Strelka bug)
+			$grexome =~ s/\[\d+;\d+\.\d\d\]$//;
 			# sanity check
 			($grexome =~ /^grexome\d+$/) || die "E grexome id $grexome illegal, sample was $sample\n";
 			if ($sample2cohortR->{$grexome} eq $cohort) {

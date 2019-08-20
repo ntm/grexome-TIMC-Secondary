@@ -173,7 +173,8 @@ while (my $inFile = readdir(INDIR)) {
 		($i == $#fields-3) && ($geno = "HET");
 		foreach my $sample (split(/,/,$samples)) {
 		    # grab grexome and [DP;AF], we know it must be there in HV and HET columns
-		    ($sample =~ /^(grexome\d\d\d\d)(\[\d+;\d\.\d\d\])$/) ||
+		    # (allowing AF > 1 for Strelka bug)
+		    ($sample =~ /^(grexome\d\d\d\d)(\[\d+;\d+\.\d\d\])$/) ||
 			die  "E: inFile $inFile has a genotype call for a sample I can't parse: $sample\n";
 		    my ($grexome,$dpaf) = ($1,$2);
 		    ($grexome2out{$grexome}) && delete($grexome2out{$grexome});
