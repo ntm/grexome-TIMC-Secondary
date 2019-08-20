@@ -119,6 +119,8 @@ while (my $line =<STDIN>) {
 	    $csqTmp[$i] =~ s~/~\\~g ;
 	    $thisCsq{$vepNames[$i]} = $csqTmp[$i] ;
 	}
+	# HGVSp has %3D for = in synonymous variants, substitute
+	($thisCsq{"HGVSp"}) && ($thisCsq{"HGVSp"} =~ s/%3D$/=/);
 	# build vepToPrint string based on @goodVeps
 	my $vepToPrint = "";
 	foreach my $vepName (@goodVeps) {
