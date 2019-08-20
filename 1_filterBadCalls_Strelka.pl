@@ -271,16 +271,24 @@ sub processBatch {
 	    # with GATK I had some issues with DP=0 calls, causing illegal divisions
 	    # by zero when calculating fracVarReads, but that is now skipped above
 
-	    # Strelka makes some phased calls sometimes, homogenize
+	    # clean up Strelka GTs and calculate AF, for fracVarReads filter:
+	    # Strelka makes some phased calls sometimes, homogenize as unphased
 	    $thisData[$format{"GT"}] =~ s~\|~/~ ;
 	    # Strelka also makes some hemizygous calls (eg when the position
-	    # is in a HET deletion), makes sense but still, homogenize
+	    # is in a HET deletion), makes sense but still, homogenize as HOMO
 	    $thisData[$format{"GT"}] =~ s~^(\d+)$~$1/$1~;
-
-	    # for AF: grab geno
+	    # grab geno
 	    my ($geno1,$geno2) = split(/\//, $thisData[$format{"GT"}]);
 	    ((defined $geno1) && (defined $geno2)) ||
 		die "E: a sample's genotype cannot be split: ".$thisData[$format{"GT"}]."in:\n$line\n";
+	    # make sure alleles are in sorted order
+	    if ($geno2 < $geno1) {
+		my $genot = $geno1;
+		$geno1 = $geno2;
+		$geno2 = $genot;
+		$thisData[$format{"GT"}] = "$geno1/$geno2";
+	    }
+
 	    my $af = '.';
 	    if (($geno1 + $geno2 == 0) || ($geno1 * $geno2 != 0)) {
 		# both genos zero (==HR), or both genos non-zero (x/y):
@@ -291,8 +299,7 @@ sub processBatch {
 		if ((! $thisData[$format{"AD"}]) || ($thisData[$format{"AD"}] =~ /^[\.,]+$/)) {
 		    die "E: GT is HET or HV but we don't have AD or AD data is blank in:\n$line\nright after:\n$lineToPrint\n";
 		}
-		($geno2 == 0) && ($geno2 = $geno1);
-		# in all cases $geno2 is now the index of the VAR
+		# $geno2 is the index of the VAR (thanks to sorting above)
 		my @ads = split(/,/, $thisData[$format{"AD"}]);
 		my $fracVarReads = $ads[$geno2] / $thisDP ;
 		if ($fracVarReads < $minFracVarReads) {
@@ -305,7 +312,8 @@ sub processBatch {
 		    $af = sprintf("%.2f",$fracVarReads);
 		}
 	    }
-	    ($data =~ s/^([^:]+):/$1:$af:/) || die "cannot add AF $af after the geno in: $data\n";
+	    ($data =~ s/^([^:]+):/$thisData[$format{"GT"}]:$af:/) || 
+		die "cannot add fixed GT $thisData[$format{'GT'}] and AF $af after the geno in: $data\n";
 
 	    # other filters (eg strandDisc) would go here
 
