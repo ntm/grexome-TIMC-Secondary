@@ -12,6 +12,15 @@
 #   per infile (never gzipped), adding .filtered or .filtered.pick to 
 #   the filename.
 #
+
+use strict;
+use warnings;
+use POSIX qw(strftime);
+use Parallel::ForkManager;
+
+# number of parallel jobs to run
+my $numJobs = 8;
+
 # full path to finalFilter.pl, unfortunately hard-coded for now
 # but with several possibbilities
 my $filterBin;
@@ -34,8 +43,14 @@ opendir(INDIR, $inDir) ||
     die "found argument $outDir but it already exists, remove it or choose another name.\n";
 mkdir($outDir) || die "cannot mkdir outDir $outDir\n";
 
+
+# create fork manager
+my $pm = new Parallel::ForkManager($numJobs);
+
+
 while (my $inFile = readdir(INDIR)) {
     ($inFile =~ /^\./) && next;
+    $pm->start && next;
     my ($fileStart,$gz);
     if ($inFile =~ (/^(.+)\.csv$/)) {
 	$fileStart = $1;
@@ -46,7 +61,7 @@ while (my $inFile = readdir(INDIR)) {
     }
     else {
 	warn "W: cannot parse filename of inFile $inFile, skipping it\n";
-	next;
+	$pm->finish;
     }
 
     my $outFile = $fileStart ;
@@ -65,8 +80,13 @@ while (my $inFile = readdir(INDIR)) {
 	$com = "cat $inDir/$inFile | $com ";
     }
     $com .= " > $outDir/$outFile";
-    warn scalar(localtime)." : starting $com\n";
+    my $now = strftime("%F %T", localtime);
+    warn "I: $now - starting $com\n";
     system($com);
-    warn scalar(localtime)." : finished $com\n";
+    $now = strftime("%F %T", localtime);
+    warn "I: $now - Finished $com\n";
+    $pm->finish;
 }
 closedir(INDIR);
+
+$pm->wait_all_children;
