@@ -290,17 +290,13 @@ sub processBatch {
 	    }
 
 	    my $af = '.';
-	    if (($geno1 + $geno2 == 0) || ($geno1 * $geno2 != 0)) {
-		# both genos zero (==HR), or both genos non-zero (x/y):
-		# minFracVarReads doesn't apply, we will add AF='.'
-	    }
-	    else {
+	    if (($geno2 != 0) && (($geno1 == 0) || ($geno1 == $geno2))) {
 		# 0/x HET or x/x HV, AD should always be there
 		if ((! $thisData[$format{"AD"}]) || ($thisData[$format{"AD"}] =~ /^[\.,]+$/)) {
 		    die "E: GT is HET or HV but we don't have AD or AD data is blank in:\n$line\nright after:\n$lineToPrint\n";
 		}
-		# $geno2 is the index of the VAR (thanks to sorting above)
 		my @ads = split(/,/, $thisData[$format{"AD"}]);
+		# $geno2 is always the index of the VAR (thanks to sorting above)
 		my $fracVarReads = $ads[$geno2] / $thisDP ;
 		if ($fracVarReads < $minFracVarReads) {
 		    # fracVarReads too low, change to NOCALL
@@ -312,6 +308,7 @@ sub processBatch {
 		    $af = sprintf("%.2f",$fracVarReads);
 		}
 	    }
+	    # else this is HR or x/y, minFracVarReads doesn't apply, use default AF='.'
 	    ($data =~ s/^([^:]+):/$thisData[$format{"GT"}]:$af:/) || 
 		die "cannot add fixed GT $thisData[$format{'GT'}] and AF $af after the geno in: $data\n";
 
