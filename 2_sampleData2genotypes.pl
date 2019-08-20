@@ -31,7 +31,8 @@
 # when we remove unused ALTs.
 # This is an initial cleanup of multiallelic sites: for example with 
 # grexomes_0050-0520, 48.4% of sites with 2 ALTs will become monoallelic.
-
+#
+# UPDATE 20/08/2019: for HV and HET genos, "sample" is now: grexomeXXXX[$dp;$af]
 
 use strict;
 use warnings;
@@ -72,7 +73,7 @@ while(my $line = <STDIN>) {
 	$com .= " 2> ".`readlink -f /proc/$$/fd/2` ;
 	chomp($com);
 	print "##sampleData2genotypes=<commandLine=\"$com\">\n";
-	print "##FORMAT=<ID=GENOS,Number=.,Type=String,Description=\"pipe-separated list of genotypes called at this position, with all corresponding sample identifiers for each genotype\">\n";
+	print "##FORMAT=<ID=GENOS,Number=.,Type=String,Description=\"pipe-separated list of genotypes called at this position, with all corresponding sample identifiers for each genotype (with [DP;AF] for HET and HV)\">\n";
 	print $lineToPrint;
 	last;
     }
@@ -97,9 +98,19 @@ while(my $line = <STDIN>) {
 	$lineToPrintEnd .= "\t".shift(@data);
     }
 
-    # discard old format, we only need GT, just make sure it's first
+    # from FORMAT we need GT, AF and DP/DPI
     my $format = shift(@data);
-    ($format =~ /^GT:/) || die "GT isnt the first FORMAT key in:\n$line\n";
+    # GT and AF should always be first, check it
+    ($format =~ /^GT:AF:/) || die "GT:AF: aren't the first FORMAT keys in:\n$line\n";
+    # find DP and/or DPI indexes
+    my ($dpCol,$dpiCol) = (0,0);
+    my @format = split(/:/, $format);
+    foreach my $i (2..$#format) {
+	($format[$i] eq "DP") && ($dpCol = $i);
+	($format[$i] eq "DPI") && ($dpiCol = $i);
+    }
+    ($dpCol==0) && ($dpiCol==0) && 
+	die "E in 2_sampleData2genotypes.pl: no DP or DPI in format:\n$line\n";
     # print new FORMAT
     $lineToPrintEnd .= "\tGENOS";
 
@@ -117,35 +128,30 @@ while(my $line = <STDIN>) {
 	$data[$i] .= ':';
 	# ignore NOCALLs
 	($data[$i] =~ m~^\./\.:~) && next;
-	# have ref+alts appear in sorted order, and allow phased GTs
-	# (replacing by unphased sorted)
-	if ($data[$i] =~ m~^(\d+)[/|](\d+):~) {
-	    my ($g1,$g2) = ($1,$2);
-	    if ($g1 > $g2) {
-		my $tmp = $g1;
-		$g1 = $g2;
-		$g2 = $tmp;
-	    }
-	    $data[$i] = "$g1/$g2:";
-	    $seenAlleles[$g1] = 1;
-	    $seenAlleles[$g2] = 1;
-	}
-	# allow hemizygous GTs, replace by HOMO
-	elsif ($data[$i] =~ m~^(\d+):~) {
-	    $data[$i] = "$1/$1:";
-	    $seenAlleles[$1] = 1;
-	}
+	($data[$i] =~ m~^(\d+)/(\d+):([^:]+):~) || 
+	    die "cannot grab genotype and AF for sample $i in $data[$i] in line:\n$line\n";
+	my ($geno1,$geno2,$af) = ($1,$2,$3);
+	$seenAlleles[$geno1] = 1;
+	$seenAlleles[$geno2] = 1;
+	my $geno = "$geno1/$geno2";
+	if (defined $geno2samples{$geno}) { $geno2samples{$geno} .= ","; }
+	else { $geno2samples{$geno} = ""; }
 
-	($data[$i] =~ m~^(\d+/\d+):~) || 
-	    die "cannot grab genotype for sample $i in $data[$i] in line:\n$line\n";
-	my $geno = $1;
-	if (defined $geno2samples{$geno}) {
-	    $geno2samples{$geno} .= ",".$samples[$i];
-	}
-	else {
-	    $geno2samples{$geno} = $samples[$i];
+	$geno2samples{$geno} .= $samples[$i];
+	if ($af ne '.') {
+	    # if we have an AF this is a HET or HV call
+	    # find DP/DPI (whichever is defined and not '.' and biggest)
+	    my @thisData = split(/:/, $data[$i]);
+	    my $dp = 0;
+	    ($dpCol) && ($thisData[$dpCol]) && ($thisData[$dpCol] ne '.') && ($dp = $thisData[$dpCol]);
+	    ($dpiCol) && ($thisData[$dpiCol]) && ($thisData[$dpiCol] ne '.') && ($dp < $thisData[$dpiCol]) &&
+		($dp = $thisData[$dpiCol]);
+	    ($dp) || die "E: AF is $af but couldn't find DP or DPI in $data[$i]\n$line\n";
+	    # add [DP;AF] after sample ID
+	    $geno2samples{$geno} .= "[$dp;$af]";
 	}
     }
+
     # now print data for each genotype, removing data from %geno2samples as we go
     # format is: genotype1~sample1,sample2|genotype2~sample3|genotype3~sample4,sample5
 

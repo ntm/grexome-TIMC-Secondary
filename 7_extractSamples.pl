@@ -166,16 +166,18 @@ while (my $inFile = readdir(INDIR)) {
 	    if ($fields[$i]) {
 		($fields[$i] =~ /^([^~]+)~([^~\|]+)$/) || 
 		    die "cannot parse HV/HET data $fields[$i] from infile $inFile\n";
-		my ($geno,$grexomes) = ($1,$2);
+		my ($geno,$samples) = ($1,$2);
 		# actually, just use HV or HET for geno, the actual allele is in ALLELE_NUM
+		# we will still add [DP;AF] after HV/HET
 		($i == $#fields-5) && ($geno = "HV");
 		($i == $#fields-3) && ($geno = "HET");
-		foreach my $grexome (split(/,/,$grexomes)) {
-		    # sanity: eg we don't want infile to have gone through addPatientIDs.pl
-		    ($grexome =~ /^grexome\d\d\d\d$/) ||
-			die "E: inFile $inFile has a genotype call for a grexome I can't recognize: $grexome\n";
+		foreach my $sample (split(/,/,$samples)) {
+		    # grab grexome and [DP;AF], we know it must be there in HV and HET columns
+		    ($sample =~ /^(grexome\d\d\d\d)(\[\d+;\d\.\d\d\])$/) ||
+			die  "E: inFile $inFile has a genotype call for a sample I can't parse: $sample\n";
+		    my ($grexome,$dpaf) = ($1,$2);
 		    ($grexome2out{$grexome}) && delete($grexome2out{$grexome});
-		    print { $outFHs{$grexome} } "$toPrintStart$geno\t$toPrintEnd" ;
+		    print { $outFHs{$grexome} } "$toPrintStart$geno$dpaf\t$toPrintEnd" ;
 		}
 	    }
 	}

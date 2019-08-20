@@ -474,9 +474,14 @@ sub processBatch {
 		    my @goodSamples = ();
 		    my @badSamples = ();
 		    foreach my $sample (@samples) {
-			if ($sample2cohortR->{$sample} eq $cohort) {
+			my $grexome = $sample;
+			# remove trailing [DP;AF] if it's there
+			$grexome =~ s/\[\d+;\d\.\d\d\]$//;
+			# sanity check
+			($grexome =~ /^grexome\d+$/) || die "E grexome id $grexome illegal, sample was $sample\n";
+			if ($sample2cohortR->{$grexome} eq $cohort) {
 			    # $sample belongs to cohort
-			    if (($gi == 3) || (! defined $sample2causalR->{$sample}) || ($sample2causalR->{$sample} eq $symbol)) {
+			    if (($gi == 3) || (! defined $sample2causalR->{$grexome}) || ($sample2causalR->{$grexome} eq $symbol)) {
 				# we are HR or sample has no causal gene or it's the current gene
 				push(@goodSamples,$sample);
 			    }
@@ -486,12 +491,12 @@ sub processBatch {
 				push(@badSamples,$sample);
 			    }
 			}
-			elsif (($gi==3) || (! defined ${$notControlsR->{$cohort}}{$sample2cohortR->{$sample}})) {
+			elsif (($gi==3) || (! defined ${$notControlsR->{$cohort}}{$sample2cohortR->{$grexome}})) {
 			    # sample is HR, or it is from another cohort that can be used as control 
 			    # for $cohort
 			    push(@badSamples,$sample);
 			}
-			elsif ((defined $sample2causalR->{$sample}) && ($sample2causalR->{$sample} ne $symbol)) {
+			elsif ((defined $sample2causalR->{$grexome}) && ($sample2causalR->{$grexome} ne $symbol)) {
 			    # sample is from a notControls cohort but it has a causal gene (and it's not this gene)
 			    push(@badSamples,$sample);
 			}
