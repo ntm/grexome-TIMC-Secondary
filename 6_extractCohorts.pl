@@ -409,13 +409,13 @@ close(IN);
     die "E: cannot unlink tmpFileCandidatesSeen $tmpFileCandidatesSeen: $!\n";
 foreach my $gene (keys(%knownCandidatesSeen)) {
     ($knownCandidatesSeen{$gene}) ||
-	warn "W: \"known candidate gene\" $gene was never seen, probably a typo in $metadata or in $candidatesFile\n";
+	warn "W: \"known candidate gene\" $gene was never seen!! typo in metadata or candidates xlsx files?\n";
 }
 
 $now = strftime("%F %T", localtime);
 rmdir($tmpDir) || 
     die "E: $now - all done but cannot rmdir tmpDir $tmpDir, why? $!\n";
-warn "I: $now - DONE running: ".join(" ", $0, @ARGV)."\n";
+warn "I: $now - DONE running $0\n";
 
 
 
