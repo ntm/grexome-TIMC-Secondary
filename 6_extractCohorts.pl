@@ -128,9 +128,9 @@ my %knownCandidateGenes = ();
 	die "E parsing xlsx: no col title is Level\n";
     
     foreach my $row ($rowMin+1..$rowMax) {
-	my $cohort = $worksheet->get_cell($row, $pathoCol)->value;
-	my $gene = $worksheet->get_cell($row, $geneCol)->value;
-	my $level = $worksheet->get_cell($row, $levelCol)->value;
+	my $cohort = $worksheet->get_cell($row, $pathoCol)->unformatted();
+	my $gene = $worksheet->get_cell($row, $geneCol)->unformatted();
+	my $level = $worksheet->get_cell($row, $levelCol)->unformatted();
 
 	# clean up $gene
 	$gene =~ s/^\s+//;
