@@ -136,10 +136,6 @@ while (my $inFile = readdir(INDIR)) {
     # from this cohort
     # will be gzipped if infiles were
     my %outFHs;
-    # also keep a hash to clean up files for grexomes we didn't genotype
-    # in the inFiles, key==grexome, value is the outFilename but key
-    # will be deleted from hash if we write some data for it
-    my %grexome2out;
 
     ($cohort2grexomes{$cohort}) || 
 	die "cohort $cohort parsed from filename of infile $inFile is not in $metadata\n";
@@ -147,9 +143,8 @@ while (my $inFile = readdir(INDIR)) {
 	my $patient = $grexome2patient{$grexome};
 	my $outFile = "$outDir/$cohort.$grexome.$patient.$fileEnd";
 	($gz) && ($outFile .= ".gz");
-	$grexome2out{$grexome} = $outFile;
 	my $outFull = " > $outFile";
-	($gz) && ($outFull = " | gzip -c --fast $outFull");
+	($gz) && ($outFull = " | gzip -c $outFull");
 	open (my $FH, $outFull) || die "cannot (gzip-?)open $outFile for writing (as $outFull)\n";
 	print $FH "$header\n";
 	$outFHs{$grexome} = $FH ;
@@ -177,7 +172,6 @@ while (my $inFile = readdir(INDIR)) {
 		    ($sample =~ /^(grexome\d\d\d\d)(\[\d+;\d+\.\d\d\])$/) ||
 			die  "E: inFile $inFile has a genotype call for a sample I can't parse: $sample\n";
 		    my ($grexome,$dpaf) = ($1,$2);
-		    ($grexome2out{$grexome}) && delete($grexome2out{$grexome});
 		    print { $outFHs{$grexome} } "$toPrintStart$geno$dpaf\t$toPrintEnd" ;
 		}
 	    }
@@ -186,9 +180,6 @@ while (my $inFile = readdir(INDIR)) {
     close(IN);
     foreach my $fh (values %outFHs) {
 	close($fh);
-    }
-    foreach my $grex (keys %grexome2out) {
-	unlink($grexome2out{$grex});
     }
 }
 closedir(INDIR);

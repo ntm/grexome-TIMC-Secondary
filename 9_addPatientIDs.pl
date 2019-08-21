@@ -100,7 +100,7 @@ while (my $inFile = readdir(INDIR)) {
 
     my $outFile = "$outDir/$fileStart.patientIDs.csv";
     my $outFull = " > $outFile";
-    ($gz) && ($outFull = " | gzip -c --fast $outFull.gz");
+    ($gz) && ($outFull = " | gzip -c $outFull.gz");
     open (OUT, $outFull) || 
 	die "cannot (gzip-?)open $outFile for writing (as $outFull)\n";
 
