@@ -3,12 +3,18 @@
 # 19/08/2019, but starting from 6_extractCohorts.pl
 # NTM
 
-#### TODO!!! no edits currently except line above
+# Takes 2 arguments: $inDir $outDir
+# - $inDir must contain gzipped cohort TSVs as produced by extractCohorts.pl;
+# - $outDir doesn't exist, it will be created and filled with one TSV
+#   per infile (never gzipped), adding .Transcripts to the name.
 
-# Takes as arguments a $metadata xlsx file, a $candidatesFile
-#  xlsx file, an $outDir and a $tmpDir that don't exist; 
-# reads on stdin a fully annotated TSV file;
-# makes $outDir and creates in it one gzipped TSV file per cohort.
+
+
+## Reads on stdin a fully annotated TSV file, filtered to only retain rare
+# variants (gnomad et al) and exclude variants seen in many NEGCTRLS, but
+# not necessarily limited to PICK transcripts.
+# 
+# makes $outDir and creates in it one TSV file per cohort.
 # The cohorts are defined in $metadata.
 # For each sample, any identified causal (mutation in a) gene is grabbed
 # from $metadata.
@@ -44,6 +50,8 @@
 # Lines where no samples from the cohort are HV|HET (for this alt allele)
 # are skipped. We rely on the fact that vcf2tsv.pl moved HV/HET genotypes
 # concerning other alleles to OTHER (but we check it).
+
+SYMBOL KNOWN_CANDIDATE_GENE Gene Feature PICK CANONICAL RefSeq BIOTYPE
 
 
 use strict;
