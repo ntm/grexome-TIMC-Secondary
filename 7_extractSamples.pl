@@ -8,7 +8,7 @@
 # $inDir must contain cohort TSVs as produced by extractCohorts.pl,
 # possibly filtered with finalFilters.pl, and possibly gzipped;
 # $outDir doesn't exist, it will be created and filled with one TSV
-# per sample (as long as it is genotyped in an infile). 
+# per sample. 
 # Filenames will include patientID/specimenID.
 # For a sample, we only print lines from its cohort file and where 
 # it has an HV or HET genotype: this genotype is printed in a new 

@@ -17,6 +17,7 @@ use Getopt::Long;
 my $max_ctrl_hv = 3; # COUNT_NEGCTRL_HV <= $x
 my $max_ctrl_het = 10; # COUNT_NEGCTRL_HET <= $x
 my $min_cohort_hv = 0; # COUNT_$cohort_HV >= $x
+my $min_hr = 100; # COUNT_$cohort_HR + COUNT_NEGCTRL_HR >= $x
 
 my $no_mod = ''; # if enabled, filter out MODIFIER impacts
 my $no_low = ''; # if enabled, filter out LOW impacts
@@ -32,6 +33,7 @@ my $max_af_esp = 0.05; # AA_AF and EA_AF <= $x, this is ESP
 GetOptions ("max_ctrl_hv=i" => \$max_ctrl_hv,
 	    "max_ctrl_het=i" => \$max_ctrl_het,
 	    "min_cohort_hv=i" => \$min_cohort_hv,
+	    "min_hr=i" => \$min_hr,
 	    "no_mod" => \$no_mod,
 	    "no_low" => \$no_low,
 	    "pick" => \$pick,
@@ -43,6 +45,7 @@ GetOptions ("max_ctrl_hv=i" => \$max_ctrl_hv,
 # build string of all filter values, for logging
 my $filterString = "max_ctrl_hv=$max_ctrl_hv max_ctrl_het=$max_ctrl_het";
 ($min_cohort_hv) && ($filterString .= " min_cohort_hv=$min_cohort_hv");
+($min_hr) && ($filterString .= " min_hr=$min_hr");
 ($no_mod) && ($filterString .= " no_mod");
 ($no_low) && ($filterString .= " no_low");
 ($pick) && ($filterString .= " pick");
@@ -62,6 +65,10 @@ foreach my $i (0..$#titles) {
 	# replace cohort name with COHORT in COUNT_*_HV (only for the hash key, not in the outFile)
 	($1 ne "NEGCTRL") && ($title = "COUNT_COHORT_HV");
     }
+    elsif ($title =~ /^COUNT_(\w+)_HR/) {
+	# same for HR, replace cohort name with COHORT in COUNT_*_HR hash key
+	($1 ne "NEGCTRL") && ($title = "COUNT_COHORT_HR");
+    }
     $title2index{$title} = $i;
 }
 
@@ -78,6 +85,9 @@ while(my $line = <STDIN>) {
 	next;
     }
     if ($fields[$title2index{"COUNT_COHORT_HV"}] < $min_cohort_hv) {
+	next;
+    }
+    if ($fields[$title2index{"COUNT_COHORT_HR"}] + $fields[$title2index{"COUNT_NEGCTRL_HR"}]  < $min_hr) {
 	next;
     }
     if ((defined $max_ctrl_het) && ($fields[$title2index{"COUNT_NEGCTRL_HET"}] > $max_ctrl_het)) {
