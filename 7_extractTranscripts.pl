@@ -9,8 +9,8 @@
 #   per infile (never gzipped), adding .Transcripts to the name.
 #
 # Each cohort tsv is filtered with 8_finalFilters.pl to consider
-# only rare variants (max_af_*), that aren't seen in too many
-# CTRLs (max_ctrl_*), that are well genotyped in our dataset (min_hr),
+# only rare variants (max_af_*) in picked transcripts, that aren't seen
+# in too many CTRLs (max_ctrl_*), that are well genotyped in our dataset (min_hr),
 # and that have HIGH or MODERATE impact (no_mod no_low).
 # We then produce one TSV for each cohort.
 # In each TSV we print one line for each transcript (=="Feature"), with:
@@ -55,7 +55,7 @@ foreach my $f (@possibleFilterBins) {
     die "Sorry, can't find 8_finalFilters.pl, update \@possibleFilterBins\n";
 
 # columns we want to keep, in this order:
-my @keptColumns = qw(SYMBOL KNOWN_CANDIDATE_GENE Feature PICK CANONICAL Gene RefSeq BIOTYPE);
+my @keptColumns = qw(SYMBOL KNOWN_CANDIDATE_GENE Feature Gene RefSeq BIOTYPE);
 # in addition we insert the new COUNT* columns right after the last @keptColumns
 # and immediately followed by the HV_HIGH et al colums, and we then copy all 
 # the GTEX_* columns (in the same order as in infile)
@@ -107,7 +107,7 @@ while (my $inFile = readdir(INDIR)) {
     my $now = strftime("%F %T", localtime);
     warn "I: $now - starting $0 on $cohort\n";
 
-    my $com = "$filterBin --max_ctrl_hv 10 --max_ctrl_het 50 --min_hr 100 --no_mod --no_low";
+    my $com = "$filterBin --max_ctrl_hv 10 --max_ctrl_het 50 --min_hr 100 --no_mod --no_low --pick";
     # using defaults for AFs 
     # $com .= " --max_af_gnomad 0.01 --max_af_1kg 0.03 --max_af_esp 0.05"
     open(FILTER, "gunzip -c $inDir/$inFile | $com | ") ||
