@@ -116,13 +116,21 @@ while(my $line = <STDIN>) {
 	}
 	($keep) || next;
     }
-    if (($fields[$title2index{"AA_AF"}]) && 
-	   ($fields[$title2index{"AA_AF"}] > $max_af_esp)) {
-	next;
+    if ($fields[$title2index{"AA_AF"}]) {
+	#again several &-separated values
+	my $keep = 0;
+	foreach my $esp (split(/&/, $fields[$title2index{"AA_AF"}])) {
+	    ($esp <= $max_af_esp) && ($keep = 1);
+	}
+	($keep) || next;
     }
-    if (($fields[$title2index{"EA_AF"}]) && 
-	  ($fields[$title2index{"EA_AF"}] > $max_af_esp)) {
-	next;
+    if ($fields[$title2index{"EA_AF"}]) {
+	#again several &-separated values
+	my $keep = 0;
+	foreach my $esp (split(/&/, $fields[$title2index{"EA_AF"}])) {
+	    ($esp <= $max_af_esp) && ($keep = 1);
+	}
+	($keep) || next;
     }
 
     # passed all filters
