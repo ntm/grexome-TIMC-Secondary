@@ -176,7 +176,12 @@ while (my $line = <STDIN>) {
     # OK, build line with expression values inserted where they should, 
     # and with GTEX_RATIOs first, then favorites, then others
     my @toPrint = @fields[0..$insertBeforeIndex-1];
-    push(@toPrint, @favTissRatios);
+    foreach my $favTissRatio (@favTissRatios) {
+	# print max 2 digits after decimal
+	my $favTR_toPrint = $favTissRatio;
+	($favTissRatio) && ($favTR_toPrint = sprintf("%.2f",$favTissRatio));
+	push(@toPrint, $favTR_toPrint);
+    }
     push(@toPrint, @thisGtex[@favTissIndex]);
     foreach my $i (0..$#tissues) {
 	(grep(/^$i$/, @favTissIndex) == 0) && push(@toPrint, $thisGtex[$i]);
