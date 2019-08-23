@@ -302,7 +302,7 @@ while (my $inFile = readdir(INDIR)) {
 	    $samples =~ s/^\d+\/\d+~//;
 	    
 	    foreach my $sample (split(/,/,$samples)) {
-		# ignore [DP;AF]
+		# ignore [DP:AF]
 		($sample =~ /^(grexome\d\d\d\d)/) || 
 		    die "E: cannot grab grexome from sample $sample\n";
 		my $grexome = $1;

@@ -62,7 +62,7 @@ print "$header\n";
 		 die "cannot parse HV/HET data $fields[$i]\n";
 	     my $samples = $1;
 	     foreach my $sample (split(/,/,$samples)) {
-		 # no ending $ so we're fine with [DP;AF] and/or if infile went through addPatientIDs.pl
+		 # no ending $ so we're fine with [DP:AF] and/or if infile went through addPatientIDs.pl
 		 ($sample =~ /^(grexome\d\d\d\d)/) ||
 		     die "E: inFile has a genotype call for a sample I can't recognize: $sample\n";
 		 if ($subcohort{$1}) {

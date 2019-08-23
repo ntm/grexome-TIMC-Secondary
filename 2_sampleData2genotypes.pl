@@ -32,7 +32,7 @@
 # This is an initial cleanup of multiallelic sites: for example with 
 # grexomes_0050-0520, 48.4% of sites with 2 ALTs will become monoallelic.
 #
-# UPDATE 20/08/2019: for HV and HET genos, "sample" is now: grexomeXXXX[$dp;$af]
+# UPDATE 20/08/2019: for HV and HET genos, "sample" is now: grexomeXXXX[$dp:$af]
 
 use strict;
 use warnings;
@@ -73,7 +73,7 @@ while(my $line = <STDIN>) {
 	$com .= " 2> ".`readlink -f /proc/$$/fd/2` ;
 	chomp($com);
 	print "##sampleData2genotypes=<commandLine=\"$com\">\n";
-	print "##FORMAT=<ID=GENOS,Number=.,Type=String,Description=\"pipe-separated list of genotypes called at this position, with all corresponding sample identifiers for each genotype (with [DP;AF] for HET and HV)\">\n";
+	print "##FORMAT=<ID=GENOS,Number=.,Type=String,Description=\"pipe-separated list of genotypes called at this position, with all corresponding sample identifiers for each genotype (with [DP:AF] for HET and HV)\">\n";
 	print $lineToPrint;
 	last;
     }
@@ -147,8 +147,8 @@ while(my $line = <STDIN>) {
 	    ($dpiCol) && ($thisData[$dpiCol]) && ($thisData[$dpiCol] ne '.') && ($dp < $thisData[$dpiCol]) &&
 		($dp = $thisData[$dpiCol]);
 	    ($dp) || die "E: AF is $af but couldn't find DP or DPI in $data[$i]\n$line\n";
-	    # add [DP;AF] after sample ID
-	    $geno2samples{$geno} .= "[$dp;$af]";
+	    # add [DP:AF] after sample ID
+	    $geno2samples{$geno} .= "[$dp:$af]";
 	}
     }
 

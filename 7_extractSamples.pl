@@ -163,13 +163,13 @@ while (my $inFile = readdir(INDIR)) {
 		    die "cannot parse HV/HET data $fields[$i] from infile $inFile\n";
 		my ($geno,$samples) = ($1,$2);
 		# actually, just use HV or HET for geno, the actual allele is in ALLELE_NUM
-		# we will still add [DP;AF] after HV/HET
+		# we will still add [DP:AF] after HV/HET
 		($i == $#fields-5) && ($geno = "HV");
 		($i == $#fields-3) && ($geno = "HET");
 		foreach my $sample (split(/,/,$samples)) {
-		    # grab grexome and [DP;AF], we know it must be there in HV and HET columns
+		    # grab grexome and [DP:AF], we know it must be there in HV and HET columns
 		    # (allowing AF > 1 for Strelka bug)
-		    ($sample =~ /^(grexome\d\d\d\d)(\[\d+;\d+\.\d\d\])$/) ||
+		    ($sample =~ /^(grexome\d\d\d\d)(\[\d+:\d+\.\d\d\])$/) ||
 			die  "E: inFile $inFile has a genotype call for a sample I can't parse: $sample\n";
 		    my ($grexome,$dpaf) = ($1,$2);
 		    print { $outFHs{$grexome} } "$toPrintStart$geno$dpaf\t$toPrintEnd" ;
