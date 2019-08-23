@@ -12,30 +12,34 @@
 # only rare variants (max_af_*) in picked transcripts, that aren't seen
 # in too many CTRLs (max_ctrl_*), that are well genotyped in our dataset (min_hr),
 # and that have HIGH, MODERATE or LOW impact (no_mod).
-# We will actually redifine HIGH and MODERATE a bit:
-# - missense variants are upgraded from MODER to HIGH if they are
+# We will define a new MODHIGH impact, as follows:
+# - missense variants are upgraded from MODER to MODHIGH if they are
 #   considered deleterious by most methods (details in code, look for "missense");
-# - splice_region_variant is upgraded from LOW to MODER.
+# - splice_region_variant is upgraded from LOW to MODHIGH.
 # We then produce one TSV for each cohort.
 # In each TSV we print one line for each transcript (=="Feature"), with:
 # - COUNT_$cohort_HV_HIGH = number of distinct samples with at
 #   least one HV HIGH variant
+# - COUNT_$cohort_HV_MODHIGH = number of distinct samples with at
+#   least one HV MODHIGH-or-HIGH variant
 # - COUNT_$cohort_HV_MODER = number of distinct samples with at
-#   least one HV MODERATE-or-HIGH variant
+#   least one HV MODERATE-or-MODHIGH-or-HIGH variant
 # - COUNT_$cohort_HET_HIGH = number of distinct samples with at
 #   least TWO HET (or one HV) HIGH variants
+# - COUNT_$cohort_HET_MODHIGH = number of distinct samples with at
+#   least TWO HET (or one HV) MODHIGH-or-HIGH variants
 # - COUNT_$cohort_HET_MODER = number of distinct samples with at
-#   least TWO HET (or one HV) MODERATE-or-HIGH variants
-# - 4 more columns COUNT_NEGCTRL_* with similar counts but counting
+#   least TWO HET (or one HV) MODERATE-or-MODHIGH-or-HIGH variants
+# - 6 more columns COUNT_NEGCTRL_* with similar counts but counting
 #   the control samples (using the extractCohorts criteria).
-# - HV_HIGH, HV_MODER, HET_HIGH, HET_MODER: list of samples counted
-#   in the corresponding COUNT columns (so the *MODER columns contain
-#   the corresponding *HIGH samples, and the HET* columns contain
-#   the corresponding HV* samples, but it's ok), we don't list the
-#   NEGCTRL samples.
+# - HV_HIGH, HV_MODHIGH, HV_MODER, HET_HIGH, HET_MODHIGH, HET_MODER: 
+#   list of samples counted in the corresponding COUNT columns (so eg the
+#   *MODER columns contain the corresponding *HIGH and *MODHIGH samples,
+#   and the HET* columns contain the corresponding HV* samples);
+#   we don't list the NEGCTRL samples.
 # In addition, several useful columns from the source file are
 # retained, see @keptColumns.
-# A transcript line is not printed if all 4 COUNT_$cohort columns
+# A transcript line is not printed if all 6 COUNT_$cohort columns
 # are zero.
 
 use strict;
@@ -72,7 +76,7 @@ foreach my $i (0..$#keptColumns) {
 }
 
 # also for convenience: the types of samples to count
-my @countTypes = ("HV_HIGH","HV_MODER","HET_HIGH","HET_MODER");
+my @countTypes = ("HV_HIGH","HV_MODHIGH","HV_MODER","HET_HIGH","HET_MODHIGH","HET_MODER");
 
 #########################################################
 
@@ -204,10 +208,11 @@ while (my $inFile = readdir(INDIR)) {
     my %transcript2start;
     # key==$transcript, value==GTEX data to print (starting with \t)
     my %transcript2gtex;
-    # key==$transcript, value is an arrayref with 8 hashrefs,
+    # key==$transcript, value is an arrayref with 12 hashrefs,
     # one each for @countTypes and then again for NEGCTRL_*,
     # each hash has key==$grexome, value==number of variants (of that
-    # category), MODER lists the samples that are MODERATE-or-HIGH,
+    # category), MODHIGH includes HIGH samples and MODER includes MODHIGH
+    # and HIGH samples,
     # HET also lists the samples that are HV (but these count as 2 variants)
     my %transcript2samples;
 
@@ -235,22 +240,22 @@ while (my $inFile = readdir(INDIR)) {
 	if ($chr ne $prevChr) {
 	    foreach my $transcript (sort keys %transcript2start) {
 		my $toPrint = $transcript2start{$transcript};
-		# we will print except if all 4 COUNT_$cohort cols are zero
+		# we will print except if all 6 COUNT_$cohort cols are zero
 		my $printOK = 0;
 
 		# for HET counts and lists we only want samples with at least 2 variants
-		foreach my $t2si (2,3,6,7) {
+		foreach my $t2si (3..5,9..11) {
 		    foreach my $sample (keys %{$transcript2samples{$transcript}->[$t2si]}) {
 			($transcript2samples{$transcript}->[$t2si]->{$sample} >= 2) ||
 			    (delete $transcript2samples{$transcript}->[$t2si]->{$sample});
 		    }
 		}
 		# the COUNT_* values are now simple:
-		foreach my $t2si (0..7) {
+		foreach my $t2si (0..11) {
 		    $toPrint .= "\t".scalar(keys %{$transcript2samples{$transcript}->[$t2si]});
 		}
 		# and the samples lists also
-		foreach my $t2si (0..3) {
+		foreach my $t2si (0..5) {
 		    $toPrint .= "\t".join(',',sort(keys(%{$transcript2samples{$transcript}->[$t2si]})));
 		    (scalar(keys(%{$transcript2samples{$transcript}->[$t2si]})) != 0) && ($printOK = 1);
 		}
@@ -284,22 +289,22 @@ while (my $inFile = readdir(INDIR)) {
 
 	# process line
 
-	# upgrade the IMPACT of some consequences (do this first so we
-	# can "next" without having filled %transcript2*)
+	# create new MODHIGH impact (do this first so we can "next"
+	# ignored LOWs without having filled %transcript2*)
 	my $impact = $fields[$impactCol];
 	my $conseq = $fields[$conseqCol];
 	if (($impact eq "LOW") && ($conseq =~ /splice_region_variant/)) {
 	    # NOTE: VEP consequence column can have several &-separated consequences,
 	    # we just want splice_region_variant to be present somewhere
 	    # LOW->splice_region_variant becomes MODER
-	    $impact = "MODERATE";
+	    $impact = "MODHIGH";
 	}
 	elsif ($impact eq "LOW") {
 	    # other LOW variants are ignored
 	    next;
 	}
 	elsif (($impact eq "MODERATE") && ($conseq =~ /missense_variant/)) {
-	    # upgrade to HIGH if at least 3 criteria are passed, among the following:
+	    # upgrade to MODHIGH if at least 3 criteria are passed, among the following:
 	    # - SIFT -> deleterious
 	    # - Polyphen -> probably_damaging
 	    # - CADD_raw_rankscore >= 0.7
@@ -324,7 +329,7 @@ while (my $inFile = readdir(INDIR)) {
 	    }
 
 	    if ($passed >= 3) {
-		$impact = "HIGH";
+		$impact = "MODHIGH";
 	    }
 	}
 
@@ -346,8 +351,8 @@ while (my $inFile = readdir(INDIR)) {
 	    }
 	    $transcript2start{$transcript} = join("\t",@start);
 	    $transcript2gtex{$transcript} = $gtex;
-	    # also initialize samples: arrayref with 8 hashrefs to empty hashes
-	    $transcript2samples{$transcript} = [{},{},{},{},{},{},{},{}];
+	    # also initialize samples: arrayref with 12 hashrefs to empty hashes
+	    $transcript2samples{$transcript} = [{},{},{},{},{},{},{},{},{},{},{},{}];
 	}
 
 	# in any case, update %transcript2samples
@@ -378,16 +383,32 @@ while (my $inFile = readdir(INDIR)) {
 		if ($impact eq "HIGH") {
 		    # always initialize to zero if needed before incrementing
 		    if ($isHV) {
-			# COUNT_HV_HIGH and COUNT_HV_MODER get +1
-			foreach my $ai (4*$isNegctrl, 4*$isNegctrl+1) {
+			# COUNT_HV_HIGH, COUNT_HV_MODHIGH and COUNT_HV_MODER get +1
+			foreach my $ai (6*$isNegctrl..6*$isNegctrl+2) {
 			    ($transcript2samples{$transcript}->[$ai]->{$grexome}) || 
 				($transcript2samples{$transcript}->[$ai]->{$grexome} = 0);
 			    $transcript2samples{$transcript}->[$ai]->{$grexome}++;
 			}
 		    }
-		    # whether $isHV or not, COUNT_HET_HIGH and COUNT_HET_MODER get updated,
-		    # but HV variants count as 2
-		    foreach my $ai (4*$isNegctrl+2, 4*$isNegctrl+3) {
+		    # whether $isHV or not, COUNT_HET_HIGH COUNT_HET_MODHIGH and
+		    # COUNT_HET_MODER get updated, but HV variants count as 2
+		    foreach my $ai (6*$isNegctrl+3..6*$isNegctrl+5) {
+			($transcript2samples{$transcript}->[$ai]->{$grexome}) || 
+			    ($transcript2samples{$transcript}->[$ai]->{$grexome} = 0);
+			$transcript2samples{$transcript}->[$ai]->{$grexome} += (1+$isHV);
+		    }
+		}
+		elsif ($impact eq "MODHIGH") {
+		    if ($isHV) {
+			# COUNT_HV_MODHIGH and COUNT_HV_MODER get +1
+			foreach my $ai (6*$isNegctrl+1, 6*$isNegctrl+2) {
+			    ($transcript2samples{$transcript}->[$ai]->{$grexome}) || 
+				($transcript2samples{$transcript}->[$ai]->{$grexome} = 0);
+			    $transcript2samples{$transcript}->[$ai]->{$grexome}++;
+			}
+		    }
+		    # whether $isHV or not, COUNT_HET_MODHIGH and COUNT_HET_MODER get +1 or +2
+		    foreach my $ai (6*$isNegctrl+4, 6*$isNegctrl+5) {
 			($transcript2samples{$transcript}->[$ai]->{$grexome}) || 
 			    ($transcript2samples{$transcript}->[$ai]->{$grexome} = 0);
 			$transcript2samples{$transcript}->[$ai]->{$grexome} += (1+$isHV);
@@ -396,13 +417,13 @@ while (my $inFile = readdir(INDIR)) {
 		elsif ($impact eq "MODERATE") {
 		    if ($isHV) {
 			# COUNT_HV_MODER gets +1
-			my $ai = 4*$isNegctrl+1;
+			my $ai = 6*$isNegctrl+2;
 			($transcript2samples{$transcript}->[$ai]->{$grexome}) || 
 			    ($transcript2samples{$transcript}->[$ai]->{$grexome} = 0);
 			$transcript2samples{$transcript}->[$ai]->{$grexome}++;
 		    }
 		    # whether $isHV or not, COUNT_HET_MODER gets +1 or +2
-		    my $ai = 4*$isNegctrl+3;
+		    my $ai = 6*$isNegctrl+5;
 		    ($transcript2samples{$transcript}->[$ai]->{$grexome}) || 
 			($transcript2samples{$transcript}->[$ai]->{$grexome} = 0);
 		    $transcript2samples{$transcript}->[$ai]->{$grexome} += (1+$isHV);
