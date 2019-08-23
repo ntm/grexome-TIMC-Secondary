@@ -11,7 +11,11 @@
 # Each cohort tsv is filtered with 8_finalFilters.pl to consider
 # only rare variants (max_af_*) in picked transcripts, that aren't seen
 # in too many CTRLs (max_ctrl_*), that are well genotyped in our dataset (min_hr),
-# and that have HIGH or MODERATE impact (no_mod no_low).
+# and that have HIGH, MODERATE or LOW impact (no_mod).
+# We will actually redifine HIGH and MODERATE a bit:
+# - missense variants are upgraded from MODER to HIGH if they are
+#   considered deleterious by most methods (details in code, look for "missense");
+# - splice_region_variant is upgraded from LOW to MODER.
 # We then produce one TSV for each cohort.
 # In each TSV we print one line for each transcript (=="Feature"), with:
 # - COUNT_$cohort_HV_HIGH = number of distinct samples with at
@@ -107,7 +111,7 @@ while (my $inFile = readdir(INDIR)) {
     my $now = strftime("%F %T", localtime);
     warn "I: $now - starting $0 on $cohort\n";
 
-    my $com = "$filterBin --max_ctrl_hv 10 --max_ctrl_het 50 --min_hr 100 --no_mod --no_low --pick";
+    my $com = "$filterBin --max_ctrl_hv 10 --max_ctrl_het 50 --min_hr 100 --no_mod --pick";
     # using defaults for AFs 
     # $com .= " --max_af_gnomad 0.01 --max_af_1kg 0.03 --max_af_esp 0.05"
     open(FILTER, "gunzip -c $inDir/$inFile | $com | ") ||
@@ -120,8 +124,11 @@ while (my $inFile = readdir(INDIR)) {
 
     # $transCol == column of "Feature" (== transcript)
     my $transCol;
-    # column of IMPACT
-    my $impactCol;
+    # columns of IMPACT and Consequence
+    my ($impactCol, $conseqCol);
+    # columns of the missense effect predictors we use
+    my ($siftCol,$polyphenCol,$caddCol,$tasteCol,$revelCol);
+
     # columns of HV,HET,NEGCTRL_HV,NEGCTRL_HET
     my ($colHv,$colHet,$colNegHv,$colNegHet);
     # @destCols: for each column $i in infile: 
@@ -153,6 +160,24 @@ while (my $inFile = readdir(INDIR)) {
 	}
 	elsif ($headers[$hi] eq "IMPACT") {
 	    $impactCol = $hi;
+	}
+	elsif ($headers[$hi] eq "Consequence") {
+	    $conseqCol = $hi;
+	}
+	elsif ($headers[$hi] eq "SIFT") {
+	    $siftCol = $hi;
+	}
+	elsif ($headers[$hi] eq "PolyPhen") {
+	    $polyphenCol = $hi;
+	}
+	elsif ($headers[$hi] eq "CADD_raw_rankscore") {
+	    $caddCol = $hi;
+	}
+	elsif ($headers[$hi] eq "MutationTaster_pred") {
+	    $tasteCol = $hi;
+	}
+	elsif ($headers[$hi] eq "REVEL_rankscore") {
+	    $revelCol = $hi;
 	}
 	elsif ($headers[$hi] eq "HV") {
 	    $colHv = $hi;
@@ -258,6 +283,51 @@ while (my $inFile = readdir(INDIR)) {
 	}
 
 	# process line
+
+	# upgrade the IMPACT of some consequences (do this first so we
+	# can "next" without having filled %transcript2*)
+	my $impact = $fields[$impactCol];
+	my $conseq = $fields[$conseqCol];
+	if (($impact eq "LOW") && ($conseq =~ /splice_region_variant/)) {
+	    # NOTE: VEP consequence column can have several &-separated consequences,
+	    # we just want splice_region_variant to be present somewhere
+	    # LOW->splice_region_variant becomes MODER
+	    $impact = "MODERATE";
+	}
+	elsif ($impact eq "LOW") {
+	    # other LOW variants are ignored
+	    next;
+	}
+	elsif (($impact eq "MODERATE") && ($conseq =~ /missense_variant/)) {
+	    # upgrade to HIGH if at least 3 criteria are passed, among the following:
+	    # - SIFT -> deleterious
+	    # - Polyphen -> probably_damaging
+	    # - CADD_raw_rankscore >= 0.7
+	    # - MutationTaster_pred contains at least one A or D
+	    # - REVEL_rankscore >= 0.7
+	    my $passed = 0;
+	    if (($fields[$siftCol]) && ($fields[$siftCol] =~ /deleterious\(/)) {
+		# deleterious\( so we don't get deleterious_low_confidence
+		$passed++;
+	    }
+	    if (($fields[$polyphenCol]) && ($fields[$polyphenCol] =~ /probably_damaging/)) {
+		$passed++;
+	    }
+	    if (($fields[$caddCol]) && ($fields[$caddCol] >= 0.7)) {
+		$passed++;
+	    }
+	    if (($fields[$tasteCol]) && ($fields[$tasteCol] =~ /[AD]/)) {
+		$passed++;
+	    }
+	    if (($fields[$revelCol]) && ($fields[$revelCol] >= 0.7)) {
+		$passed++;
+	    }
+
+	    if ($passed >= 3) {
+		$impact = "HIGH";
+	    }
+	}
+
 	my $transcript = $fields[$transCol];
 	if (! $transcript2start{$transcript}) {
 	    # first time we see $transcript, construct start and gtex strings
@@ -281,7 +351,6 @@ while (my $inFile = readdir(INDIR)) {
 	}
 
 	# in any case, update %transcript2samples
-	my $impact = $fields[$impactCol];
 
 	foreach my $col ($colHv,$colHet,$colNegHv,$colNegHet) {
 	    # all columns are processed very similarly, we need some flags
