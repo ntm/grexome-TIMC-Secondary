@@ -36,7 +36,7 @@ chomp($header);
     die "header of exonsOfInterest $exonsOfInterest isn't as expected, remake the file correctly or fix the code\n";
 
 # print my own header
-print "Gene\tTranscript\tExon\tExon length (+20)\tPercentage covered >= 20x\tPercentage covered >= 10x\n";
+print "Gene\tTranscript\tExon\tBases examined (+-10 around each exon)\tPercentage covered >= 20x\tPercentage covered >= 10x\n";
 
 while (my $line = <GENES>) {
     chomp($line);
