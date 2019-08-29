@@ -1,0 +1,33 @@
+###############################################
+29/08/2019
+
+Needed for SecondaryAnalyses/10_coverage.pl:
+
+I want a bed-like file with exon coordinates of the canonical transcripts 
+of candidate genes from our grexome metadata file candidateGenes.xlsx 
+(currently only has Azoo candidate genes).
+Getting this from the UCSC genome browser (as I did in fauve:/data/BEDs/):
+
+https://genome.ucsc.edu/cgi-bin/hgTables
+Human  hg38
+Genes  GENCODE v29
+Table: knownGene
+Identifiers (names/accessions): ["paste list" and copy-paste the list of gene names from candidateGenes.xlsx]
+Filter: [add filter, link table "knownCanonical", in knownCanonical filters add "free-form query: 1"]
+Output format: selected fields...
+Output file: ttt.bed
+File type returned:  plain text
+Get output ->
+    Select fields from hg38.knownGene: name, chrom, exonStarts, exonEnds
+    Select fields from hg38.kgXref: geneSymbol
+
+Then clean up file:
+# remove alt and "fix" chromosomes:
+grep -Pv 'chr\w+(alt|fix)' ttt  > ttt2
+# remove some genes I didn't ask for (eg RNF141 has ZNF230 as "Gene Synonyms", but
+# ZNF230 is a gene by itself, not even on the same chrom; same for HID1)
+grep -Pv 'HID1|RNF141|AC026316\.5' ttt2 > gencode29_hg38_CandidateGenes_clean_190829
+# remove tmp intermediate files
+rm ttt ttt2
+
+DONE.
