@@ -1,1 +1,3 @@
 Old/
+# don't git .gz files (eg in *_Data)
+*.gz

@@ -3,47 +3,98 @@
 # 29/08/2019
 # NTM
 
-# Takes 2 args: $exonsOfInterest and $gvcf
-# $exonsOfInterest is a tsv holding exon coordinates of genes of interest;
-# $gvcf is a GVCF file, must be tabix-indexed.
-# Print to stdout a tsv with one line per exon, for each exon we report
-# the percentage of its bases (going to +-10 into neighboring introns)
-# that are covered at least 10x or 20x.
-
+# Takes 3 args: a $candidatesFile xlsx, a gzipped tsv $transciptsFile as
+# produced in Coverage_Data/, and a $gvcf (must be tabix-indexed).
+# Print to stdout a tsv: 
+# for each candidate gene found in $transcriptsFile, print
+# one line per exon (limited to CDS parts of exons),
+# for each exon we report the percentage of its bases 
+# (going to +-10 into neighboring introns) that are covered 
+# at least 10x or 20x.
+# A global line for the whole CDS is also printed (Exon==ALL).
 
 use strict;
 use warnings;
+use Spreadsheet::XLSX;
 
 
-(@ARGV == 2) || die "needs 2 args: a tsv with exons of interest and a GVCF file\n";
-my ($exonsOfInterest, $gvcf) = @ARGV;
-(-f $exonsOfInterest) ||
-    die "exonsOfInterest $exonsOfInterest doesn't exist or isn't a file\n";
+#########################################################
+
+(@ARGV == 3) || die "needs 3 args: a candidatesFile, a tsv.gz and a GVCF\n";
+my ($candidatesFile, $transcriptsFile, $gvcf) = @ARGV;
+
+(-f $candidatesFile) ||
+    die "E: the supplied candidates file $candidatesFile doesn't exist\n";
+(-f $transcriptsFile) ||
+    die "transcriptsFile $transcriptsFile doesn't exist or isn't a file\n";
 (-f $gvcf) ||
     die "GVCF $gvcf doesn't exist or isn't a file\n";
 (-f "$gvcf.tbi") ||
     die "GVCF $gvcf exists but can't find its index file $gvcf.tbi, did you tabix-index the gvcf?\n";
 
 
-open(GENES,$exonsOfInterest) || 
-    die "cannot open exonsOfInterest $exonsOfInterest\n";
+#########################################################
+# parse known candidate genes file
 
-# skip header, 2 lines but check second one
-<GENES>;
-my $header = <GENES>;
-chomp($header);
-($header eq "#hg38.knownGene.name\thg38.knownGene.chrom\thg38.knownGene.exonStarts\thg38.knownGene.exonEnds\thg38.kgXref.geneSymbol") ||
-    die "header of exonsOfInterest $exonsOfInterest isn't as expected, remake the file correctly or fix the code\n";
+# %candidateGenes: key==gene name, value==1 if gene is of interest
+# but not seen yet, 2 if it's been seen
+my %candidateGenes = ();
 
-# print my own header
+{
+    # code adapted from 6_extractCohorts.pl
+    my $workbook = Spreadsheet::XLSX->new("$candidatesFile");
+    (defined $workbook) ||
+	die "E when parsing xlsx\n";
+    ($workbook->worksheet_count() == 1) ||
+	die "E parsing xlsx: expecting a single worksheet, got ".$workbook->worksheet_count()."\n";
+    my $worksheet = $workbook->worksheet(0);
+    my ($colMin, $colMax) = $worksheet->col_range();
+    my ($rowMin, $rowMax) = $worksheet->row_range();
+    # check the column titles and grab indexes of our columns of interest
+    my ($geneCol) = (-1);
+    foreach my $col ($colMin..$colMax) {
+	my $cell = $worksheet->get_cell($rowMin, $col);
+	($cell->value() eq "Candidate gene") &&
+	    ($geneCol = $col);
+     }
+    ($geneCol >= 0) ||
+	die "E parsing xlsx: no col title is Candidate gene\n";
+    
+    foreach my $row ($rowMin+1..$rowMax) {
+	my $gene = $worksheet->get_cell($row, $geneCol)->unformatted();
+	# clean up $gene
+	$gene =~ s/^\s+//;
+	$gene =~ s/\s+$//;
+
+	$candidateGenes{$gene} = 1;
+    }
+}
+
+
+#########################################################
+
+open(GENES, "gunzip -c $transcriptsFile |") || 
+    die "cannot gunzip-open transcriptsFile $transcriptsFile\n";
+
+# print header
 print "Gene\tTranscript\tExon\tBases examined (+-10 around each exon)\tPercentage covered >= 20x\tPercentage covered >= 10x\n";
 
 while (my $line = <GENES>) {
     chomp($line);
     my @fields = split(/\t/,$line);
-    (@fields == 5) || 
+    (@fields == 7) || 
 	die "wrong number of fields in line:\n$line\n";
-    my ($transcript,$chr,$starts,$ends,$gene) = @fields;
+    my ($transcript,$chr,$cdsStart,$cdsEnd,$starts,$ends,$gene) = @fields;
+
+    # skip if this doesn't concern a candidate gene
+    ($candidateGenes{$gene}) || next;
+    # mark gene as seen, or warn if it was seen earlier
+    if ($candidateGenes{$gene} == 1) {
+	$candidateGenes{$gene} = 2;
+    }
+    else {
+	warn "W: found several transcripts for gene $gene, is this expected?\n";
+    }
 
     my @starts = split(/,/,$starts);
     my $numExons = @starts;
@@ -58,6 +109,13 @@ while (my $line = <GENES>) {
     my ($bases20Gene,$bases10Gene,$bases0Gene) = (0,0,0);
 
     foreach my $i (0..$#starts) {
+	# ignore 5'-UTR
+	($ends[$i] < $cdsStart) && next;
+	($starts[$i] < $cdsStart) && ($starts[$i] = $cdsStart);
+	# ignore 3'-UTR
+	($starts[$i] > $cdsEnd) && next;
+	($ends[$i] > $cdsEnd) && ($ends[$i] = $cdsEnd);
+
 	# for Exon use eg 3\12 (so excel doesn't corrupt my file)
 	my $toPrint = "$gene\t$transcript\t";
 	$toPrint .= $i+1;
@@ -172,6 +230,12 @@ while (my $line = <GENES>) {
     $frac = ($bases20Gene + $bases10Gene) / $basesTotalGene;
     $toPrint .= sprintf("%.2f",$frac)."\n";
     print $toPrint;
+}
+
+foreach my $gene (sort keys %candidateGenes) {
+    if ($candidateGenes{$gene} == 1) {
+	warn "W: all done but candidate gene $gene was never seen!\n";
+    }
 }
 
 close(GENES);
