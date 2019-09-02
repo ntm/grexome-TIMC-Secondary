@@ -28,8 +28,8 @@
 #
 # A new KNOWN_CANDIDATE_GENE column is inserted right after SYMBOL:
 # it holds the "Level" value parsed from  $candidatesFile if SYMBOL is a known 
-# candidate gene for this cohort (as specified in $candidatesFile), it 
-# stays empty otherwise. Any $causalGene from $metadata is considered a
+# candidate gene for this cohort (as specified in $candidatesFile), 
+# 0 otherwise. Any $causalGene from $metadata is considered a
 # a known candidate gene with Level=5.
 #
 # New COUNT_$cohort_$geno and COUNT_NEGCTRL_$geno columns are created
@@ -540,7 +540,10 @@ sub processBatch {
 			$toPrint .= $level;
 			$candidatesSeen{$fields[$i]} = 1;
 		    }
-		    # else leave empty
+		    else {
+			# if not a known candidate use zero
+			$toPrint .= "0";
+		    }
 		    # print all COUNTs
 		    $toPrint .= "\t".join("\t",@counts);
 		}
