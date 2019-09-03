@@ -6,17 +6,31 @@
 # Takes 3 args: a $candidatesFile xlsx, a gzipped tsv $transciptsFile as
 # produced in Coverage_Data/, and a $gvcf (must be tabix-indexed).
 # Print to stdout a tsv: 
-# for each candidate gene found in $transcriptsFile, print
+# for each coding transcript in $transcriptsFile that is transcribed
+# from a candidate gene listed in $candidatesFile, print
 # one line per exon (limited to CDS parts of exons),
 # for each exon we report the percentage of its bases 
 # (going to +-10 into neighboring introns) that are covered 
 # at least 10x or 20x.
 # A global line for the whole CDS is also printed (Exon==ALL).
+# In addition, any coding transcript corresponding to a non-candidate 
+# gene gets printed as a single line (with Exon==ALL) with probability 
+# $probaSample.
+# Any gene present in $candidatesFile gets 1 in column 
+# KNOWN_CANDIDATE_GENE (others get 0).
+# Non-coding transcripts are currently skipped.
+# 2 final lines are printed, with the global stats for ALL_CANDIDATES
+# and ALL_SAMPLED_GENES.
 
 use strict;
 use warnings;
 use Spreadsheet::XLSX;
 
+
+#########################################################
+
+# probability that a non-candidate coding transcript is analyzed
+my $probaSample = 0.05;
 
 #########################################################
 
@@ -73,11 +87,19 @@ my %candidateGenes = ();
 
 #########################################################
 
+# counters for global stats:
+# we will count the number of bases of candidate genes whose 
+# coverage $cov is >= 20x, 10x <= $cov < 20x, or < 10x respectively
+my ($bases20Candidates,$bases10Candidates,$bases0Candidates) = (0,0,0);
+# same for all other sampled genes
+my ($bases20Sampled,$bases10Sampled,$bases0Sampled) = (0,0,0);
+
+
 open(GENES, "gunzip -c $transcriptsFile |") || 
     die "cannot gunzip-open transcriptsFile $transcriptsFile\n";
 
 # print header
-print "Gene\tTranscript\tExon\tBases examined (+-10 around each exon)\tPercentage covered >= 20x\tPercentage covered >= 10x\n";
+print "Gene\tKNOWN_CANDIDATE_GENE\tTranscript\tExon\tBases examined (+-10 around each exon)\tPercentage covered >= 20x\tPercentage covered >= 10x\n";
 
 while (my $line = <GENES>) {
     chomp($line);
@@ -86,14 +108,21 @@ while (my $line = <GENES>) {
 	die "wrong number of fields in line:\n$line\n";
     my ($transcript,$chr,$cdsStart,$cdsEnd,$starts,$ends,$gene) = @fields;
 
-    # skip if this doesn't concern a candidate gene
-    ($candidateGenes{$gene}) || next;
-    # mark gene as seen, or warn if it was seen earlier
-    if ($candidateGenes{$gene} == 1) {
+    # skip non-coding transcripts
+    if ($cdsStart == $cdsEnd) {
+	next;
+    }
+
+    # if gene is a candidate mark it as seen, or warn if it was seen earlier
+    if (($candidateGenes{$gene}) && ($candidateGenes{$gene} == 1)) {
 	$candidateGenes{$gene} = 2;
     }
+    elsif ($candidateGenes{$gene}) {
+	warn "W: found several transcripts for candidate gene $gene, is this expected?\n";
+    }
     else {
-	warn "W: found several transcripts for gene $gene, is this expected?\n";
+	# not a candidate gene: only examine it with probability $probaSample
+	(rand(1) > $probaSample) && next;
     }
 
     my @starts = split(/,/,$starts);
@@ -102,7 +131,8 @@ while (my $line = <GENES>) {
     ($numExons == @ends) || 
 	die "mismatch between numbers of starts and ends in line:\n$line\n";
 
-    # we will print one line per exon, but also a final line for the whole gene/transcript
+    # we will print one line per exon for candidate genes, but also a final 
+    # line for the whole gene/transcript
     my $lengthGene = 0;
     # we will count the number of bases in this gene whose coverage $cov is:
     # $cov >= 20x, 10x <= $cov < 20x, or $cov < 10x respectively
@@ -116,8 +146,15 @@ while (my $line = <GENES>) {
 	($starts[$i] > $cdsEnd) && next;
 	($ends[$i] > $cdsEnd) && ($ends[$i] = $cdsEnd);
 
+	my $toPrint = "$gene\t";
+	if ($candidateGenes{$gene}) {
+	    $toPrint .= "1\t";
+	}
+	else {
+	    $toPrint .= "0\t";
+	}
+	$toPrint .= "$transcript\t";
 	# for Exon use eg 3\12 (so excel doesn't corrupt my file)
-	my $toPrint = "$gene\t$transcript\t";
 	$toPrint .= $i+1;
 	$toPrint .= "\\$numExons\t";
 	# end-start+1 is the exon length, add 10 bases on each side
@@ -147,9 +184,9 @@ while (my $line = <GENES>) {
 	    }
 	    # this line must overlap $range but it may go beyond, adjust if needed
 	    if ($pos < $starts[$i]-10) {
-		#sanity
-		($end >= $starts[$i]-10) ||
-		    die "tabix gave a line for $range that doesn't overlap it (before, end==$end):\n$gvcfLine\n";
+		# tabix can return a line with a deletion that actually precedes 
+		# $range, skip these lines
+		($end >= $starts[$i]-10) || next;
 		$pos = $starts[$i]-10;
 	    }
 	    if ($end > $ends[$i]+10) {
@@ -212,15 +249,20 @@ while (my $line = <GENES>) {
 	$frac = ($basesCovered20 + $basesCovered10) / $basesTotal;
 	$toPrint .= sprintf("%.2f",$frac)."\n";
 
-	print $toPrint;
+	# only print per-exon stats for candidate genes
+	($candidateGenes{$gene}) && (print $toPrint);
 	# done with this exon but also record stats for the gene
 	$bases20Gene += $basesCovered20;
 	$bases10Gene += $basesCovered10;
 	$bases0Gene += $basesCovered0;
     }
 
-    # done printing data for each exon of this gene, now print global stats for $gene
-    my $toPrint = "$gene\t$transcript\tALL\t$lengthGene\t";
+    # done printing data for each exon of this gene (if it's a candidate),
+    # now print global stats for $gene
+    my $toPrint = "$gene\t";
+    if ($candidateGenes{$gene}) { $toPrint .= "1\t"; }
+    else { $toPrint .= "0\t"; }
+    $toPrint .= "$transcript\tALL\t$lengthGene\t";
     my $basesTotalGene = $bases20Gene + $bases10Gene + $bases0Gene;
     if ( (abs($lengthGene - $basesTotalGene) / $lengthGene) > 0.1) {
 	warn "W: GENE LEVEL, more than 10% difference between bases counted ($basesTotalGene) and length==$lengthGene for: $gene\n";
@@ -230,7 +272,39 @@ while (my $line = <GENES>) {
     $frac = ($bases20Gene + $bases10Gene) / $basesTotalGene;
     $toPrint .= sprintf("%.2f",$frac)."\n";
     print $toPrint;
+
+    # finally, update global stats
+    if ($candidateGenes{$gene}) {
+	$bases20Candidates += $bases20Gene;
+	$bases10Candidates += $bases10Gene;
+	$bases0Candidates += $bases0Gene;
+    }
+    else {
+	$bases20Sampled += $bases20Gene;
+	$bases10Sampled += $bases10Gene;
+	$bases0Sampled += $bases0Gene;
+    }
 }
+
+# print global stats
+my $toPrint = "ALL_CANDIDATES\t1\tALL_CANDIDATES\tALL\t";
+my $basesTotal = $bases20Candidates + $bases10Candidates + $bases0Candidates;
+$toPrint .= "$basesTotal\t";
+my $frac = $bases20Candidates / $basesTotal;
+$toPrint .= sprintf("%.2f",$frac)."\t";
+$frac = ($bases20Candidates + $bases10Candidates) / $basesTotal;
+$toPrint .= sprintf("%.2f",$frac)."\n";
+print $toPrint;
+# same for all sampled transcripts
+$toPrint = "ALL_SAMPLED\t0\tALL_SAMPLED\tALL\t";
+$basesTotal = $bases20Sampled + $bases10Sampled + $bases0Sampled;
+$toPrint .= "$basesTotal\t";
+$frac = $bases20Sampled / $basesTotal;
+$toPrint .= sprintf("%.2f",$frac)."\t";
+$frac = ($bases20Sampled + $bases10Sampled) / $basesTotal;
+$toPrint .= sprintf("%.2f",$frac)."\n";
+print $toPrint;
+
 
 foreach my $gene (sort keys %candidateGenes) {
     if ($candidateGenes{$gene} == 1) {
