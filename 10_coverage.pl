@@ -3,19 +3,21 @@
 # 29/08/2019
 # NTM
 
-# Takes 3 args: a $candidatesFile xlsx, a gzipped tsv $transciptsFile as
-# produced in Coverage_Data/, and a $gvcf (must be tabix-indexed).
-# Print to stdout a tsv: 
+# Takes 4 args: a $candidatesFile xlsx, a gzipped tsv $transciptsFile
+# as produced in Coverage_Data/, a merged bgzipped $gvcf (must be 
+# tabix-indexed), and an $outDir that doesn't exist.
+# For each sample (grexome*) found in $gvcf, produce in $outDir a 
+# coverage*.tsv file with:
 # for each coding transcript in $transcriptsFile that is transcribed
 # from a candidate gene listed in $candidatesFile, print
 # one line per exon (limited to CDS parts of exons),
 # for each exon we report the percentage of its bases 
 # (going to +-10 into neighboring introns) that are covered 
-# at least 10x or 20x.
+# at least 10x, 20x or 50x.
 # A global line for the whole CDS is also printed (Exon==ALL).
-# In addition, any coding transcript corresponding to a non-candidate 
-# gene gets printed as a single line (with Exon==ALL) with probability 
-# $probaSample.
+# In addition, one every $sampleEveryN coding transcript 
+# corresponding to non-candidate genes gets printed as a single
+# line (with Exon==ALL).
 # Any gene present in $candidatesFile gets 1 in column 
 # KNOWN_CANDIDATE_GENE (others get 0).
 # Non-coding transcripts are currently skipped.
@@ -29,13 +31,14 @@ use Spreadsheet::XLSX;
 
 #########################################################
 
-# probability that a non-candidate coding transcript is analyzed
-my $probaSample = 0.05;
+# fraction of non-candidate coding transcripts that are analyzed:
+# we analyze one coding transcript every $sampleEveryN
+my $sampleEveryN = 20;
 
 #########################################################
 
-(@ARGV == 3) || die "needs 3 args: a candidatesFile, a tsv.gz and a GVCF\n";
-my ($candidatesFile, $transcriptsFile, $gvcf) = @ARGV;
+(@ARGV == 4) || die "needs 4 args: a candidatesFile, a tsv.gz, a GVCF and an outDir\n";
+my ($candidatesFile, $transcriptsFile, $gvcf, $outDir) = @ARGV;
 
 (-f $candidatesFile) ||
     die "E: the supplied candidates file $candidatesFile doesn't exist\n";
@@ -45,6 +48,9 @@ my ($candidatesFile, $transcriptsFile, $gvcf) = @ARGV;
     die "GVCF $gvcf doesn't exist or isn't a file\n";
 (-f "$gvcf.tbi") ||
     die "GVCF $gvcf exists but can't find its index file $gvcf.tbi, did you tabix-index the gvcf?\n";
+(-e $outDir) && 
+    die "outDir $outDir already exists, remove it or choose another name.\n";
+mkdir($outDir) || die "cannot mkdir outDir $outDir\n";
 
 
 #########################################################
@@ -84,22 +90,58 @@ my %candidateGenes = ();
     }
 }
 
+#########################################################
+# grab sample ids from GVCF header
+my @samples;
+
+open(GVCF,"gunzip -c $gvcf |") || 
+    die "cannot gunzip-open GVCF $gvcf for reading\n";
+while(my $line = <GVCF>) {
+    ($line =~ /^##/) && next;
+    ($line =~ /^#CHROM/) || die "problem with GVCF $gvcf header, not CHROM?\n$line\n";
+    chomp($line);
+    my @fields = split(/\t/,$line);
+    @samples = @fields[9..$#fields];
+    last;
+}
+close(GVCF);
+
+# array of filehandles open for writing, one for each grexome,
+# same indexes as @samples
+my @outFHs;
+foreach my $grexome (@samples) {
+    my $outFile = "$outDir/coverage_$grexome.csv";
+    open(my $FH, "> $outFile") || die "cannot open $outFile for writing\n";
+    push(@outFHs, $FH);
+    # print header
+    print $FH "Gene\tKNOWN_CANDIDATE_GENE\tTranscript\tExon\tBases examined (+-10 around each exon)\tPercentage covered >= 50x\tPercentage covered >= 20x\tPercentage covered >= 10x\n";
+}
 
 #########################################################
 
 # counters for global stats:
-# we will count the number of bases of candidate genes whose 
-# coverage $cov is >= 20x, 10x <= $cov < 20x, or < 10x respectively
-my ($bases20Candidates,$bases10Candidates,$bases0Candidates) = (0,0,0);
+# for each grexome, we will count the number of bases of
+# candidate genes whose  coverage $cov is 
+# >= 50x, 20x <= $cov < 50x, 10x <= $cov < 20x, or < 10x respectively
+my @bases50Candidates = (0) x scalar(@samples);
+my @bases20Candidates = (0) x scalar(@samples);
+my @bases10Candidates = (0) x scalar(@samples);
+my @bases0Candidates = (0) x scalar(@samples);
 # same for all other sampled genes
-my ($bases20Sampled,$bases10Sampled,$bases0Sampled) = (0,0,0);
+my @bases50Sampled = (0) x scalar(@samples);
+my @bases20Sampled = (0) x scalar(@samples);
+my @bases10Sampled = (0) x scalar(@samples);
+my @bases0Sampled = (0) x scalar(@samples);
+# total lengths of candidates and of sampled transcripts
+my ($lengthCandidates,$lengthSampled) = (0,0);
 
+
+# remember how many non-candidate coding transcripts were seen, for sampling
+my $transcriptsSeen = 0;
 
 open(GENES, "gunzip -c $transcriptsFile |") || 
     die "cannot gunzip-open transcriptsFile $transcriptsFile\n";
 
-# print header
-print "Gene\tKNOWN_CANDIDATE_GENE\tTranscript\tExon\tBases examined (+-10 around each exon)\tPercentage covered >= 20x\tPercentage covered >= 10x\n";
 
 while (my $line = <GENES>) {
     chomp($line);
@@ -121,8 +163,14 @@ while (my $line = <GENES>) {
 	warn "W: found several transcripts for candidate gene $gene, is this expected?\n";
     }
     else {
-	# not a candidate gene: only examine it with probability $probaSample
-	(rand(1) > $probaSample) && next;
+	# not a candidate gene: only examine one every $sampleEveryN
+	if ($transcriptsSeen+1 == $sampleEveryN) {
+	    $transcriptsSeen = 0;
+	}
+	else {
+	    $transcriptsSeen++;
+	    next;
+	}
     }
 
     my @starts = split(/,/,$starts);
@@ -134,9 +182,12 @@ while (my $line = <GENES>) {
     # we will print one line per exon for candidate genes, but also a final 
     # line for the whole gene/transcript
     my $lengthGene = 0;
-    # we will count the number of bases in this gene whose coverage $cov is:
-    # $cov >= 20x, 10x <= $cov < 20x, or $cov < 10x respectively
-    my ($bases20Gene,$bases10Gene,$bases0Gene) = (0,0,0);
+    # for each grexome, count the bases whose cov is:
+    # $cov >= 50x, 20x <= $cov < 50x, 10x <= $cov < 20x, or $cov < 10x respectively
+    my @bases50Gene = (0) x scalar(@samples);
+    my @bases20Gene = (0) x scalar(@samples);
+    my @bases10Gene = (0) x scalar(@samples);
+    my @bases0Gene = (0) x scalar(@samples);
 
     foreach my $i (0..$#starts) {
 	# ignore 5'-UTR
@@ -146,7 +197,8 @@ while (my $line = <GENES>) {
 	($starts[$i] > $cdsEnd) && next;
 	($ends[$i] > $cdsEnd) && ($ends[$i] = $cdsEnd);
 
-	my $toPrint = "$gene\t";
+	# print single quote before gene name so excel doesn't corrupt file
+	my $toPrint = "\'$gene\t";
 	if ($candidateGenes{$gene}) {
 	    $toPrint .= "1\t";
 	}
@@ -158,13 +210,15 @@ while (my $line = <GENES>) {
 	$toPrint .= $i+1;
 	$toPrint .= "\\$numExons\t";
 	# end-start+1 is the exon length, add 10 bases on each side
-	my $length = $ends[$i] - $starts[$i] + 21;
-	$toPrint .= "$length\t";
-	$lengthGene += $length;
+	my $lengthExon = $ends[$i] - $starts[$i] + 21;
+	$toPrint .= "$lengthExon\t";
+	$lengthGene += $lengthExon;
 
-	# we will count the number of bases in this exon whose coverage $cov is:
-	# $cov >= 20x, 10x <= $cov < 20x, or $cov < 10x respectively
-	my ($basesCovered20,$basesCovered10,$basesCovered0) = (0,0,0);
+	# count the bases of this exon covered at 50x / 20x / 10x / 0x for each grexome
+	my @bases50Exon = (0) x scalar(@samples);
+	my @bases20Exon = (0) x scalar(@samples);
+	my @bases10Exon = (0) x scalar(@samples);
+	my @bases0Exon = (0) x scalar(@samples);
 
 	# range of interest: start at -10 and end at +10
 	my $range = "$chr:".($starts[$i]-10)."-".($ends[$i]+10);
@@ -176,7 +230,7 @@ while (my $line = <GENES>) {
 	while (my $gvcfLine = <GVCF>) {
 	    chomp($gvcfLine);
 	    my @gvcfFields = split(/\t/,$gvcfLine);
-	    my ($pos,$info,$format,$data) = @gvcfFields[1,7..9];
+	    my ($pos,$info,$format,@sampleData) = @gvcfFields[1,7..$#gvcfFields];
 	    my $end = $pos;
 	    # if this is a non-var block...
 	    if ($info =~ /END=(\d+);/) {
@@ -198,8 +252,6 @@ while (my $line = <GENES>) {
 	    # number of bases overlapping range in this line
 	    my $numBases = $end - $pos + 1;
 
-	    # what's the coverage?
-	    my $coverage = 0;
 	    # %format: key is a FORMAT key (eg MIN_DP), value is the index of that key in $format
 	    my %format;
 	    { 
@@ -208,103 +260,122 @@ while (my $line = <GENES>) {
 		    $format{$format[$i]} = $i ;
 		}
 	    }
-	    my @data = split(/:/,$data);
-	    # if MIN_DP exists, use that
-	    if (defined $format{"MIN_DP"}) {
-		$coverage = $data[$format{"MIN_DP"}];
-	    }
-	    else {
-		# grab the depth (DP or DPI, whichever is defined and higher)
-		if ((defined $format{"DP"}) && ($data[$format{"DP"}]) && ($data[$format{"DP"}] ne '.')) {
-		    $coverage = $data[$format{"DP"}];
-		}
-		if ((defined $format{"DPI"}) && ($data[$format{"DPI"}]) && ($data[$format{"DPI"}] ne '.') &&
-		    ($data[$format{"DPI"}] > $coverage)) {
-		    $coverage = $data[$format{"DPI"}];
-		}
-	    }
 
-	    if ($coverage >= 20) {
-		$basesCovered20 += $numBases;
-	    }
-	    elsif ($coverage >= 10) {
-		$basesCovered10 += $numBases;
-	    }
-	    else {
-		$basesCovered0 += $numBases;
-	    }
+	    foreach my $i (0..$#samples) {
+		# what's the coverage for this sample?
+		my $coverage = 0;
 
+		my @data = split(/:/,$sampleData[$i]);
+		# if MIN_DP exists, use that
+		if ((defined $format{"MIN_DP"}) && ($data[$format{"MIN_DP"}]) && ($data[$format{"MIN_DP"}] ne '.')) {
+		    $coverage = $data[$format{"MIN_DP"}];
+		}
+		else {
+		    # grab the depth (DP or DPI, whichever is defined and higher)
+		    if ((defined $format{"DP"}) && ($data[$format{"DP"}]) && ($data[$format{"DP"}] ne '.')) {
+			$coverage = $data[$format{"DP"}];
+		    }
+		    if ((defined $format{"DPI"}) && ($data[$format{"DPI"}]) && ($data[$format{"DPI"}] ne '.') &&
+			($data[$format{"DPI"}] > $coverage)) {
+			$coverage = $data[$format{"DPI"}];
+		    }
+		}
+		if ($coverage >= 50) {
+		    $bases50Exon[$i] += $numBases;
+		}
+		elsif ($coverage >= 20) {
+		    $bases20Exon[$i] += $numBases;
+		}
+		elsif ($coverage >= 10) {
+		    $bases10Exon[$i] += $numBases;
+		}
+		else {
+		    $bases0Exon[$i] += $numBases;
+		}
+	    }		
 	}
 	close(GVCF);
 
-	# we didn't deal with the Strelka call-HR-before-indel bug, and we
-	# didn't take into account the REF size (for DELs or MNPs), so the
-	# result will be approximate... still, make sure we're close enough
-	my $basesTotal = $basesCovered20 + $basesCovered10 + $basesCovered0;
-	if ( (abs($length - $basesTotal) / $length) > 0.1) {
-	    warn "W: more than 10% difference between bases counted ($basesTotal) and length for: $toPrint\n";
+	foreach my $i (0..$#samples) {
+	    # only print per-exon stats for candidate genes
+	    if ($candidateGenes{$gene}) {
+		my $frac = $bases50Exon[$i] / $lengthExon;
+		my $toPrintEnd = sprintf("%.2f",$frac)."\t";
+		$frac = ($bases50Exon[$i] + $bases20Exon[$i]) / $lengthExon;
+		$toPrintEnd .= sprintf("%.2f",$frac)."\t";
+		$frac = ($bases50Exon[$i] + $bases20Exon[$i] + $bases10Exon[$i]) / $lengthExon;
+		$toPrintEnd .= sprintf("%.2f",$frac)."\n";
+		print {$outFHs[$i]} $toPrint.$toPrintEnd;
+	    }
+	    # done with this exon but also record stats for the gene
+	    $bases50Gene[$i] += $bases50Exon[$i];
+	    $bases20Gene[$i] += $bases20Exon[$i];
+	    $bases10Gene[$i] += $bases10Exon[$i];
+	    $bases0Gene[$i] += $bases0Exon[$i];
 	}
-	my $frac = $basesCovered20 / $basesTotal;
-	$toPrint .= sprintf("%.2f",$frac)."\t";
-	$frac = ($basesCovered20 + $basesCovered10) / $basesTotal;
-	$toPrint .= sprintf("%.2f",$frac)."\n";
-
-	# only print per-exon stats for candidate genes
-	($candidateGenes{$gene}) && (print $toPrint);
-	# done with this exon but also record stats for the gene
-	$bases20Gene += $basesCovered20;
-	$bases10Gene += $basesCovered10;
-	$bases0Gene += $basesCovered0;
     }
 
     # done printing data for each exon of this gene (if it's a candidate),
     # now print global stats for $gene
-    my $toPrint = "$gene\t";
+    my $toPrint = "\'$gene\t";
     if ($candidateGenes{$gene}) { $toPrint .= "1\t"; }
     else { $toPrint .= "0\t"; }
     $toPrint .= "$transcript\tALL\t$lengthGene\t";
-    my $basesTotalGene = $bases20Gene + $bases10Gene + $bases0Gene;
-    if ( (abs($lengthGene - $basesTotalGene) / $lengthGene) > 0.1) {
-	warn "W: GENE LEVEL, more than 10% difference between bases counted ($basesTotalGene) and length==$lengthGene for: $gene\n";
-    }
-    my $frac = $bases20Gene / $basesTotalGene;
-    $toPrint .= sprintf("%.2f",$frac)."\t";
-    $frac = ($bases20Gene + $bases10Gene) / $basesTotalGene;
-    $toPrint .= sprintf("%.2f",$frac)."\n";
-    print $toPrint;
 
-    # finally, update global stats
-    if ($candidateGenes{$gene}) {
-	$bases20Candidates += $bases20Gene;
-	$bases10Candidates += $bases10Gene;
-	$bases0Candidates += $bases0Gene;
-    }
-    else {
-	$bases20Sampled += $bases20Gene;
-	$bases10Sampled += $bases10Gene;
-	$bases0Sampled += $bases0Gene;
+    foreach my $i (0..$#samples) {
+	my $frac = $bases50Gene[$i] / $lengthGene;
+	my $toPrintEnd = sprintf("%.2f",$frac)."\t";
+	$frac = ($bases50Gene[$i] + $bases20Gene[$i]) / $lengthGene;
+	$toPrintEnd .= sprintf("%.2f",$frac)."\t";
+	$frac = ($bases50Gene[$i] + $bases20Gene[$i] + $bases10Gene[$i]) / $lengthGene;
+	$toPrintEnd .= sprintf("%.2f",$frac)."\n";
+	print {$outFHs[$i]} $toPrint.$toPrintEnd;
+
+	# finally, update global stats
+	if ($candidateGenes{$gene}) {
+	    $bases50Candidates[$i] += $bases50Gene[$i];
+	    $bases20Candidates[$i] += $bases20Gene[$i];
+	    $bases10Candidates[$i] += $bases10Gene[$i];
+	    $bases0Candidates[$i] += $bases0Gene[$i];
+	    $lengthCandidates += $lengthGene;
+	}
+	else {
+	    $bases50Sampled[$i] += $bases50Gene[$i];
+	    $bases20Sampled[$i] += $bases20Gene[$i];
+	    $bases10Sampled[$i] += $bases10Gene[$i];
+	    $bases0Sampled[$i] += $bases0Gene[$i];
+	    $lengthSampled += $lengthGene;
+	}
     }
 }
 
 # print global stats
-my $toPrint = "ALL_CANDIDATES\t1\tALL_CANDIDATES\tALL\t";
-my $basesTotal = $bases20Candidates + $bases10Candidates + $bases0Candidates;
-$toPrint .= "$basesTotal\t";
-my $frac = $bases20Candidates / $basesTotal;
-$toPrint .= sprintf("%.2f",$frac)."\t";
-$frac = ($bases20Candidates + $bases10Candidates) / $basesTotal;
-$toPrint .= sprintf("%.2f",$frac)."\n";
-print $toPrint;
-# same for all sampled transcripts
-$toPrint = "ALL_SAMPLED\t0\tALL_SAMPLED\tALL\t";
-$basesTotal = $bases20Sampled + $bases10Sampled + $bases0Sampled;
-$toPrint .= "$basesTotal\t";
-$frac = $bases20Sampled / $basesTotal;
-$toPrint .= sprintf("%.2f",$frac)."\t";
-$frac = ($bases20Sampled + $bases10Sampled) / $basesTotal;
-$toPrint .= sprintf("%.2f",$frac)."\n";
-print $toPrint;
+my $toPrint = "ALL_CANDIDATES\t1\tALL_CANDIDATES\tALL\t$lengthCandidates\t";
 
+foreach my $i (0..$#samples) {
+    my $frac = $bases50Candidates[$i] / $lengthCandidates;
+    my $toPrintEnd = sprintf("%.2f",$frac)."\t";
+    $frac = ($bases50Candidates[$i] + $bases20Candidates[$i]) / $lengthCandidates;
+    $toPrintEnd .= sprintf("%.2f",$frac)."\t";
+    $frac = ($bases50Candidates[$i] + $bases20Candidates[$i] + $bases10Candidates[$i]) / $lengthCandidates;
+    $toPrintEnd .= sprintf("%.2f",$frac)."\n";
+    print {$outFHs[$i]} $toPrint.$toPrintEnd;
+}
+# same for all sampled transcripts
+$toPrint = "ALL_SAMPLED\t0\tALL_SAMPLED\tALL\t$lengthSampled\t";
+foreach my $i (0..$#samples) {
+    my $frac = $bases50Sampled[$i] / $lengthSampled;
+    my $toPrintEnd = sprintf("%.2f",$frac)."\t";
+    $frac = ($bases50Sampled[$i] + $bases20Sampled[$i]) / $lengthSampled;
+    $toPrintEnd .= sprintf("%.2f",$frac)."\t";
+    $frac = ($bases50Sampled[$i] + $bases20Sampled[$i] + $bases10Sampled[$i]) / $lengthSampled;
+    $toPrintEnd .= sprintf("%.2f",$frac)."\n";
+    print {$outFHs[$i]} $toPrint.$toPrintEnd;
+}
+
+foreach my $fh (@outFHs) {
+    close($fh);
+}
 
 foreach my $gene (sort keys %candidateGenes) {
     if ($candidateGenes{$gene} == 1) {
