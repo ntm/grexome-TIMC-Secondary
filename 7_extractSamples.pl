@@ -17,6 +17,11 @@
 # For a sample, we only print lines from its cohort file and where 
 # it has an HV or HET genotype: this genotype is printed in a new 
 # column GENOTYPE, inserted right after KNOWN_CANDIDATE_GENE.
+# It is followed by new columns NB_TRANSCRIPT_$geno_$impact with
+# $geno == HV or HET and $impact == HIGH or MODER, counting the total
+# number of $geno-$impact variants (passing all filters and) affecting
+# this transcript in this grexome; and then NB_TRANSCRIPT_ALL with all
+# variants affecting this transcript in this grexome.
 # Also the HV, NEGCTRL_HV, HET etc... columns are not printed.
 #
 # NOTE: the fact that HV et al are the last 6 columns (allowing for 
@@ -117,9 +122,10 @@ while (my $inFile = readdir(INDIR)) {
 	warn "W: cannot parse filename of inFile $inDir/$inFile, skipping it\n";
     }
 
-    # KNOWN_CANDIDATE_GENE column 
+    # KNOWN_CANDIDATE_GENE, Feature and IMPACT columns 
     my $knownCandidateCol = -1;
-
+    my ($featureCol, $impactCol) = (-1,-1);
+    
     my $inFull = "$inDir/$inFile";
     ($gz) && ($inFull = "gunzip -c $inFull | ");
     open(IN, $inFull) ||
@@ -131,11 +137,27 @@ while (my $inFile = readdir(INDIR)) {
 	if ($header[$i] eq "KNOWN_CANDIDATE_GENE") {
 	    $knownCandidateCol = $i;
 	    $header[$i] .= "\tGENOTYPE";
-	    last;
+	    foreach my $g ("HV", "HET") {
+		foreach my $im ("HIGH", "MODER") {
+		    $header[$i] .= "\tNB_TRANSCRIPT_$g"."_$im";
+		}
+	    }
+	    $header[$i] .= "\tNB_TRANSCRIPT_ALL";
+	}
+	elsif ($header[$i] eq "Feature") {
+	    $featureCol = $i;
+	}
+	elsif ($header[$i] eq "IMPACT") {
+	    $impactCol = $i;
 	}
     }
     ($knownCandidateCol >= 0) || 
 	die "E: couldn't find KNOWN_CANDIDATE_GENE in header of infile $inFile\n";
+    ($featureCol >= 0) || 
+	die "E: couldn't find Feature in header of infile $inFile\n";
+    ($impactCol >= 0) || 
+	die "E: couldn't find IMPACT in header of infile $inFile\n";
+
     $header = join("\t",@header);
     ($header =~ s/\tHV\tNEGCTRL_HV\tHET\tNEGCTRL_HET\tOTHER\tNEGCTRL_OTHER$//) ||
 	($header =~ s/\tHV\tNEGCTRL_HV\tHET\tNEGCTRL_HET\tOTHER\tNEGCTRL_OTHER(\tmax_ctrl_hv=[^\t]+)$/$1/) ||
@@ -181,11 +203,26 @@ while (my $inFile = readdir(INDIR)) {
     }
 
     # now read the data
+    # in order to print NB_TRANSCRIPT* we need:
+    # key == grexome, values are arrayrefs of the beginnings and ends of lines
+    # (respectively) that must be printed for this grexome
+    my %grex2lineStarts;
+    my %grex2lineEnds;
+    # key == grexome, value is an arrayref, for each line to print it holds
+    # the transcript that this line deals with
+    my %grex2transcripts;
+    # key == grexome, value is a hashref whose keys are transcripts and values
+    # are arrayrefs with 5 ints: numbers of HV_HIGH, HV_MODER, HET_HIGH, HET_MODER and ALL
+    # found for this transcript in this grexome
+    my %grex2trans2counters;
+
     while (my $line = <IN>) {
 	chomp($line);
 	my @fields = split(/\t/, $line, -1) ;
 	my $toPrintStart = join("\t",@fields[0..$knownCandidateCol])."\t";
 	my $toPrintEnd = join("\t",@fields[($knownCandidateCol+1)..($#fields-6)])."\n";
+	my $transcript = $fields[$featureCol];
+	my $impact = $fields[$impactCol];
 
 	foreach my $i ($#fields-5,$#fields-3) {
 	    if ($fields[$i]) {
@@ -202,12 +239,45 @@ while (my $inFile = readdir(INDIR)) {
 		    ($sample =~ /^(grexome\d\d\d\d)(\[\d+:\d+\.\d\d\])$/) ||
 			die  "E: inFile $inFile has a genotype call for a sample I can't parse: $sample\n";
 		    my ($grexome,$dpaf) = ($1,$2);
-		    print { $outFHs{$grexome} } "$toPrintStart$geno$dpaf\t$toPrintEnd" ;
+
+		    # initialize everything for this grexome if needed
+		    ($grex2lineStarts{$grexome}) || ($grex2lineStarts{$grexome} = []);
+		    ($grex2lineEnds{$grexome}) || ($grex2lineEnds{$grexome} = []);
+		    ($grex2transcripts{$grexome}) || ($grex2transcripts{$grexome} = []);
+		    ($grex2trans2counters{$grexome}) || ($grex2trans2counters{$grexome} = {});
+		    ($grex2trans2counters{$grexome}->{$transcript}) || ($grex2trans2counters{$grexome}->{$transcript} = [0,0,0,0]);
+
+		    # now fill our data structures
+		    push(@{$grex2lineStarts{$grexome}}, "$toPrintStart$geno$dpaf");
+		    push(@{$grex2lineEnds{$grexome}}, "\t$toPrintEnd");
+		    push(@{$grex2transcripts{$grexome}}, $transcript);
+		    my $indexToIncr = 0;
+		    ($geno eq "HET") && ($indexToIncr += 2);
+		    if ($impact eq "HIGH") {
+			$grex2trans2counters{$grexome}->{$transcript}->[$indexToIncr]++;
+		    }
+		    elsif ($impact eq "MODERATE") {
+			$grex2trans2counters{$grexome}->{$transcript}->[$indexToIncr+1]++;
+		    }
+		    # in any case increment the ALL counter
+		    $grex2trans2counters{$grexome}->{$transcript}->[4]++;
 		}
 	    }
 	}
     }
     close(IN);
+
+    # now print everything we accumulated
+    foreach my $grexome (keys %grex2lineStarts) {
+	foreach my $i (0..$#{$grex2lineStarts{$grexome}}) {
+	    my $toPrint = $grex2lineStarts{$grexome}->[$i];
+	    my $transcript = $grex2transcripts{$grexome}->[$i];
+	    $toPrint .= "\t".join("\t", @{$grex2trans2counters{$grexome}->{$transcript}});
+	    $toPrint .= $grex2lineEnds{$grexome}->[$i];
+
+	    print { $outFHs{$grexome} } $toPrint;
+	}
+    }
     foreach my $fh (values %outFHs) {
 	close($fh);
     }
