@@ -3,13 +3,17 @@
 # 25/03/2018
 # NTM
 
-# Take 3 arguments: $metadata $inDir $outDir
+# Take 4 arguments: $metadata $inDir $covDir $outDir
 # $metadata is the patient_summary xlsx file (with grexomeID etc columns);
 # $inDir must contain cohort TSVs as produced by extractCohorts.pl,
 # possibly filtered with finalFilters.pl, and possibly gzipped;
+# $covDir is a subdir containing per-grexome coverage files, as produced
+# by 0_coverage.pl;
 # $outDir doesn't exist, it will be created and filled with one TSV
 # per sample. 
 # Filenames will include patientID/specimenID.
+# The global coverage data (ALL_CANDIDATES and ALL_SAMPLED) for each
+# grexome is grabbed from $covDir and added at the end of the header line.
 # For a sample, we only print lines from its cohort file and where 
 # it has an HV or HET genotype: this genotype is printed in a new 
 # column GENOTYPE, inserted right after KNOWN_CANDIDATE_GENE.
@@ -24,12 +28,15 @@ use warnings;
 use Spreadsheet::XLSX;
 
 
-(@ARGV == 3) || die "needs 3 args: a metadata XLSX, an inDir and a non-existant outDir\n";
-my ($metadata, $inDir, $outDir) = @ARGV;
+(@ARGV == 4) || 
+    die "needs 4 args: a metadata XLSX, an inDir, a covDir and a non-existant outDir\n";
+my ($metadata, $inDir, $covDir, $outDir) = @ARGV;
 (-d $inDir) ||
     die "inDir $inDir doesn't exist or isn't a directory\n";
 opendir(INDIR, $inDir) ||
     die "cannot opendir inDir $inDir\n";
+(-d $covDir) ||
+    die "covDir $covDir doesn't exist or isn't a directory\n";
 (-e $outDir) && 
     die "found argument $outDir but it already exists, remove it or choose another name.\n";
 mkdir($outDir) || die "cannot mkdir outDir $outDir\n";
@@ -69,10 +76,12 @@ my %grexome2patient = ();
 	die "E parsing xlsx: no col title is pathology\n";
     ($specimenCol >= 0) ||
 	die "E parsing xlsx: no column title is specimenID\n";
-      ($patientCol >= 0) ||
-	  die "E parsing xlsx: no column title is patientID\n";
+    ($patientCol >= 0) ||
+	die "E parsing xlsx: no column title is patientID\n";
     
     foreach my $row ($rowMin+1..$rowMax) {
+	(defined $worksheet->get_cell($row, $grexCol)) ||
+	    die "E: cell undefined for row $row, col $grexCol\n";
 	my $grexome = $worksheet->get_cell($row, $grexCol)->value;
 	# skip "none" lines
 	($grexome eq "none") && next;
@@ -146,8 +155,29 @@ while (my $inFile = readdir(INDIR)) {
 	my $outFull = " > $outFile";
 	($gz) && ($outFull = " | gzip -c $outFull");
 	open (my $FH, $outFull) || die "cannot (gzip-?)open $outFile for writing (as $outFull)\n";
-	print $FH "$header\n";
+
+	# grab global coverage data for $grexome
+	my $covFile = "$covDir/coverage_$grexome.csv";
+	(-f $covFile) || 
+	    die "E: trying to grab coverage data for $grexome but covFile doesn't exist: $covFile\n";
+	# global coverage data is in last 2 lines
+	open(COV, "tail -n 2 $covFile |") ||
+	    die "cannot tail-grab cov data from covFile with: tail -n 2 $covFile\n";
+	# ALL_CANDIDATES
+	my $covLine = <COV>;
+	chomp $covLine;
+	my @covFields = split(/\t/,$covLine);
+	(@covFields == 8) || die "E: expecting 8 fields from candidates coverage line $covLine\n";
+	my $headerCov = "\tCoverage_Candidates_50x=$covFields[5] Coverage_Candidates_20x=$covFields[6] Coverage_Candidates_10x=$covFields[7]";
+	# ALL_SAMPLED
+	$covLine = <COV>;
+	chomp $covLine;
+	@covFields = split(/\t/,$covLine);
+	(@covFields == 8) || die "E: expecting 8 fields from sampled coverage line $covLine\n";
+	$headerCov .= "   Coverage_Sampled_50x=$covFields[5] Coverage_Sampled_20x=$covFields[6] Coverage_Sampled_10x=$covFields[7]";
+	print $FH "$header$headerCov\n";
 	$outFHs{$grexome} = $FH ;
+	close(COV);
     }
 
     # now read the data
