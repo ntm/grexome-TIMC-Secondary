@@ -337,15 +337,19 @@ while (my $line = <GENES>) {
 	    $bases20Candidates[$i] += $bases20Gene[$i];
 	    $bases10Candidates[$i] += $bases10Gene[$i];
 	    $bases0Candidates[$i] += $bases0Gene[$i];
-	    $lengthCandidates += $lengthGene;
 	}
 	else {
 	    $bases50Sampled[$i] += $bases50Gene[$i];
 	    $bases20Sampled[$i] += $bases20Gene[$i];
 	    $bases10Sampled[$i] += $bases10Gene[$i];
 	    $bases0Sampled[$i] += $bases0Gene[$i];
-	    $lengthSampled += $lengthGene;
 	}
+    }
+    if ($candidateGenes{$gene}) {
+	$lengthCandidates += $lengthGene;
+    }
+    else {
+	$lengthSampled += $lengthGene;
     }
 }
 
