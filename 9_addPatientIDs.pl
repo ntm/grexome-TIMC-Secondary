@@ -50,6 +50,7 @@ my %grexome2patient = ();
     my ($grexCol, $specimenCol, $patientCol) = (-1,-1,-1);
     foreach my $col ($colMin..$colMax) {
 	my $cell = $worksheet->get_cell($rowMin, $col);
+	(defined $cell) || next;
 	($cell->value() eq "grexomeID") && ($grexCol = $col);
 	($cell->value() eq "specimenID") && ($specimenCol = $col);
 	($cell->value() eq "patientID") && ($patientCol = $col);
