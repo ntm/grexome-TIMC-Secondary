@@ -172,6 +172,8 @@ my %sample2causal = ();
     my ($grexCol, $cohortCol,$causalCol) = (-1,-1,-1);
     foreach my $col ($colMin..$colMax) {
 	my $cell = $worksheet->get_cell($rowMin, $col);
+	# if column has no header just ignore it
+	(defined $cell) || next;
 	($cell->value() eq "grexomeID") &&
 	    ($grexCol = $col);
 	($cell->value() eq "pathology") &&
