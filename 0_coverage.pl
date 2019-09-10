@@ -5,9 +5,11 @@
 
 # Takes 4 args: a $candidatesFile xlsx, a gzipped tsv $transciptsFile
 # as produced in Coverage_Data/, a merged bgzipped $gvcf (must be 
-# tabix-indexed), and an $outDir that doesn't exist.
-# For each sample (grexome*) found in $gvcf, produce in $outDir a 
-# coverage*.tsv file with:
+# tabix-indexed), and an $outDir.
+# If $outDir doesn't exist it is created; if it exists any pre-existing
+# coverage*tsv file in it is not remade (considered good).
+# For each grexome* sample found in $gvcf and lacking a coverage*tsv
+# in $outDir, produce $outDir/coverage*.tsv with:
 # for each coding transcript in $transcriptsFile that is transcribed
 # from a candidate gene listed in $candidatesFile, print
 # one line per exon (limited to CDS parts of exons),
@@ -48,9 +50,7 @@ my ($candidatesFile, $transcriptsFile, $gvcf, $outDir) = @ARGV;
     die "GVCF $gvcf doesn't exist or isn't a file\n";
 (-f "$gvcf.tbi") ||
     die "GVCF $gvcf exists but can't find its index file $gvcf.tbi, did you tabix-index the gvcf?\n";
-(-e $outDir) && 
-    die "outDir $outDir already exists, remove it or choose another name.\n";
-mkdir($outDir) || die "cannot mkdir outDir $outDir\n";
+(-d $outDir) || mkdir($outDir) || die "cannot mkdir outDir $outDir\n";
 
 
 #########################################################
@@ -106,21 +106,30 @@ while(my $line = <GVCF>) {
 }
 close(GVCF);
 
-# array of filehandles open for writing, one for each grexome,
+# samples that already have a coverage file are ignored (value 1)
+my @samplesIgnored = (0) x scalar(@samples);
+
+# array of filehandles open for writing, one for each non-ignored grexome,
 # same indexes as @samples
 my @outFHs;
-foreach my $grexome (@samples) {
+foreach my $i (0..$#samples) {
+    my $grexome = $samples[$i];
     my $outFile = "$outDir/coverage_$grexome.csv";
-    open(my $FH, "> $outFile") || die "cannot open $outFile for writing\n";
-    push(@outFHs, $FH);
-    # print header
-    print $FH "Gene\tKNOWN_CANDIDATE_GENE\tTranscript\tExon\tBases examined (+-10 around each exon)\tPercentage covered >= 50x\tPercentage covered >= 20x\tPercentage covered >= 10x\n";
+    if (-e $outFile) {
+	$samplesIgnored[$i] = 1;
+    }
+    else {
+	open(my $FH, "> $outFile") || die "cannot open $outFile for writing\n";
+	$outFHs[$i] = $FH;
+	# print header
+	print $FH "Gene\tKNOWN_CANDIDATE_GENE\tTranscript\tExon\tBases examined (+-10 around each exon)\tPercentage covered >= 50x\tPercentage covered >= 20x\tPercentage covered >= 10x\n";
+    }
 }
 
 #########################################################
 
 # counters for global stats:
-# for each grexome, we will count the number of bases of
+# for each non-ignored grexome, we will count the number of bases of
 # candidate genes whose  coverage $cov is 
 # >= 50x, 20x <= $cov < 50x, 10x <= $cov < 20x, or < 10x respectively
 my @bases50Candidates = (0) x scalar(@samples);
@@ -262,6 +271,8 @@ while (my $line = <GENES>) {
 	    }
 
 	    foreach my $i (0..$#samples) {
+		# skip ignored grexomes
+		($samplesIgnored[$i]) && next;
 		# what's the coverage for this sample?
 		my $coverage = 0;
 
@@ -297,6 +308,7 @@ while (my $line = <GENES>) {
 	close(GVCF);
 
 	foreach my $i (0..$#samples) {
+	    ($samplesIgnored[$i]) && next;
 	    # only print per-exon stats for candidate genes
 	    if ($candidateGenes{$gene}) {
 		my $frac = $bases50Exon[$i] / $lengthExon;
@@ -323,6 +335,7 @@ while (my $line = <GENES>) {
     $toPrint .= "$transcript\tALL\t$lengthGene\t";
 
     foreach my $i (0..$#samples) {
+	($samplesIgnored[$i]) && next;
 	my $frac = $bases50Gene[$i] / $lengthGene;
 	my $toPrintEnd = sprintf("%.2f",$frac)."\t";
 	$frac = ($bases50Gene[$i] + $bases20Gene[$i]) / $lengthGene;
@@ -357,6 +370,7 @@ while (my $line = <GENES>) {
 my $toPrint = "ALL_CANDIDATES\t1\tALL_CANDIDATES\tALL\t$lengthCandidates\t";
 
 foreach my $i (0..$#samples) {
+    ($samplesIgnored[$i]) && next;
     my $frac = $bases50Candidates[$i] / $lengthCandidates;
     my $toPrintEnd = sprintf("%.2f",$frac)."\t";
     $frac = ($bases50Candidates[$i] + $bases20Candidates[$i]) / $lengthCandidates;
@@ -368,6 +382,7 @@ foreach my $i (0..$#samples) {
 # same for all sampled transcripts
 $toPrint = "ALL_SAMPLED\t0\tALL_SAMPLED\tALL\t$lengthSampled\t";
 foreach my $i (0..$#samples) {
+    ($samplesIgnored[$i]) && next;
     my $frac = $bases50Sampled[$i] / $lengthSampled;
     my $toPrintEnd = sprintf("%.2f",$frac)."\t";
     $frac = ($bases50Sampled[$i] + $bases20Sampled[$i]) / $lengthSampled;
@@ -378,7 +393,7 @@ foreach my $i (0..$#samples) {
 }
 
 foreach my $fh (@outFHs) {
-    close($fh);
+    ($fh) && close($fh);
 }
 
 foreach my $gene (sort keys %candidateGenes) {
