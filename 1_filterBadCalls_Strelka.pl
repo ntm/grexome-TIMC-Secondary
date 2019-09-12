@@ -5,14 +5,9 @@
 
 
 # Parses on stdin a Strelka GVCF file with one or more sample data columns;
-# takes as args:
-# --minDP int (must have DP or DPI >= $minDP),
-# --minGQX int (must have GQX >= $minGQX), 
-# --strandDisc [NOT IMPLEMENTED YET], 
-# --minFracVarReads float (must have fraction of variant reads for the 
-#                          called variant AD[i]/DP >= $minFracVarReads, filter is not
-#                          applied if called genotype is HR or VAR1/VAR2 with 2 non-ref alleles).
+# Args: see $USAGE.
 # Prints to stdout a VCF file where:
+# - grexomes that don't appear in $metadata "grexomeID" column are removed;
 # - non-variant lines are removed;
 # - the variant calls in data columns are replaced by ./. if a condition
 #   is not met, or if previous call was '.' (the Strelka NOCALL);
@@ -25,6 +20,7 @@
 use strict;
 use warnings;
 use Getopt::Long;
+use Spreadsheet::XLSX;
 use POSIX qw(strftime);
 use Parallel::ForkManager;
 
@@ -48,6 +44,9 @@ my $minDP = 0;
 my $minGQX = 0;
 my $minFracVarReads = 0;
 
+# metadata XLSX, no default
+my $metadata;
+
 # for multi-threading, need to create a tmpDir. It will
 # be removed when we are done and must not pre-exist.
 # To improve performance it should be on a ramdisk.
@@ -59,7 +58,8 @@ my $numJobs = 16;
 # help: if true just print $USAGE and exit
 my $help = '';
 
-GetOptions ("minDP=i" => \$minDP,
+GetOptions ("metadata=s" => \$metadata,
+	    "minDP=i" => \$minDP,
             "minGQX=i"   => \$minGQX,
             "minFracVarReads=f"  => \$minFracVarReads,
 	    "jobs=i" => \$numJobs,
@@ -69,6 +69,7 @@ GetOptions ("minDP=i" => \$minDP,
 
 my $USAGE = "Parse a Strelka GVCF on stdin, print to stdout a similar GVCF where calls that fail basic quality filters are changed to NOCALL and lines are only printed if at least one sample has a non-HR genotype call.\n
 Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
+--metadata string [no default] : patient metadata xlsx file, with path
 --minDP int [$minDP] : must have DP or DPI >= minDP
 --minGQX int [$minGQX] : must have GQX >= minGQX
 --minFracVarReads float [$minFracVarReads] must have fraction of variant reads for the called variant AD[i]/DP >= minFracVarReads, filter is not applied if called genotype is HR or VAR1/VAR2 with 2 non-ref alleles
@@ -80,10 +81,51 @@ Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 ($help) &&
     die "$USAGE\n\n";
 
+($metadata) || die "E: you must provide a metadata file\n";
+(-f $metadata) || die "E: the supplied metadata file doesn't exist\n";
+
 (-e $tmpDir) && 
     die "E: tmpDir $tmpDir exists, please remove or rename it, or provide a different one with --tmpdir\n";
 mkdir($tmpDir) || 
     die "E: cannot mkdir tmpDir $tmpDir\n";
+
+
+#########################################################
+# parse patient metadata file
+
+# key==existing grexome, value==1
+my %grexomes = ();
+
+{
+    my $workbook = Spreadsheet::XLSX->new("$metadata");
+    (defined $workbook) ||
+	die "E when parsing xlsx\n";
+    ($workbook->worksheet_count() == 1) ||
+	die "E parsing xlsx: expecting a single worksheet, got ".$workbook->worksheet_count()."\n";
+    my $worksheet = $workbook->worksheet(0);
+    my ($colMin, $colMax) = $worksheet->col_range();
+    my ($rowMin, $rowMax) = $worksheet->row_range();
+    # check the column titles and grab indexes of our columns of interest
+    my ($grexCol) = (-1);
+    foreach my $col ($colMin..$colMax) {
+	my $cell = $worksheet->get_cell($rowMin, $col);
+	# if column has no header just ignore it
+	(defined $cell) || next;
+	($cell->value() eq "grexomeID") &&
+	    ($grexCol = $col);
+    }
+    ($grexCol >= 0) ||
+	die "E parsing xlsx: no column title is grexomeID\n";
+
+    foreach my $row ($rowMin+1..$rowMax) {
+	my $grexome = $worksheet->get_cell($row, $grexCol)->value;
+	# skip "none" lines
+	($grexome eq "none") && next;
+	(defined $grexomes{$grexome}) && 
+	    die "E parsing xlsx: have 2 lines with grexome $grexome\n";
+	$grexomes{$grexome} = 1;
+    }
+}
 
 #############################################
 # deal with headers
@@ -91,13 +133,19 @@ mkdir($tmpDir) ||
 my $now = strftime("%F %T", localtime);
 warn "I: $now - starting to run: ".join(" ", $0, @ARGV)."\n";
 
-# parse header, just copy it
+# array, same number of elements as there are columns in the #CHROM line
+# (and hence in each data line), value is true iff column must be skipped
+# (corresponding to grexomes that no longer exist in the metadata file, 
+# eg they were dupes of other grexomes with better sequencing)
+my @skippedCols = ();
+
+# parse header, just copy it except we remove grexomes that don't exist anymore
 while(my $line = <STDIN>) {
     if ($line =~ /^##/) {
 	print $line;
     }
     elsif ($line =~ /^#CHROM/) {
-	# add info with full command line run
+	# add ##comment with full command line run
 	my $com = qx/ps -o args= $$/;
 	chomp($com);
 	$com .= " < ".`readlink -f /proc/$$/fd/0` ;
@@ -107,7 +155,18 @@ while(my $line = <STDIN>) {
 	$com .= " 2> ".`readlink -f /proc/$$/fd/2` ;
 	chomp($com);
 	print "##filterBadCalls=<commandLine=\"$com\">\n";
-	print $line;
+
+	# remove grexomes that don't exist in $metadata (anymore)
+	chomp($line);
+	my @fields = split(/\t/,$line);
+	foreach my $i (reverse(9..$#fields)) {
+	    # reverse so we can splice bad columns out
+	    if (! $grexomes{$fields[$i]}) {
+		splice(@fields,$i,1);
+		$skippedCols[$i] = 1;
+	    }
+	}
+	print join("\t",@fields)."\n";
 	last;
     }
     else {
@@ -162,7 +221,7 @@ while (!$lastBatch) {
     open(my $tmpOutFH, "> $tmpOut") || die "cannot open $tmpOut for writing\n";
 
     # process this batch
-    &processBatch(\@lines,$tmpOutFH,$minDP,$minGQX,$minFracVarReads);
+    &processBatch(\@lines,$tmpOutFH,$minDP,$minGQX,$minFracVarReads,\@skippedCols);
 
     # done, close tmp FH and create flag-file
     close($tmpOutFH) || die "cannot close tmp outFH $tmpOutFH\n";
@@ -199,9 +258,10 @@ warn "I: $now - DONE running: ".join(" ", $0, @ARGV)."\n";
 # - ref to array of chomped lines
 # - outFH open filehandle to print to
 # - filter cutoffs $minDP, $minGQX, $minFracVarReads
+# - ref to array saying which columns to skip
 sub processBatch {
-    (@_ == 5) || die "E: processBatch needs 5 args\n";
-    my ($linesR,$outFH,$minDP,$minGQX,$minFracVarReads) = @_;
+    (@_ == 6) || die "E: processBatch needs 6 args\n";
+    my ($linesR,$outFH,$minDP,$minGQX,$minFracVarReads,$skippedColsR) = @_;
 
     foreach my $line (@$linesR) {
 	# $keepLine: boolean, true if at least one sample is not ./. and 0/0 after filtering
@@ -211,18 +271,15 @@ sub processBatch {
 	# if no ALT in line, skip immediately
 	($data[4] eq '.') && next;
 	# first 9 fields are copied except AF is added to FORMAT after GT
-	my $lineToPrint = shift(@data);
-	foreach my $i (2..8) {
-	    $lineToPrint .= "\t".shift(@data);
-	}
-	my $format = shift(@data);
+	my $lineToPrint = join("\t",@data[0..7]);
+	my $format = $data[8];
 	my $newFormat = $format;
 	($newFormat =~ s/^GT:/GT:AF:/)  || 
 	    die "E: cannot add AF after GT in format: $format\n";
 	$lineToPrint .= "\t$newFormat";
 	# %format: key is a FORMAT key (eg GQX), value is the index of that key in $format
 	my %format;
-	{ 
+	{
 	    my @format = split(/:/, $format);
 	    foreach my $i (0..$#format) {
 		$format{$format[$i]} = $i ;
@@ -237,7 +294,9 @@ sub processBatch {
 	(defined $format{"AD"}) || die "no AD key in FORMAT string for line:\n$line\n";
 
 	# now deal with actual data fields
-	while(my $data = shift(@data)) {
+	foreach my $i (9..$#data) {
+	    ($skippedColsR->[$i]) && next;
+	    my $data = $data[$i];
 	    # if genotype is already '.' or './.' == NOCALL, just use ./.
 	    if (($data =~ m~^\.$~) || ($data =~ m~^\.:~) || ($data =~ m~^\./\.~)) {
 		$lineToPrint .= "\t./." ;
