@@ -15,8 +15,8 @@
 # The global coverage data (ALL_CANDIDATES and ALL_SAMPLED) for each
 # grexome is grabbed from $covDir and added at the end of the header line.
 # For a sample, we only print lines from its cohort file and where 
-# it has an HV or HET genotype: this genotype is printed in a new 
-# column GENOTYPE, inserted right after KNOWN_CANDIDATE_GENE.
+# it has an HV or HET genotype: this genotype is printed in new columns
+# GENOTYPE and DP:AF, inserted right after KNOWN_CANDIDATE_GENE.
 # It is followed by new columns NB_TRANSCRIPT_$geno_$impact with
 # $geno == HV or HET and $impact == HIGH or MODER, counting the total
 # number of $geno-$impact variants (passing all filters and) affecting
@@ -231,13 +231,13 @@ while (my $inFile = readdir(INDIR)) {
 		    die "cannot parse HV/HET data $fields[$i] from infile $inFile\n";
 		my ($geno,$samples) = ($1,$2);
 		# actually, just use HV or HET for geno, the actual allele is in ALLELE_NUM
-		# we will still add [DP:AF] after HV/HET
+		# we will still add DP:AF after HV/HET
 		($i == $#fields-5) && ($geno = "HV");
 		($i == $#fields-3) && ($geno = "HET");
 		foreach my $sample (split(/,/,$samples)) {
 		    # grab grexome and [DP:AF], we know it must be there in HV and HET columns
 		    # (allowing AF > 1 for Strelka bug)
-		    ($sample =~ /^(grexome\d\d\d\d)(\[\d+:\d+\.\d\d\])$/) ||
+		    ($sample =~ /^(grexome\d\d\d\d)\[(\d+:\d+\.\d\d)\]$/) ||
 			die  "E: inFile $inFile has a genotype call for a sample I can't parse: $sample\n";
 		    my ($grexome,$dpaf) = ($1,$2);
 
@@ -249,7 +249,7 @@ while (my $inFile = readdir(INDIR)) {
 		    ($grex2trans2counters{$grexome}->{$transcript}) || ($grex2trans2counters{$grexome}->{$transcript} = [0,0,0,0]);
 
 		    # now fill our data structures
-		    push(@{$grex2lineStarts{$grexome}}, "$toPrintStart$geno$dpaf");
+		    push(@{$grex2lineStarts{$grexome}}, "$toPrintStart$geno\t$dpaf");
 		    push(@{$grex2lineEnds{$grexome}}, "\t$toPrintEnd");
 		    push(@{$grex2transcripts{$grexome}}, $transcript);
 		    my $indexToIncr = 0;
