@@ -17,11 +17,11 @@
 # For a sample, we only print lines from its cohort file and where 
 # it has an HV or HET genotype: this genotype is printed in new columns
 # GENOTYPE and DP:AF, inserted right after KNOWN_CANDIDATE_GENE.
-# It is followed by new columns NB_TRANSCRIPT_$geno_$impact with
+# It is followed by new columns NB_$geno_$impact_ThisSample_ThisTranscript with
 # $geno == HV or HET and $impact == HIGH or MODER, counting the total
 # number of $geno-$impact variants (passing all filters and) affecting
-# this transcript in this grexome; and then NB_TRANSCRIPT_ALL with all
-# variants affecting this transcript in this grexome.
+# this transcript in this grexome; and then NB_ALLVARIANTS_ThisSample_ThisTranscript
+# with all variants affecting this transcript in this grexome.
 # Also the HV, NEGCTRL_HV, HET etc... columns are not printed.
 #
 # NOTE: the fact that HV et al are the last 6 columns (allowing for 
@@ -140,10 +140,10 @@ while (my $inFile = readdir(INDIR)) {
 	    $header[$i] .= "\tGENOTYPE";
 	    foreach my $g ("HV", "HET") {
 		foreach my $im ("HIGH", "MODER") {
-		    $header[$i] .= "\tNB_TRANSCRIPT_$g"."_$im";
+		    $header[$i] .= "\tNB_$g"."_$im"."_ThisSample_ThisTranscript";
 		}
 	    }
-	    $header[$i] .= "\tNB_TRANSCRIPT_ALL";
+	    $header[$i] .= "\tNB_ALLVARIANTS_ThisSample_ThisTranscript";
 	}
 	elsif ($header[$i] eq "Feature") {
 	    $featureCol = $i;
@@ -204,7 +204,7 @@ while (my $inFile = readdir(INDIR)) {
     }
 
     # now read the data
-    # in order to print NB_TRANSCRIPT* we need:
+    # in order to print NB_* we need:
     # key == grexome, values are arrayrefs of the beginnings and ends of lines
     # (respectively) that must be printed for this grexome
     my %grex2lineStarts;
