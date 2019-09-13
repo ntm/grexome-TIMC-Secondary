@@ -186,8 +186,8 @@ while (my $line = <GENES>) {
 	($starts[$i] > $cdsEnd) && next;
 	($ends[$i] > $cdsEnd) && ($ends[$i] = $cdsEnd);
 
-	# print single quote before gene name so excel doesn't corrupt file
-	my $toPrint = "\'$gene\t";
+	# apostrophe-space before gene name so excel doesn't corrupt file
+	my $toPrint = "\' $gene\t";
 	if ($candidateGenes{$gene}) {
 	    $toPrint .= "1\t";
 	}
@@ -305,7 +305,7 @@ while (my $line = <GENES>) {
 
     # done printing data for each exon of this gene (if it's a candidate),
     # now print global stats for $gene
-    my $toPrint = "\'$gene\t";
+    my $toPrint = "\' $gene\t";
     if ($candidateGenes{$gene}) { $toPrint .= "1\t"; }
     else { $toPrint .= "0\t"; }
     $toPrint .= "$transcript\tALL\t$lengthGene\t";

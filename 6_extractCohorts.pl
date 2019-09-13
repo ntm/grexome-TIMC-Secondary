@@ -537,7 +537,8 @@ sub processBatch {
 	    my $toPrint = "$fields[0]";
 	    foreach my $i (1..$#fields) {
 		if ($i == $symbolCol) {
-		    $toPrint .= "\t$fields[$i]\t";
+		    # prepend apostrophe-space to gene names to avoid excel corrupting everything
+		    $toPrint .= "\t\' $fields[$i]\t";
 		    if (($knownCandidateGenesR->{$cohort}) && (my $level = $knownCandidateGenesR->{$cohort}->{$fields[$i]})) {
 			$toPrint .= $level;
 			$candidatesSeen{$fields[$i]} = 1;
