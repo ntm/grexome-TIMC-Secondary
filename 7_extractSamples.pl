@@ -137,7 +137,7 @@ while (my $inFile = readdir(INDIR)) {
     foreach my $i (0..$#header) {
 	if ($header[$i] eq "KNOWN_CANDIDATE_GENE") {
 	    $knownCandidateCol = $i;
-	    $header[$i] .= "\tGENOTYPE";
+	    $header[$i] .= "\tGENOTYPE\tDP:AF";
 	    foreach my $g ("HV", "HET") {
 		foreach my $im ("HIGH", "MODER") {
 		    $header[$i] .= "\tNB_$g"."_$im"."_ThisSample_ThisTranscript";
@@ -197,7 +197,7 @@ while (my $inFile = readdir(INDIR)) {
 	chomp $covLine;
 	@covFields = split(/\t/,$covLine);
 	(@covFields == 8) || die "E: expecting 8 fields from sampled coverage line $covLine\n";
-	$headerCov .= "   Coverage_Sampled_50x=$covFields[5] Coverage_Sampled_20x=$covFields[6] Coverage_Sampled_10x=$covFields[7]";
+	$headerCov .= "   Coverage_AllGenes_50x=$covFields[5] Coverage_AllGenes_20x=$covFields[6] Coverage_AllGenes_10x=$covFields[7]";
 	print $FH "$header$headerCov\n";
 	$outFHs{$grexome} = $FH ;
 	close(COV);
