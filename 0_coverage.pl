@@ -17,25 +17,22 @@
 # (going to +-10 into neighboring introns) that are covered 
 # at least 10x, 20x or 50x.
 # A global line for the whole CDS is also printed (Exon==ALL).
-# In addition, one every $sampleEveryN coding transcript 
-# corresponding to non-candidate genes gets printed as a single
-# line (with Exon==ALL).
+# In addition, every coding transcript corresponding to non-candidate
+# genes gets printed as a single line (with Exon==ALL).
 # Any gene present in $candidatesFile gets 1 in column 
 # KNOWN_CANDIDATE_GENE (others get 0).
 # Non-coding transcripts are currently skipped.
 # 2 final lines are printed, with the global stats for ALL_CANDIDATES
-# and ALL_SAMPLED_GENES.
+# and ALL_GENES.
 
 use strict;
 use warnings;
 use Spreadsheet::XLSX;
 
+# use tabix module (installed in /usr/local/lib64/), this requires bioperl
+use lib "/home/nthierry/Software/VariantEffectPredictor/ensembl-vep/";
+use Bio::DB::HTS::Tabix;
 
-#########################################################
-
-# fraction of non-candidate coding transcripts that are analyzed:
-# we analyze one coding transcript every $sampleEveryN
-my $sampleEveryN = 20;
 
 #########################################################
 
@@ -92,19 +89,14 @@ my %candidateGenes = ();
 
 #########################################################
 # grab sample ids from GVCF header
-my @samples;
+my $tabix = Bio::DB::HTS::Tabix->new( filename => "$gvcf" );
 
-open(GVCF,"gunzip -c $gvcf |") || 
-    die "cannot gunzip-open GVCF $gvcf for reading\n";
-while(my $line = <GVCF>) {
-    ($line =~ /^##/) && next;
-    ($line =~ /^#CHROM/) || die "problem with GVCF $gvcf header, not CHROM?\n$line\n";
-    chomp($line);
-    my @fields = split(/\t/,$line);
-    @samples = @fields[9..$#fields];
-    last;
-}
-close(GVCF);
+# ->header gives all headers in a single scalar, we just want the #CHROM line
+my $header = $tabix->header;
+($header =~ /\n(#CHROM\t.+)$/) ||
+    die "E: cannot extract #CHROM line from header:\n$header\n";
+my @fields = split(/\t/,$1);
+my @samples = @fields[9..$#fields];
 
 # samples that already have a coverage file are ignored (value 1)
 my @samplesIgnored = (0) x scalar(@samples);
@@ -145,9 +137,6 @@ my @bases0Sampled = (0) x scalar(@samples);
 my ($lengthCandidates,$lengthSampled) = (0,0);
 
 
-# remember how many non-candidate coding transcripts were seen, for sampling
-my $transcriptsSeen = 0;
-
 open(GENES, "gunzip -c $transcriptsFile |") || 
     die "cannot gunzip-open transcriptsFile $transcriptsFile\n";
 
@@ -171,16 +160,7 @@ while (my $line = <GENES>) {
     elsif ($candidateGenes{$gene}) {
 	warn "W: found several transcripts for candidate gene $gene, is this expected?\n";
     }
-    else {
-	# not a candidate gene: only examine one every $sampleEveryN
-	if ($transcriptsSeen+1 == $sampleEveryN) {
-	    $transcriptsSeen = 0;
-	}
-	else {
-	    $transcriptsSeen++;
-	    next;
-	}
-    }
+    # else not a candidate gene, nothing to do
 
     my @starts = split(/,/,$starts);
     my $numExons = @starts;
@@ -232,11 +212,8 @@ while (my $line = <GENES>) {
 	# range of interest: start at -10 and end at +10
 	my $range = "$chr:".($starts[$i]-10)."-".($ends[$i]+10);
 	# grab GVCF lines in our range of interest
-	my $tabix = "tabix $gvcf $range";
-
-	open(GVCF, "$tabix |") ||
-	    die "cannot tabix-open the gvcf of interest with:\n$tabix\n";
-	while (my $gvcfLine = <GVCF>) {
+	my $tabixIter = $tabix->query($range);
+	while (my $gvcfLine = $tabixIter->next) {
 	    chomp($gvcfLine);
 	    my @gvcfFields = split(/\t/,$gvcfLine);
 	    my ($pos,$info,$format,@sampleData) = @gvcfFields[1,7..$#gvcfFields];
@@ -305,7 +282,6 @@ while (my $line = <GENES>) {
 		}
 	    }		
 	}
-	close(GVCF);
 
 	foreach my $i (0..$#samples) {
 	    ($samplesIgnored[$i]) && next;
@@ -380,7 +356,7 @@ foreach my $i (0..$#samples) {
     print {$outFHs[$i]} $toPrint.$toPrintEnd;
 }
 # same for all sampled transcripts
-$toPrint = "ALL_SAMPLED\t0\tALL_SAMPLED\tALL\t$lengthSampled\t";
+$toPrint = "ALL_GENES\t0\tALL_GENES\tALL\t$lengthSampled\t";
 foreach my $i (0..$#samples) {
     ($samplesIgnored[$i]) && next;
     my $frac = $bases50Sampled[$i] / $lengthSampled;
@@ -403,4 +379,4 @@ foreach my $gene (sort keys %candidateGenes) {
 }
 
 close(GENES);
-
+$tabix->close;
