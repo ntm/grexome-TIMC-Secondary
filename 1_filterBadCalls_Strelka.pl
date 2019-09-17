@@ -7,15 +7,16 @@
 # Parses on stdin a Strelka GVCF file with one or more sample data columns;
 # Args: see $USAGE.
 # Prints to stdout a VCF file where:
-# - grexomes that don't appear in $metadata "grexomeID" column are removed;
+# - grexomes that don't appear in $metadata "grexomeID" column are removed
+#   (alows to discard data for ex-grexomes that were obsoleted as dupes);
 # - non-variant lines are removed;
-# - the variant calls in data columns are replaced by ./. if a condition
-#   is not met, or if previous call was '.' (the Strelka NOCALL);
+# - the variant calls in data columns are replaced by ./. if a call-condition
+#   is not met (see "heuristics"), or if previous call was '.' (the Strelka NOCALL);
 # - lines where every sample is now ./. or 0/0 are skipped;
 # - AF is added to FORMAT right after GT, and every 0/x or x/x call gets
 #   for AF the fraction of variant reads (rounded to 2 decimals), HR
-#   and x/y calls get '.'
-
+#   and x/y calls get '.';
+# - fix blatantly wrong genotype calls, see "heuristics" below.
 
 use strict;
 use warnings;
@@ -36,13 +37,26 @@ use Parallel::ForkManager;
 my $batchSize = 100000;
 
 
+# heuristics for fixing low-quality or blatantly wrong genotype calls 
+# [$dp below represents max(DP,DPI)]:
+# if $dp < $minDP , any call becomes NOCALL
+# if GQX < $minGQX , any call becomes NOCALL
+# if AF < $minAF and call was REF/VAR or VAR/VAR, call becomes NOCALL
+# if $dp >= $minDP_HV and AF >= $minAF_HV , call becomes HV
+# if $dp >= $minDP_HET and AF >= $minAF_HET and AF <= $maxAF_HET, call becomes HET
+my %filterParams = (
+    "minDP" => 10,
+    "minGQX" => 20,
+    "minAF" => 0.15,
+    "minDP_HV" => 20,
+    "minAF_HV" => 0.85,
+    "minDP_HET" => 20,
+    "minAF_HET" => 0.25,
+    "maxAF_HET" => 0.75);
+
+
 #############################################
 ## options / params from the command-line
-
-# filter cutoffs
-my $minDP = 0;
-my $minGQX = 0;
-my $minFracVarReads = 0;
 
 # metadata XLSX, no default
 my $metadata;
@@ -59,20 +73,14 @@ my $numJobs = 16;
 my $help = '';
 
 GetOptions ("metadata=s" => \$metadata,
-	    "minDP=i" => \$minDP,
-            "minGQX=i"   => \$minGQX,
-            "minFracVarReads=f"  => \$minFracVarReads,
 	    "jobs=i" => \$numJobs,
 	    "tmpdir=s" => \$tmpDir,
 	    "help" => \$help)
     or die("Error in command line arguments\n");
 
-my $USAGE = "Parse a Strelka GVCF on stdin, print to stdout a similar GVCF where calls that fail basic quality filters are changed to NOCALL and lines are only printed if at least one sample has a non-HR genotype call.\n
+my $USAGE = "Parse a Strelka GVCF on stdin, print to stdout a similar GVCF where calls that fail basic quality filters are changed to NOCALL, calls that are blatantly wrong are fixed, and lines are only printed if at least one sample has a non-HR genotype call.\n
 Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --metadata string [no default] : patient metadata xlsx file, with path
---minDP int [$minDP] : must have DP or DPI >= minDP
---minGQX int [$minGQX] : must have GQX >= minGQX
---minFracVarReads float [$minFracVarReads] must have fraction of variant reads for the called variant AD[i]/DP >= minFracVarReads, filter is not applied if called genotype is HR or VAR1/VAR2 with 2 non-ref alleles
 --tmpdir string [default = $tmpDir] : subdir where tmp files will be created (on a RAMDISK if possible), must not pre-exist and will be removed after execution
 --jobs N [default = $numJobs] : number of parallel jobs=threads to run
 --help : print this USAGE";
@@ -221,7 +229,7 @@ while (!$lastBatch) {
     open(my $tmpOutFH, "> $tmpOut") || die "cannot open $tmpOut for writing\n";
 
     # process this batch
-    &processBatch(\@lines,$tmpOutFH,$minDP,$minGQX,$minFracVarReads,\@skippedCols);
+    &processBatch(\@lines,$tmpOutFH,\%filterParams,\@skippedCols);
 
     # done, close tmp FH and create flag-file
     close($tmpOutFH) || die "cannot close tmp outFH $tmpOutFH\n";
@@ -257,11 +265,15 @@ warn "I: $now - DONE running: ".join(" ", $0, @ARGV)."\n";
 # args:
 # - ref to array of chomped lines
 # - outFH open filehandle to print to
-# - filter cutoffs $minDP, $minGQX, $minFracVarReads
+# - hashref with filter params
 # - ref to array saying which columns to skip
 sub processBatch {
-    (@_ == 6) || die "E: processBatch needs 6 args\n";
-    my ($linesR,$outFH,$minDP,$minGQX,$minFracVarReads,$skippedColsR) = @_;
+    (@_ == 4) || die "E: processBatch needs 4 args\n";
+    my ($linesR,$outFH,$filterParamsR,$skippedColsR) = @_;
+
+    # counters for number of blatant errors fixed to HV or HET
+    my $fixedToHV = 0;
+    my $fixedToHET = 0;
 
     foreach my $line (@$linesR) {
 	# $keepLine: boolean, true if at least one sample is not ./. and 0/0 after filtering
@@ -306,7 +318,7 @@ sub processBatch {
 	    my @thisData = split(/:/, $data) ;
 
 	    if ((! $thisData[$format{"GQX"}]) || ($thisData[$format{"GQX"}] eq '.') ||
-		($thisData[$format{"GQX"}] < $minGQX)) {
+		($thisData[$format{"GQX"}] < $filterParamsR->{"minGQX"})) {
 		# GQX undefined or too low, change to NOCALL
 		$lineToPrint .= "\t./.";
 		next;
@@ -323,7 +335,7 @@ sub processBatch {
 	    }
 
 	    # if depth too low or undefined for this sample, change to NOCALL
-	    if ($thisDP < $minDP) {
+	    if ($thisDP < $filterParamsR->{"minDP"}) {
 		$lineToPrint .= "\t./.";
 		next;
 	    }
@@ -357,7 +369,7 @@ sub processBatch {
 		my @ads = split(/,/, $thisData[$format{"AD"}]);
 		# $geno2 is always the index of the VAR (thanks to sorting above)
 		my $fracVarReads = $ads[$geno2] / $thisDP ;
-		if ($fracVarReads < $minFracVarReads) {
+		if ($fracVarReads < $filterParamsR->{"minAF"}) {
 		    # fracVarReads too low, change to NOCALL
 		    $lineToPrint .= "\t./.";
 		    next;
@@ -367,9 +379,23 @@ sub processBatch {
 		    $af = sprintf("%.2f",$fracVarReads);
 		}
 	    }
-	    # else this is HR or x/y, minFracVarReads doesn't apply, use default AF='.'
+	    # else this is HR or x/y, minAF doesn't apply, use default AF='.'
 	    ($data =~ s/^([^:]+):/$thisData[$format{"GT"}]:$af:/) || 
 		die "cannot add fixed GT $thisData[$format{'GT'}] and AF $af after the geno in: $data\n";
+
+	    # we have $thisDP and $af , fix blatantly wrong calls
+	    if (($thisDP >= $filterParamsR->{"minDP_HV"}) && ($geno1 == 0) &&
+		($af ne '.') && ($af >= $filterParamsR->{"minAF_HV"})) {
+		# change to HV
+		$thisData[$format{"GT"}] = "$geno2/$geno2";
+		$fixedToHV++;
+	    }
+	    if (($thisDP >= $filterParamsR->{"minDP_HET"}) && ($geno1 != 0) && ($af ne '.') && 
+		($af >= $filterParamsR->{"minAF_HET"}) && ($af <= $filterParamsR->{"maxAF_HET"})) {
+		# change to HET
+		$thisData[$format{"GT"}] = "0/$geno2";
+		$fixedToHET++;
+	    }
 
 	    # other filters (eg strandDisc) would go here
 
@@ -380,6 +406,10 @@ sub processBatch {
 	# done with $line, print if at least one sample is not NOCALL|HOMOREF
 	($keepLine) && (print $outFH "$lineToPrint\n");
     }
+    # INFO with number of fixed calls in this batch, we don't care that this
+    # comes out of order to stderr
+    ($fixedToHV) && (warn "I: fixed $fixedToHV calls to HV\n");
+    ($fixedToHET) && (warn "I: fixed $fixedToHET calls to HET\n");
 }
 
 
