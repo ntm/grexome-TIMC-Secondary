@@ -55,11 +55,14 @@ foreach my $i (1..5) {
 # fill following data structures, each is a hash with key==$transcript and:
 # value == "TRANSCRIPT\tGENE\tCHROM\tSTRAND"
 my %trans2printFirst;
+# value == $chrom (for sorting the output)
+my %trans2chr;
 # value == arrayref \($cdsStart,$cdsEnd)
 my %trans2cds;
 # value == arrayref with 2 strings \($exonStarts,$exonEnds), the strings
 # are comma-separated and already sorted
 my %trans2exons;
+
 while (my $line = <>) {
     chomp($line);
     my @fields = split(/\t/, $line, -1);
@@ -86,8 +89,14 @@ while (my $line = <>) {
 	($fields[8] =~ /gene_name "([^"]+)";/) ||
 	    die "E: cannot grab gene_name from line:\n$line\n";
 	my $gene = $1;
-	# CHROM: we use chr* convention
+	# CHROM
 	my $chr = $fields[0];
+	# for sorting we want just the chrom number, replace X Y M by 23-25
+	if ($chr eq "X") { $trans2chr{$transcript} = "23" }
+	elsif ($chr eq "Y") { $trans2chr{$transcript} = "24" }
+	elsif ($chr eq "MT") { $trans2chr{$transcript} = "25" }
+	else { $trans2chr{$transcript} = $chr }
+	# for printing we use chr* convention
 	($chr eq "MT") && ($chr = "M");
 	$chr = "chr$chr";
 
@@ -126,11 +135,28 @@ while (my $line = <>) {
     }
 }
 
+# sub for sorting by chrom then by coord (using first exon start)
+sub byChrByCoord {
+    if ($trans2chr{$a} <=> $trans2chr{$b}) {
+	return($trans2chr{$a} <=> $trans2chr{$b});
+    }
+    else {
+	($trans2exons{$a}->[0] =~ /^(\d+),/) || 
+	    die "E: in byChrByCoord cannot extract first exon start from $trans2exons{$a}->[0]\n";
+	my $startA = $1;
+	($trans2exons{$b}->[0] =~ /^(\d+),/) || 
+	    die "E: in byChrByCoord cannot extract first exon start from $trans2exons{$b}->[0]\n";
+	my $startB = $1;
+	return($startA <=> $startB);
+    }
+}
+
+
 # print header
 print "TRANSCRIPT\tGENE\tCHROM\tSTRAND\tCDS_START\tCDS_END\tEXON_STARTS\tEXON_ENDS\n";
 
-# print data in random order
-foreach my $transcript (keys(%trans2printFirst)) {
+# print data in chrom-coord order
+foreach my $transcript (sort byChrByCoord keys(%trans2printFirst)) {
     print $trans2printFirst{$transcript};
     # CDS*
     if ((defined $trans2cds{$transcript}->[0]) && (defined $trans2cds{$transcript}->[1])) {

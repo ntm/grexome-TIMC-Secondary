@@ -21,9 +21,6 @@ gunzip -c /data/Ensembl/Homo_sapiens.GRCh38.97.chr.gtf.gz | makeCanonicalTranscr
 
 .err is empty, removed.
 
-[NOTE: result is identical to previous version canonicalTranscripts_190916.tsv.gz
-which I am keeping to avoid any confusion]
-
 
 ############################################
 16/09/2019

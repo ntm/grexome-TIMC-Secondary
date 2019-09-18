@@ -140,6 +140,8 @@ my ($lengthCandidates,$lengthSampled) = (0,0);
 open(GENES, "gunzip -c $transcriptsFile |") || 
     die "cannot gunzip-open transcriptsFile $transcriptsFile\n";
 
+# skip header
+<GENES>;
 
 while (my $line = <GENES>) {
     chomp($line);
