@@ -1,4 +1,75 @@
 ###############################################
+18/09/2019
+
+Need to work from the GTF since direct ensembl access is too slow.
+Grabbing the latest ensembl Human GTF in /data/Ensembl/ .
+
+I also need the list of canonical transcripts.
+I tried using the perl API of Ensembl (see /data/Ensembl/Archive/) 
+but it's so slow I'ld call it broken.
+
+Since listCanonicalTranscripts_API.pl is impossibly slow I
+wrote listCanonicalTranscripts_MYSQL.sh , which directly 
+accesses the mysql database.
+It runs in seconds (10000 speedup over the API version).
+Results are identical except we also get the new LRG* transcripts.
+[NOTE: must run on eg nicofree, outgoing tcp/3306 is blocked at TIMC]
+/bin/sh < listCanonicalTranscripts_MYSQL.sh | gzip -c >  listCanonicalTranscripts_190918.tsv.gz
+
+Then on fauve:
+gunzip -c /data/Ensembl/Homo_sapiens.GRCh38.97.chr.gtf.gz | makeCanonicalTranscriptTable.pl listCanonicalTranscripts_190918.tsv.gz 2> makeCanonicalTranscriptTable_190918.err | gzip -c > canonicalTranscripts_190918.tsv.gz
+
+.err is empty, removed.
+
+[NOTE: result is identical to previous version canonicalTranscripts_190916.tsv.gz
+which I am keeping to avoid any confusion]
+
+
+############################################
+16/09/2019
+
+I need an updated list of canonical transcripts, I wrote
+listCanonicalTranscripts_API.pl , running:
+[NOTE: must run on eg nicofree, outgoing tcp/3306 is blocked at TIMC]
+
+/bin/time -v perl listCanonicalTranscripts_API.pl > homo_sapiens_canonicalTranscripts_190916.tsv 2> listCanonicalTranscripts_190916.err &
+
+... wow: 16h34min...
+
+After posting to ensembl-dev I got suggestions for improving the
+script, see listCanonicalTranscripts_API_withFixes.pl , maybe 4x 
+speedup.
+But the real solution is listCanonicalTranscripts_MYSQL.sh, see 18/09/2019 entry.
+
+
+
+###############################################
+12/09/2019
+
+There are a few issues with files obtained from UCSC:
+- some gene names are not in sync with Ensembl (eg one uses
+HGNC but not the other);
+- "canonical" transcripts are not the same, eg for one of our
+azoo candidate genes UCSC has a lncRNA as canonical rather than 
+the coding transcript selected by ensembl.
+
+Writing getCanonicalTranscriptsData.pl to obtain the data I need
+from Ensembl.
+
+NOTE: I cannot connect to the Ensembl databases from TIMC, I have
+to call getCanonicalTranscriptsData.pl from home (or somewhere 
+where outgoing TCP isn't filtered).
+perl getCanonicalTranscriptsData.pl > canonicalTranscripts_ensembl97.tsv 
+
+
+...
+the code is unbelievably slow. Nevermind, I will download the full GFF or GTF
+from ensembl ftp and work from that.
+
+Moving getCanonicalTranscriptsData.pl to Old/ .
+
+
+###############################################
 30/08/2019
 
 Needed for SecondaryAnalyses/10_coverage.pl:
