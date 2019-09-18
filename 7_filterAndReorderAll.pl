@@ -78,7 +78,7 @@ while (my $inFile = readdir(INDIR)) {
     ($pick) && ($outFile .= ".pick");
     $outFile .= ".csv";
     
-    my $com = "$binPath/$filterBin --max_ctrl_hv 3 --max_ctrl_het 10 --no_mod";
+    my $com = "perl $binPath/$filterBin --max_ctrl_hv 3 --max_ctrl_het 10 --no_mod";
     # using defaults for AFs 
     # $com .= " --max_af_gnomad 0.01 --max_af_1kg 0.03 --max_af_esp 0.05"
     ($pick) && ($com .= " --pick");
