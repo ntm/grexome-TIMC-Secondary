@@ -8,7 +8,7 @@
 # - $outDir doesn't exist, it will be created and filled with one TSV
 #   per infile (never gzipped), adding .Transcripts to the name.
 #
-# Each cohort tsv is filtered with 8_finalFilters.pl to consider
+# Each cohort tsv is filtered with 7_filterVariants.pl to consider
 # only rare variants (max_af_*) in picked transcripts, that aren't seen
 # in too many CTRLs (max_ctrl_*), that are well genotyped in our dataset (min_hr),
 # and that have HIGH, MODERATE or LOW impact (no_mod).
@@ -51,16 +51,16 @@ use Parallel::ForkManager;
 # number of jobs
 my $numJobs = 8;
 
-# full path to finalFilter.pl, unfortunately hard-coded for now
+# full path to filterVariants.pl, unfortunately hard-coded for now
 # but with several possibbilities
 my $filterBin;
-my @possibleFilterBins = ("/home/nthierry/PierreRay/Grexome/SecondaryAnalyses/8_finalFilters.pl",
-			  "/home/nthierry/VariantCalling/GrexomeFauve/SecondaryAnalyses/8_finalFilters.pl");
+my @possibleFilterBins = ("/home/nthierry/PierreRay/Grexome/SecondaryAnalyses/7_filterVariants.pl",
+			  "/home/nthierry/VariantCalling/GrexomeFauve/SecondaryAnalyses/7_filterVariants.pl");
 foreach my $f (@possibleFilterBins) {
     (-f $f) && ($filterBin = "perl $f") && last;
 }
 ($filterBin) || 
-    die "Sorry, can't find 8_finalFilters.pl, update \@possibleFilterBins\n";
+    die "Sorry, can't find 7_filterVariants.pl, update \@possibleFilterBins\n";
 
 # columns we want to keep, in this order:
 my @keptColumns = qw(SYMBOL KNOWN_CANDIDATE_GENE Feature Gene RefSeq BIOTYPE);
