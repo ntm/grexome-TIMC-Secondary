@@ -333,12 +333,16 @@ sub processBatch {
 	    if ((defined $format{"DP"}) && ($thisData[$format{"DP"}]) && ($thisData[$format{"DP"}] ne '.')) {
 		$thisDP = $thisData[$format{"DP"}];
 	    }
-	    if ((defined $format{"AD"}) && ($thisData[$format{"AD"}]) && ($thisData[$format{"AD"}] =~ /^[\.,]+$/)) {
+	    if ((defined $format{"AD"}) && ($thisData[$format{"AD"}]) && ($thisData[$format{"AD"}] =~ /^[\d,]+$/)) {
 		my $sumOfADs = 0;
 		foreach my $ad (split(/,/,$thisData[$format{"AD"}])) {
 		    $sumOfADs += $ad;
 		}
 		($thisDP < $sumOfADs) && ($thisDP = $sumOfADs);
+	    }
+
+	    if (($verbose) && ($data[0] eq "chr1") && ($data[1] eq "1353987")) {
+		warn "I: chr1:1353987 , calculated DP=$thisDP for grexome".(50+$i-9)."\n";
 	    }
 
 	    # if depth too low or undefined for this sample, change to NOCALL
@@ -370,7 +374,7 @@ sub processBatch {
 	    my $af = '.';
 	    if (($geno2 != 0) && (($geno1 == 0) || ($geno1 == $geno2))) {
 		# 0/x HET or x/x HV, AD should always be there
-		if ((! $thisData[$format{"AD"}]) || ($thisData[$format{"AD"}] =~ /^[\.,]+$/)) {
+		if ((! $thisData[$format{"AD"}]) || ($thisData[$format{"AD"}] !~ /^[\d,]+$/)) {
 		    die "E: GT is HET or HV but we don't have AD or AD data is blank in:\n$line\nright after:\n$lineToPrint\n";
 		}
 		my @ads = split(/,/, $thisData[$format{"AD"}]);
@@ -389,6 +393,10 @@ sub processBatch {
 	    # else this is HR or x/y, minAF doesn't apply, use default AF='.'
 	    ($data =~ s/^([^:]+):/$thisData[$format{"GT"}]:$af:/) || 
 		die "cannot add fixed GT $thisData[$format{'GT'}] and AF $af after the geno in: $data\n";
+
+	    if (($verbose) && ($data[0] eq "chr1") && ($data[1] eq "1353987")) {
+		warn "I: chr1:1353987 , calculated AF=$af for grexome".(50+$i-9)."\n";
+	    }
 
 	    # we have $thisDP and $af , fix blatantly wrong calls
 	    if (($thisDP >= $filterParamsR->{"minDP_HV"}) && ($geno1 == 0) &&

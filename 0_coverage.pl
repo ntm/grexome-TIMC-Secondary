@@ -265,7 +265,7 @@ while (my $line = <GENES>) {
 		    if ((defined $format{"DP"}) && ($data[$format{"DP"}]) && ($data[$format{"DP"}] ne '.')) {
 			$coverage = $data[$format{"DP"}];
 		    }
-		    if ((defined $format{"AD"}) && ($data[$format{"AD"}]) && ($data[$format{"AD"}] =~ /^[\.,]+$/)) {
+		    if ((defined $format{"AD"}) && ($data[$format{"AD"}]) && ($data[$format{"AD"}] =~ /^[\d,]+$/)) {
 			my $sumOfADs = 0;
 			foreach my $ad (split(/,/,$data[$format{"AD"}])) {
 			    $sumOfADs += $ad;
