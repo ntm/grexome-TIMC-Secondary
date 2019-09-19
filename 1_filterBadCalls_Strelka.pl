@@ -29,9 +29,6 @@ use Parallel::ForkManager;
 #############################################
 ## hard-coded stuff that shouldn't change much
 
-# if $debug > 0 print more info to stderr about fixed genotype calls
-my $debug = 0;
-
 # max number of lines to read in a single batch. Each batch is then
 # processed by a worker thread.
 # Reduce if you are filling up $tmpDir (which should be on a RAMDISK),
@@ -72,11 +69,15 @@ my $tmpDir = "tmpdir_filterBadCalls/";
 # number of parallel jobs to run
 my $numJobs = 16;
 
+# if $verbose > 0 print more info to stderr (currently about fixed genotype calls)
+my $verbose = 0;
+
 # help: if true just print $USAGE and exit
 my $help = '';
 
 GetOptions ("metadata=s" => \$metadata,
 	    "jobs=i" => \$numJobs,
+	    "verbose=i" => \$verbose,
 	    "tmpdir=s" => \$tmpDir,
 	    "help" => \$help)
     or die("Error in command line arguments\n");
@@ -86,6 +87,7 @@ Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --metadata string [no default] : patient metadata xlsx file, with path
 --tmpdir string [default = $tmpDir] : subdir where tmp files will be created (on a RAMDISK if possible), must not pre-exist and will be removed after execution
 --jobs N [default = $numJobs] : number of parallel jobs=threads to run
+--verbose N [default 0] : if > 0 increase verbosity on stderr
 --help : print this USAGE";
 
 # make sure required options were provided and sanity check them
@@ -232,7 +234,7 @@ while (!$lastBatch) {
     open(my $tmpOutFH, "> $tmpOut") || die "cannot open $tmpOut for writing\n";
 
     # process this batch
-    &processBatch(\@lines,$tmpOutFH,\%filterParams,\@skippedCols);
+    &processBatch(\@lines,$tmpOutFH,\%filterParams,\@skippedCols,$verbose);
 
     # done, close tmp FH and create flag-file
     close($tmpOutFH) || die "cannot close tmp outFH $tmpOutFH\n";
@@ -270,9 +272,10 @@ warn "I: $now - DONE running: ".join(" ", $0, @ARGV)."\n";
 # - outFH open filehandle to print to
 # - hashref with filter params
 # - ref to array saying which columns to skip
+# - $verbose, if > 0 be more verbose
 sub processBatch {
-    (@_ == 4) || die "E: processBatch needs 4 args\n";
-    my ($linesR,$outFH,$filterParamsR,$skippedColsR) = @_;
+    (@_ == 5) || die "E: processBatch needs 5 args\n";
+    my ($linesR,$outFH,$filterParamsR,$skippedColsR,$verbose) = @_;
 
     # counters for number of blatant errors fixed to HV or HET
     my $fixedToHV = 0;
@@ -393,7 +396,7 @@ sub processBatch {
 		# change to HV
 		$thisData[$format{"GT"}] = "$geno2/$geno2";
 		$fixedToHV++;
-		if ($debug) {
+		if ($verbose) {
 		    # warn with chrom pos ref > alts sample dp af
 		    warn "I: fix to HV, $data[0]:$data[1] $data[3] > $data[4] grexome".(50+$i-9)." DP=$thisDP AF=$af\n";
 		}
@@ -403,7 +406,7 @@ sub processBatch {
 		# change to HET
 		$thisData[$format{"GT"}] = "0/$geno2";
 		$fixedToHET++;
-		if ($debug) {
+		if ($verbose) {
 		    # warn with chrom pos ref > alts sample dp af
 		    warn "I: fix to HET, $data[0]:$data[1] $data[3] > $data[4] grexome".(50+$i-9)." DP=$thisDP AF=$af\n";
 		}
@@ -420,8 +423,8 @@ sub processBatch {
     }
     # INFO with number of fixed calls in this batch, we don't care that this
     # comes out of order to stderr
-    ($fixedToHV) && (warn "I: fixed $fixedToHV calls from HET to HV\n");
-    ($fixedToHET) && (warn "I: fixed $fixedToHET calls from HV to HET\n");
+    ($verbose) && ($fixedToHV) && (warn "I: fixed $fixedToHV calls from HET to HV\n");
+    ($verbose) && ($fixedToHET) && (warn "I: fixed $fixedToHET calls from HV to HET\n");
 }
 
 
