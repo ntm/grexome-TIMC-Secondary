@@ -34,7 +34,7 @@ use Parallel::ForkManager;
 # Reduce if you are filling up $tmpDir (which should be on a RAMDISK),
 # increase if jobs are almost instantaneous (because you are then 
 # wasting time in parallelization overhead)
-my $batchSize = 100000;
+my $batchSize = 500000;
 
 
 # heuristics for fixing low-quality or blatantly wrong genotype calls 
