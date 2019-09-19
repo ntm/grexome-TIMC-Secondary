@@ -41,7 +41,7 @@ my $batchSize = 100000;
 
 
 # heuristics for fixing low-quality or blatantly wrong genotype calls 
-# [$dp below represents max(DP,DPI)]:
+# [$dp below represents max(DP,sumOfADs)]:
 # if $dp < $minDP , any call becomes NOCALL
 # if GQX < $minGQX , any call becomes NOCALL
 # if AF < $minAF and call was REF/VAR or VAR/VAR, call becomes NOCALL
@@ -301,10 +301,8 @@ sub processBatch {
 	    }
 	}
 	# sanity: make sure the fields we need are there
-	# we use either DP or DPI as long as one is present and not '.'
+	# don't check DP since AD is checked
 	(defined $format{"GQX"}) || die "no GQX key in FORMAT string for line:\n$line\n";
-	(defined $format{"DP"}) || (defined $format{"DPI"}) ||
-	    die "no DP or DPI key in FORMAT string for line:\n$line\n";
 	(defined $format{"GT"}) || die "no GT key in FORMAT string for line:\n$line\n";
 	(defined $format{"AD"}) || die "no AD key in FORMAT string for line:\n$line\n";
 
@@ -327,14 +325,17 @@ sub processBatch {
 		next;
 	    }
 
-	    # grab the depth (DP or DPI, whichever is defined and higher)
+	    # grab the depth (DP or sumOfADs, whichever is defined and higher)
 	    my $thisDP = -1;
 	    if ((defined $format{"DP"}) && ($thisData[$format{"DP"}]) && ($thisData[$format{"DP"}] ne '.')) {
 		$thisDP = $thisData[$format{"DP"}];
 	    }
-	    if ((defined $format{"DPI"}) && ($thisData[$format{"DPI"}]) && ($thisData[$format{"DPI"}] ne '.') &&
-		($thisData[$format{"DPI"}] > $thisDP)) {
-		$thisDP = $thisData[$format{"DPI"}];
+	    if ((defined $format{"AD"}) && ($thisData[$format{"AD"}]) && ($thisData[$format{"AD"}] =~ /^[\.,]+$/)) {
+		my $sumOfADs = 0;
+		foreach my $ad (split(/,/,$thisData[$format{"AD"}])) {
+		    $sumOfADs += $ad;
+		}
+		($thisDP < $sumOfADs) && ($thisDP = $sumOfADs);
 	    }
 
 	    # if depth too low or undefined for this sample, change to NOCALL
@@ -343,7 +344,7 @@ sub processBatch {
 		next;
 	    }
 	    # with GATK I had some issues with DP=0 calls, causing illegal divisions
-	    # by zero when calculating fracVarReads, but that is now skipped above
+	    # by zero when calculating AF, but that is now skipped above
 
 	    # clean up Strelka GTs and calculate AF, for fracVarReads filter:
 	    # Strelka makes some phased calls sometimes, homogenize as unphased
