@@ -29,6 +29,9 @@ use Parallel::ForkManager;
 #############################################
 ## hard-coded stuff that shouldn't change much
 
+# if $debug > 0 print more info to stderr about fixed genotype calls
+my $debug = 0;
+
 # max number of lines to read in a single batch. Each batch is then
 # processed by a worker thread.
 # Reduce if you are filling up $tmpDir (which should be on a RAMDISK),
@@ -389,12 +392,20 @@ sub processBatch {
 		# change to HV
 		$thisData[$format{"GT"}] = "$geno2/$geno2";
 		$fixedToHV++;
+		if ($debug) {
+		    # warn with chrom pos ref > alts sample dp af
+		    warn "I: fix to HV, $data[0]:$data[1] $data[3] > $data[4] grexome".(50+$i-9)." DP=$thisDP AF=$af\n";
+		}
 	    }
 	    if (($thisDP >= $filterParamsR->{"minDP_HET"}) && ($geno1 != 0) && ($af ne '.') && 
 		($af >= $filterParamsR->{"minAF_HET"}) && ($af <= $filterParamsR->{"maxAF_HET"})) {
 		# change to HET
 		$thisData[$format{"GT"}] = "0/$geno2";
 		$fixedToHET++;
+		if ($debug) {
+		    # warn with chrom pos ref > alts sample dp af
+		    warn "I: fix to HET, $data[0]:$data[1] $data[3] > $data[4] grexome".(50+$i-9)." DP=$thisDP AF=$af\n";
+		}
 	    }
 
 	    # other filters (eg strandDisc) would go here
@@ -408,8 +419,8 @@ sub processBatch {
     }
     # INFO with number of fixed calls in this batch, we don't care that this
     # comes out of order to stderr
-    ($fixedToHV) && (warn "I: fixed $fixedToHV calls to HV\n");
-    ($fixedToHET) && (warn "I: fixed $fixedToHET calls to HET\n");
+    ($fixedToHV) && (warn "I: fixed $fixedToHV calls from HET to HV\n");
+    ($fixedToHET) && (warn "I: fixed $fixedToHET calls from HV to HET\n");
 }
 
 
