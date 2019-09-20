@@ -69,7 +69,8 @@ my $tmpDir = "tmpdir_filterBadCalls/";
 # number of parallel jobs to run
 my $numJobs = 16;
 
-# if $verbose > 0 print more info to stderr (currently about fixed genotype calls)
+# if $verbose > 0 print more info to stderr (currently about 
+# fixed genotype calls), larger values increase verbosity
 my $verbose = 0;
 
 # help: if true just print $USAGE and exit
@@ -272,7 +273,7 @@ warn "I: $now - DONE running: ".join(" ", $0, @ARGV)."\n";
 # - outFH open filehandle to print to
 # - hashref with filter params
 # - ref to array saying which columns to skip
-# - $verbose, if > 0 be more verbose
+# - $verbose, 0 is quiet, increase value for more verbosity
 sub processBatch {
     (@_ == 5) || die "E: processBatch needs 5 args\n";
     my ($linesR,$outFH,$filterParamsR,$skippedColsR,$verbose) = @_;
@@ -341,10 +342,6 @@ sub processBatch {
 		($thisDP < $sumOfADs) && ($thisDP = $sumOfADs);
 	    }
 
-	    if (($verbose) && ($data[0] eq "chr1") && ($data[1] eq "1353987")) {
-		warn "I: chr1:1353987 , calculated DP=$thisDP for grexome".(50+$i-9)."\n";
-	    }
-
 	    # if depth too low or undefined for this sample, change to NOCALL
 	    if ($thisDP < $filterParamsR->{"minDP"}) {
 		$lineToPrint .= "\t./.";
@@ -394,17 +391,13 @@ sub processBatch {
 	    ($data =~ s/^([^:]+):/$thisData[$format{"GT"}]:$af:/) || 
 		die "cannot add fixed GT $thisData[$format{'GT'}] and AF $af after the geno in: $data\n";
 
-	    if (($verbose) && ($data[0] eq "chr1") && ($data[1] eq "1353987")) {
-		warn "I: chr1:1353987 , calculated AF=$af for grexome".(50+$i-9)."\n";
-	    }
-
 	    # we have $thisDP and $af , fix blatantly wrong calls
 	    if (($thisDP >= $filterParamsR->{"minDP_HV"}) && ($geno1 == 0) &&
 		($af ne '.') && ($af >= $filterParamsR->{"minAF_HV"})) {
 		# change to HV
 		$thisData[$format{"GT"}] = "$geno2/$geno2";
 		$fixedToHV++;
-		if ($verbose) {
+		if ($verbose >= 2) {
 		    # warn with chrom pos ref > alts sample dp af
 		    warn "I: fix to HV, $data[0]:$data[1] $data[3] > $data[4] grexome".(50+$i-9)." DP=$thisDP AF=$af\n";
 		}
@@ -414,7 +407,7 @@ sub processBatch {
 		# change to HET
 		$thisData[$format{"GT"}] = "0/$geno2";
 		$fixedToHET++;
-		if ($verbose) {
+		if ($verbose >= 2) {
 		    # warn with chrom pos ref > alts sample dp af
 		    warn "I: fix to HET, $data[0]:$data[1] $data[3] > $data[4] grexome".(50+$i-9)." DP=$thisDP AF=$af\n";
 		}
