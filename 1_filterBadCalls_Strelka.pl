@@ -388,8 +388,6 @@ sub processBatch {
 		}
 	    }
 	    # else this is HR or x/y, minAF doesn't apply, use default AF='.'
-	    ($data =~ s/^([^:]+):/$thisData[$format{"GT"}]:$af:/) || 
-		die "cannot add fixed GT $thisData[$format{'GT'}] and AF $af after the geno in: $data\n";
 
 	    # we have $thisDP and $af , fix blatantly wrong calls
 	    if (($thisDP >= $filterParamsR->{"minDP_HV"}) && ($geno1 == 0) &&
@@ -415,7 +413,10 @@ sub processBatch {
 
 	    # other filters (eg strandDisc) would go here
 
-	    # OK data passed all filters, print and set $keepLine if not HOMOREF
+	    # OK data passed all filters but $thisData(GT) may have been changed
+	    # -> fix GT in $data and set $keepLine if not HOMOREF
+	    ($data =~ s/^([^:]+):/$thisData[$format{"GT"}]:$af:/) || 
+		die "cannot fix GT to $thisData[$format{'GT'}] and add AF $af after the geno in: $data\n";
 	    $lineToPrint .= "\t$data";
 	    ($thisData[$format{"GT"}] ne '0/0') && ($keepLine = 1);
 	}
