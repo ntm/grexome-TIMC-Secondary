@@ -18,8 +18,8 @@
 # For a sample, we only print lines from its cohort file and where 
 # it has an HV or HET genotype: this genotype is printed in new columns
 # GENOTYPE and DP:AF, inserted right after KNOWN_CANDIDATE_GENE.
-# It is followed by new columns NB_$geno_$impact_ThisSample_ThisTranscript with
-# $geno == HV or HET and $impact == HIGH or MODER, counting the total
+# Between GENOTYPE and DP:AF we insert new columns NB_$geno_$impact_ThisSample_ThisTranscript
+# with $geno == HV or HET and $impact == HIGH or MODER, counting the total
 # number of $geno-$impact variants (passing all filters and) affecting
 # this transcript in this grexome; and then NB_ALLVARIANTS_ThisSample_ThisTranscript
 # with all variants affecting this transcript in this grexome.
@@ -161,13 +161,14 @@ while (my $inFile = readdir(INDIR)) {
     foreach my $i (0..$#header) {
 	if ($header[$i] eq "KNOWN_CANDIDATE_GENE") {
 	    $knownCandidateCol = $i;
-	    $header[$i] .= "\tGENOTYPE\tDP:AF";
+	    $header[$i] .= "\tGENOTYPE";
 	    foreach my $g ("HV", "HET") {
 		foreach my $im ("HIGH", "MODER") {
 		    $header[$i] .= "\tNB_$g"."_$im"."_ThisSample_ThisTranscript";
 		}
 	    }
 	    $header[$i] .= "\tNB_ALLVARIANTS_ThisSample_ThisTranscript";
+	    $header[$i] .= "\tDP:AF";
 	}
 	elsif ($header[$i] eq "Feature") {
 	    $featureCol = $i;
@@ -279,8 +280,8 @@ while (my $inFile = readdir(INDIR)) {
 		    ($grex2trans2counters{$grexome}->{$transcript}) || ($grex2trans2counters{$grexome}->{$transcript} = [0,0,0,0]);
 
 		    # now fill our data structures
-		    push(@{$grex2lineStarts{$grexome}}, "$toPrintStart$geno\t$dpaf");
-		    push(@{$grex2lineEnds{$grexome}}, "\t$toPrintEnd");
+		    push(@{$grex2lineStarts{$grexome}}, "$toPrintStart$geno");
+		    push(@{$grex2lineEnds{$grexome}}, "\t$dpaf\t$toPrintEnd");
 		    push(@{$grex2transcripts{$grexome}}, $transcript);
 		    my $indexToIncr = 0;
 		    ($geno eq "HET") && ($indexToIncr += 2);
