@@ -4,7 +4,8 @@
 # NTM
 
 # Takes 2 arguments: $inDir $outDir
-# - $inDir must contain gzipped cohort TSVs as produced by extractCohorts.pl;
+# - $inDir must contain (possibly gzipped) cohort TSVs as produced by
+#      extractCohorts.pl (possibly filtered);
 # - $outDir doesn't exist, it will be created and filled with one TSV
 #   per infile (never gzipped), adding .Transcripts to the name.
 #
@@ -24,18 +25,18 @@
 #   least one HV MODHIGH-or-HIGH variant
 # - COUNT_$cohort_HV_MODER = number of distinct samples with at
 #   least one HV MODERATE-or-MODHIGH-or-HIGH variant
-# - COUNT_$cohort_HET_HIGH = number of distinct samples with at
+# - COUNT_$cohort_COMPHET_HIGH = number of distinct samples with at
 #   least TWO HET (or one HV) HIGH variants
-# - COUNT_$cohort_HET_MODHIGH = number of distinct samples with at
+# - COUNT_$cohort_COMPHET_MODHIGH = number of distinct samples with at
 #   least TWO HET (or one HV) MODHIGH-or-HIGH variants
-# - COUNT_$cohort_HET_MODER = number of distinct samples with at
+# - COUNT_$cohort_COMPHET_MODER = number of distinct samples with at
 #   least TWO HET (or one HV) MODERATE-or-MODHIGH-or-HIGH variants
 # - 6 more columns COUNT_NEGCTRL_* with similar counts but counting
 #   the control samples (using the extractCohorts criteria).
-# - HV_HIGH, HV_MODHIGH, HV_MODER, HET_HIGH, HET_MODHIGH, HET_MODER: 
+# - HV_HIGH, HV_MODHIGH, HV_MODER, COMPHET_HIGH, COMPHET_MODHIGH, COMPHET_MODER: 
 #   list of samples counted in the corresponding COUNT columns (so eg the
 #   *MODER columns contain the corresponding *HIGH and *MODHIGH samples,
-#   and the HET* columns contain the corresponding HV* samples);
+#   and the COMPHET* columns contain the corresponding HV* samples);
 #   we don't list the NEGCTRL samples.
 # In addition, several useful columns from the source file are
 # retained, see @keptColumns.
@@ -76,7 +77,7 @@ foreach my $i (0..$#keptColumns) {
 }
 
 # also for convenience: the types of samples to count
-my @countTypes = ("HV_HIGH","HV_MODHIGH","HV_MODER","HET_HIGH","HET_MODHIGH","HET_MODER");
+my @countTypes = ("HV_HIGH","HV_MODHIGH","HV_MODER","COMPHET_HIGH","COMPHET_MODHIGH","COMPHET_MODER");
 
 #########################################################
 
@@ -99,8 +100,15 @@ while (my $inFile = readdir(INDIR)) {
     ($inFile =~ /^\./) && next;
     $pm->start && next;
     my $cohort;
+    # command-line to execute
+    my $com;
     if ($inFile =~ (/^(\w+)\.csv\.gz$/)) {
 	$cohort = $1;
+	$com = "gunzip -c $inDir/$inFile | ";
+    }
+    elsif ($inFile =~ (/^(\w+)\.filtered\.pick\.csv$/)) {
+	$cohort = $1;
+	$com = "cat $inDir/$inFile | ";
     }
     else {
 	warn "W: cannot parse filename of inFile $inFile, skipping it\n";
@@ -115,11 +123,11 @@ while (my $inFile = readdir(INDIR)) {
     my $now = strftime("%F %T", localtime);
     warn "I: $now - starting $0 on $cohort\n";
 
-    my $com = "$filterBin --max_ctrl_hv 10 --max_ctrl_het 50 --min_hr 100 --no_mod --pick";
+    $com .= " $filterBin --max_ctrl_hv 10 --max_ctrl_het 50 --min_hr 100 --no_mod --pick |";
     # using defaults for AFs 
     # $com .= " --max_af_gnomad 0.01 --max_af_1kg 0.03 --max_af_esp 0.05"
-    open(FILTER, "gunzip -c $inDir/$inFile | $com | ") ||
-	die "E: cannot gunzip-open and filter infile $inFile\n";
+    open(FILTER, "$com") ||
+	die "E: cannot (gunzip-?)-open and filter infile $inFile\n";
 
     # header line
     my $header = <FILTER>;
@@ -213,7 +221,7 @@ while (my $inFile = readdir(INDIR)) {
     # each hash has key==$grexome, value==number of variants (of that
     # category), MODHIGH includes HIGH samples and MODER includes MODHIGH
     # and HIGH samples,
-    # HET also lists the samples that are HV (but these count as 2 variants)
+    # COMPHET also lists the samples that are HV (but these count as 2 variants)
     my %transcript2samples;
 
     # chrom in previous line, when new line is different we print and empty hashes
@@ -243,7 +251,7 @@ while (my $inFile = readdir(INDIR)) {
 		# we will print except if all 6 COUNT_$cohort cols are zero
 		my $printOK = 0;
 
-		# for HET counts and lists we only want samples with at least 2 variants
+		# for COMPHET counts and lists we only want samples with at least 2 variants
 		foreach my $t2si (3..5,9..11) {
 		    foreach my $sample (keys %{$transcript2samples{$transcript}->[$t2si]}) {
 			($transcript2samples{$transcript}->[$t2si]->{$sample} >= 2) ||
@@ -390,8 +398,8 @@ while (my $inFile = readdir(INDIR)) {
 			    $transcript2samples{$transcript}->[$ai]->{$grexome}++;
 			}
 		    }
-		    # whether $isHV or not, COUNT_HET_HIGH COUNT_HET_MODHIGH and
-		    # COUNT_HET_MODER get updated, but HV variants count as 2
+		    # whether $isHV or not, COUNT_COMPHET_HIGH COUNT_COMPHET_MODHIGH and
+		    # COUNT_COMPHET_MODER get updated, but HV variants count as 2
 		    foreach my $ai (6*$isNegctrl+3..6*$isNegctrl+5) {
 			($transcript2samples{$transcript}->[$ai]->{$grexome}) || 
 			    ($transcript2samples{$transcript}->[$ai]->{$grexome} = 0);
@@ -407,7 +415,7 @@ while (my $inFile = readdir(INDIR)) {
 			    $transcript2samples{$transcript}->[$ai]->{$grexome}++;
 			}
 		    }
-		    # whether $isHV or not, COUNT_HET_MODHIGH and COUNT_HET_MODER get +1 or +2
+		    # whether $isHV or not, COUNT_COMPHET_MODHIGH and COUNT_COMPHET_MODER get +1 or +2
 		    foreach my $ai (6*$isNegctrl+4, 6*$isNegctrl+5) {
 			($transcript2samples{$transcript}->[$ai]->{$grexome}) || 
 			    ($transcript2samples{$transcript}->[$ai]->{$grexome} = 0);
@@ -422,7 +430,7 @@ while (my $inFile = readdir(INDIR)) {
 			    ($transcript2samples{$transcript}->[$ai]->{$grexome} = 0);
 			$transcript2samples{$transcript}->[$ai]->{$grexome}++;
 		    }
-		    # whether $isHV or not, COUNT_HET_MODER gets +1 or +2
+		    # whether $isHV or not, COUNT_COMPHET_MODER gets +1 or +2
 		    my $ai = 6*$isNegctrl+5;
 		    ($transcript2samples{$transcript}->[$ai]->{$grexome}) || 
 			($transcript2samples{$transcript}->[$ai]->{$grexome} = 0);
