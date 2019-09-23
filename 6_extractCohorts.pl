@@ -58,6 +58,8 @@ use Parallel::ForkManager;
 # should NOT be used as neg controls for each other.
 # The cohort names must match the "pathology" column of the $metadata xlsx
 # (this is checked).
+# NOTE: @notControls IS DUPLICATED IN extractTranscripts.pl, IF IT IS CHANGED HERE IT 
+# MUST ALSO BE CHANGED THERE 
 my @notControls = (["Flag","Astheno","Headless"],
 		   ["Azoo","Ovo","Macro","IOP"],
 		   ["Globo","Macro","Terato"]);
