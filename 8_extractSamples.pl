@@ -18,6 +18,9 @@
 # For a sample, we only print lines from its cohort file and where 
 # it has an HV or HET genotype: this genotype is printed in new columns
 # GENOTYPE and DP:AF, inserted right after KNOWN_CANDIDATE_GENE.
+# For samples with a causal gene, we also grab its genotype in the NEGCTRL_HV
+# and NEGCTRL_HET columns (so the sample file doesn't have only variants
+# impacting its causal gene).
 # Between GENOTYPE and DP:AF we insert new columns NB_$geno_$impact_ThisSample_ThisTranscript
 # with $geno == HV or HET and $impact == HIGH or MODER, counting the total
 # number of $geno-$impact variants (passing all filters and) affecting
@@ -48,6 +51,8 @@ mkdir($outDir) || die "cannot mkdir outDir $outDir\n";
 
 # key==cohort name, value is an arrayref of all grexomes from this cohort
 my %cohort2grexomes = ();
+# also the other way around: key==grexome, value==its cohort
+my %grexome2cohort = ();
 
 # key==grexome, value is patientID if it exists, specimenID otherwise
 my %grexome2patient = ();
@@ -91,6 +96,7 @@ my %grexome2patient = ();
 	my $cohort = $worksheet->get_cell($row, $cohortCol)->value;
 	(defined $cohort2grexomes{$cohort}) || ($cohort2grexomes{$cohort} = []);
 	push(@{$cohort2grexomes{$cohort}}, $grexome);
+	$grexome2cohort{$grexome} = $cohort;
 	my $patient = $worksheet->get_cell($row, $specimenCol)->unformatted();
 	if ($worksheet->get_cell($row, $patientCol)) {
 	    my $tmp = $worksheet->get_cell($row, $patientCol)->unformatted();
@@ -130,6 +136,7 @@ while (my $inFile = readdir(INDIR)) {
 
     # need HV HET and other Geno columns (will all be removed)
     my ($hvCol,$hetCol) = (-1,-1);
+    my ($hvNegCol,$hetNegCol) = (-1,-1);
     # $colsToRemove[$i] == 1 if column $i in infile must be removed
     my @colsToRemove;
     # reverse so we can splice out elements
@@ -144,15 +151,25 @@ while (my $inFile = readdir(INDIR)) {
 	    $colsToRemove[$i] = 1;
 	    splice(@header,$i,1);
 	}
-	elsif (grep(/$header[$i]/, ("NEGCTRL_HV","NEGCTRL_HET","OTHER","NEGCTRL_OTHER"))) {
+	if ($header[$i] eq "NEGCTRL_HV") {
+	    $hvNegCol = $i;
+	    $colsToRemove[$i] = 1;
+	    splice(@header,$i,1);
+	}
+	elsif ($header[$i] eq "NEGCTRL_HET") {
+	    $hetNegCol = $i;
+	    $colsToRemove[$i] = 1;
+	    splice(@header,$i,1);
+	}
+	elsif (grep(/$header[$i]/, ("OTHER","NEGCTRL_OTHER"))) {
 	    $colsToRemove[$i] = 1;
 	    splice(@header,$i,1);
 	}
     }
-    ($hvCol >= 0) || 
-	die "E: couldn't find HV in header of infile $inFile\n";
-    ($hetCol >= 0) || 
-	die "E: couldn't find HET in header of infile $inFile\n";
+    ($hvCol >= 0) || ($hvNegCol >= 0) || 
+	die "E: couldn't find HV or NEGCTRL_HV in header of infile $inFile\n";
+    ($hetCol >= 0) || ($hetNegCol >= 0) || 
+	die "E: couldn't find HET or NEGCTRL_HET in header of infile $inFile\n";
 
     # KNOWN_CANDIDATE_GENE, Feature and IMPACT column indexes after
     # removing @colsToRemove columns
@@ -242,10 +259,13 @@ while (my $inFile = readdir(INDIR)) {
     while (my $line = <IN>) {
 	chomp($line);
 	my @fields = split(/\t/, $line, -1) ;
-	# grab needed GENO data: HV at index 0 and HET at index 1
+	# grab needed GENO data: HV at index 0, HET at index 1, 
+	# NEGCTRL_HV at index 2, NEGCTRL_HET at index 3
 	my @genoData;
 	($fields[$hvCol]) && ($genoData[0] = $fields[$hvCol]);
 	($fields[$hetCol]) && ($genoData[1] = $fields[$hetCol]);
+	($fields[$hvNegCol]) && ($genoData[2] = $fields[$hvNegCol]);
+	($fields[$hetNegCol]) && ($genoData[3] = $fields[$hetNegCol]);
 	# splice all GENO data out
 	foreach my $i (reverse(0..$#colsToRemove)) {
 	    ($colsToRemove[$i]) && splice(@fields,$i,1);
@@ -256,22 +276,25 @@ while (my $inFile = readdir(INDIR)) {
 	my $transcript = $fields[$featureCol];
 	my $impact = $fields[$impactCol];
 
-	foreach my $i (0,1) {
+	foreach my $i (0..3) {
 	    if ($genoData[$i]) {
 		($genoData[$i] =~ /^([^~]+)~([^~\|]+)$/) || 
 		    die "cannot parse HV/HET data $genoData[$i] from infile $inFile\n";
 		my ($geno,$samples) = ($1,$2);
 		# actually, just use HV or HET for geno, the actual allele is in ALLELE_NUM
 		# we will still add DP:AF after HV/HET
-		($i == 0) && ($geno = "HV");
-		($i == 1) && ($geno = "HET");
+		($i % 2 == 0) && ($geno = "HV");
+		($i % 2 == 1) && ($geno = "HET");
 		foreach my $sample (split(/,/,$samples)) {
 		    # grab grexome and [DP:AF], we know it must be there in HV and HET columns
 		    # (allowing AF > 1 for Strelka bug)
 		    ($sample =~ /^(grexome\d\d\d\d)\[(\d+:\d+\.\d\d)\]$/) ||
 			die  "E: inFile $inFile has a genotype call for a sample I can't parse: $sample\n";
 		    my ($grexome,$dpaf) = ($1,$2);
-
+		    # ignore grexomes from other cohorts in NEGCTRL* columns
+		    if (($i >= 2) && ($grexome2cohort{$grexome} ne $cohort)) {
+			next;
+		    }
 		    # initialize everything for this grexome if needed
 		    ($grex2lineStarts{$grexome}) || ($grex2lineStarts{$grexome} = []);
 		    ($grex2lineEnds{$grexome}) || ($grex2lineEnds{$grexome} = []);
