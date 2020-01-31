@@ -30,7 +30,7 @@
 # it holds the "Level" value parsed from  $candidatesFile if SYMBOL is a known 
 # candidate gene for this cohort (as specified in $candidatesFile), 
 # 0 otherwise. Any $causalGene from $metadata is considered a
-# a known candidate gene with Level=5.
+# known candidate gene with Level=5.
 #
 # New COUNT_$cohort_$geno and COUNT_NEGCTRL_$geno columns are created
 # for each  GENO (HV, HET, OTHER, HR) in that order.

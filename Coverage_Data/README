@@ -1,4 +1,14 @@
 ###############################################
+07/11/2019
+
+I want the canonical transcripts in BED format (for samtools bedconv),
+producing this:
+gunzip -c canonicalTranscripts_190918.tsv.gz | canonicalTranscripts_table2bed.pl | gzip -c > canonicalTranscripts_190918.bed.gz
+
+AOK.
+
+
+###############################################
 18/09/2019
 
 Need to work from the GTF since direct ensembl access is too slow.
