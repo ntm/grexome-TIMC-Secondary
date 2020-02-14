@@ -8,8 +8,12 @@
 # reads on stdin a fully annotated TSV file;
 # makes $outDir and creates in it one gzipped TSV file per cohort.
 # The cohorts are defined in $metadata.
-# For each sample, any identified causal (mutation in a) gene is grabbed
-# from $metadata.
+#
+# Normally, for each sample, any identified causal (mutation in a) gene 
+# is grabbed from $metadata; except if --ignoreCausal was specificed,
+# in which case we ignore any known causal mutations for samples (but
+# still grab the causal genes, they will still be "known candidates level 5").
+# 
 # @notControls defined at the top of this script says which cohorts
 # should NOT be used as negative controls for each other.
 # For optimal performance $tmpDir should be on a RAMDISK (eg tmpfs).
@@ -46,6 +50,7 @@
 
 use strict;
 use warnings;
+use Getopt::Long;
 use Spreadsheet::XLSX;
 use POSIX qw(strftime);
 use Parallel::ForkManager;
@@ -66,22 +71,63 @@ my @notControls = (["Flag","Astheno","Headless"],
 
 
 # max number of lines to read in a single batch. Each batch is then
-# processed by a worker thread.
+# processed by a worker thread. This is a performance tuning param,
+# leaving to default should be fine
 my $batchSize = 20000;
+
+
+#############################################
+## options / params from the command-line
 
 # number of jobs
 my $numJobs = 16;
 
+# metadata and candidateGenes XLSX files, no defaults
+my ($metadata, $candidatesFile);
 
-#########################################################
+# outDir and tmpDir, also no defaults
+my ($outDir, $tmpDir);
 
-(@ARGV == 4) || die "needs 4 args: a patient metadata xlsx, a candidateGenes xlsx, and non-existing dirs outDir and tmpDir\n";
-my ($metadata, $candidatesFile, $outDir, $tmpDir) = @ARGV;
+# flag, if true we ignore known causal mutations. Default is "don't ignore".
+my $ignoreCausal = '';
 
+# help: if true just print $USAGE and exit
+my $help = '';
+
+
+my $USAGE = "Parse on STDIN a fully annotated TSV file as produced by steps 1-5 of this secondaryAnalysis pipeline; create in outDir one gzipped TSV file per cohort.\n
+Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
+--metadata string [no default] : patient metadata xlsx file, with path
+--candidateGenes string [no default] : known candidate genes in xlsx file, with path
+--outdir string [no default] : subdir where resulting cohort files will be created, must not pre-exist
+--tmpdir string [no default] : subdir where tmp files will be created (on a RAMDISK if possible), must not pre-exist and will be removed after execution
+--jobs N [default = $numJobs] : number of parallel jobs=threads to run
+--ignoreCausal : if specified, confirmed causal mutations from metadata file are ignored
+--help : print this USAGE";
+
+GetOptions ("metadata=s" => \$metadata,
+	    "candidateGenes=s" => \$candidatesFile,
+	    "outdir=s" => \$outDir,
+	    "tmpdir=s" => \$tmpDir,
+	    "jobs=i" => \$numJobs,
+	    "ignoreCausal" => \$ignoreCausal,
+	    "help" => \$help)
+    or die("Error in command line arguments\n$USAGE\n");
+
+# make sure required options were provided and sanity check them
+($help) && die "$USAGE\n\n";
+
+($metadata) || die "E: you must provide a metadata file\n";
+(-f $metadata) || die "E: the supplied metadata file doesn't exist\n";
+($candidatesFile) || die "E: you must provide a candidateGenes file\n";
+(-f $candidatesFile) || die "E: the supplied candidateGenes file $candidatesFile doesn't exist\n";
+
+($outDir) || die "E: you must provide an outDir\n";
 (-e $outDir) && 
     die "found argument $outDir but it already exists, remove it or choose another name.\n";
 mkdir($outDir) || die "cannot mkdir outDir $outDir\n";
 
+($tmpDir) || die "E: you must provide a tmpDir\n";
 (-e $tmpDir) && 
     die "found argument $tmpDir but it already exists, remove it or choose another name.\n";
 mkdir($tmpDir) || die "cannot mkdir tmpDir $tmpDir\n";
@@ -100,8 +146,6 @@ warn "I: $now - starting to run: ".join(" ", $0, @ARGV)."\n";
 # name that is never seen will be reported to stderr (and probably a typo needs fixing).
 my %knownCandidateGenes = ();
 
-(-f $candidatesFile) ||
-    die "E: the supplied candidates file $candidatesFile doesn't exist\n";
 {
     my $workbook = Spreadsheet::XLSX->new("$candidatesFile");
     (defined $workbook) ||
@@ -154,11 +198,10 @@ my %knownCandidateGenes = ();
 my %sample2cohort = ();
 # cohort names
 my @cohorts = ();
-# causal gene, key==sample id, value == HGNC gene name
+# causal gene, key==sample id, value == HGNC gene name, will 
+# stay empty if --ignoreCausal was specificed
 my %sample2causal = ();
 
-(-f $metadata) ||
-    die "E: the supplied metadata file doesn't exist\n";
 {
     # for cohort names we use a temp hash to avoid redundancy
     my %cohorts;
@@ -204,7 +247,8 @@ my %sample2causal = ();
 	    # clean up a bit, remove leading or trailing whitespace
 	    $causal =~ s/^\s+//;
 	    $causal =~ s/\s+$//;
-	    $sample2causal{$grexome} = $causal;
+	    # store $grexome->$causal EXCEPT IF $ignoreCausal is true
+	    ($ignoreCausal) || ($sample2causal{$grexome} = $causal);
 	    # add to knownCandidateGenes with level 5
 	    (defined $knownCandidateGenes{$cohort}) || ($knownCandidateGenes{$cohort} = {});
 	    $knownCandidateGenes{$cohort}->{$causal} = 5;
