@@ -76,13 +76,6 @@ my $verbose = 0;
 # help: if true just print $USAGE and exit
 my $help = '';
 
-GetOptions ("metadata=s" => \$metadata,
-	    "jobs=i" => \$numJobs,
-	    "verbose=i" => \$verbose,
-	    "tmpdir=s" => \$tmpDir,
-	    "help" => \$help)
-    or die("Error in command line arguments\n");
-
 my $USAGE = "Parse a Strelka GVCF on stdin, print to stdout a similar GVCF where calls that fail basic quality filters are changed to NOCALL, calls that are blatantly wrong are fixed, and lines are only printed if at least one sample has a non-HR genotype call.\n
 Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --metadata string [no default] : patient metadata xlsx file, with path
@@ -90,6 +83,13 @@ Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --jobs N [default = $numJobs] : number of parallel jobs=threads to run
 --verbose N [default 0] : if > 0 increase verbosity on stderr
 --help : print this USAGE";
+
+GetOptions ("metadata=s" => \$metadata,
+	    "jobs=i" => \$numJobs,
+	    "verbose=i" => \$verbose,
+	    "tmpdir=s" => \$tmpDir,
+	    "help" => \$help)
+    or die("Error in command line arguments\n$USAGE\n");
 
 # make sure required options were provided and sanity check them
 ($help) &&
