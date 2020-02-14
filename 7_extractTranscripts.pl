@@ -4,15 +4,16 @@
 # NTM
 
 # Takes 2 arguments: $inDir $outDir
-# - $inDir must contain (possibly gzipped) cohort TSVs as produced by
-#      extractCohorts.pl (possibly filtered);
+# - $inDir must contain cohort TSVs as produced by extractCohorts.pl,
+#   filtered and reordered by filterVariants.pl and reorderColumns.pl;
 # - $outDir doesn't exist, it will be created and filled with one TSV
-#   per infile (never gzipped), adding .Transcripts to the name.
+#   per infile, adding .Transcripts to the name.
 #
-# Each cohort tsv is filtered with 7_filterVariants.pl if it wasn't filtered 
-# previously, to consider only rare variants (max_af_*) in picked transcripts,
-# that aren't seen in too many CTRLs (max_ctrl_*), that are well genotyped in
-# our dataset (min_hr), and that have HIGH, MODERATE or LOW impact (no_mod).
+# We expect that cohort files were filtered to consider only rare variants 
+# (max_af_*) in picked transcripts, that aren't seen in too many CTRLs 
+# (max_ctrl_*), that are well genotyped in our dataset (min_hr), and that 
+# have HIGH, MODERATE or LOW impact (no_mod).
+#
 # We will define a new MODHIGH impact, as follows:
 # - missense variants are upgraded from MODER to MODHIGH if they are
 #   considered deleterious by most methods (details in code, look for "missense");
@@ -62,25 +63,6 @@ use POSIX qw(strftime);
 my @notControls = (["Flag","Astheno","Headless"],
 		   ["Azoo","Ovo","Macro","IOP"],
 		   ["Globo","Macro","Terato"]);
-
-
-my ($filterBin,$reorderBin) = ("7_filterVariants.pl","7_reorderColumns.pl");
-
-# possible paths to find $filterBin and $reorderBin
-my @possibleBinPaths = ("/home/nthierry/PierreRay/Grexome/SecondaryAnalyses/",
-			"/home/nthierry/VariantCalling/GrexomeFauve/SecondaryAnalyses/");
-my $binPath;
-foreach my $path (@possibleBinPaths) {
-    (-d $path) && ($binPath = $path) && last;
-}
-($binPath) || 
-    die "E: no possibleBinPaths exists, update \@possibleBinPaths\n";
-
-(-f "$binPath/$filterBin") || 
-    die "E: found binPath $binPath but it doesn't contain filterBin $filterBin\n";
-
-(-f "$binPath/$reorderBin") || 
-    die "E: found binPath $binPath but it doesn't contain reorderBin $reorderBin\n";
 
 
 # columns we want to keep, in this order:
@@ -182,21 +164,8 @@ my %cohort2header;
 while (my $inFile = readdir(INDIR)) {
     ($inFile =~ /^\./) && next;
     my $cohort;
-    # command-line to execute
-    my $com;
-    if ($inFile =~ (/^(\w+)\.csv\.gz$/)) {
+    if ($inFile =~ (/^(\w+)\.filtered\.pick\.csv$/)) {
 	$cohort = $1;
-	$com = "gunzip -c $inDir/$inFile ";
-	$com .= "| perl $binPath/$filterBin --max_ctrl_hv 10 --max_ctrl_het 50 --min_hr 100 --no_mod --pick ";
-	# using defaults for AFs 
-	# $com .= " --max_af_gnomad 0.01 --max_af_1kg 0.03 --max_af_esp 0.05"
-	# also reorder columns
-	$com .= "| perl $binPath/$reorderBin | ";
-   }
-    elsif ($inFile =~ (/^(\w+)\.filtered\.pick\.csv$/)) {
-	$cohort = $1;
-	# already filtered&reordered and not gzipped, just cat
-	$com = "cat $inDir/$inFile | ";
     }
     else {
 	warn "W: cannot parse filename of inFile $inFile, skipping it\n";
@@ -206,8 +175,8 @@ while (my $inFile = readdir(INDIR)) {
     my $now = strftime("%F %T", localtime);
     warn "I: $now - starting $0 on $cohort\n";
 
-    open(INFILE, "$com") ||
-	die "E: cannot (gunzip-?)-open and filter infile $inFile, command tried is:\n$com\n";
+    open(INFILE, "$inDir/$inFile") ||
+	die "E: cannot open infile $inDir/$inFile\n";
 
     ###################################
     # header line
@@ -452,6 +421,7 @@ while (my $inFile = readdir(INDIR)) {
 
     $now = strftime("%F %T", localtime);
     warn "I: $now - Finished parsing $cohort infile\n";
+    close(INFILE);
 }
 closedir(INDIR);
 
