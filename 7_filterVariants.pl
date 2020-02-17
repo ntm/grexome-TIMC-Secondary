@@ -76,7 +76,7 @@ foreach my $i (0..$#titles) {
 # parse data
 while(my $line = <STDIN>) {
     chomp($line);
-    my @fields = split(/\t/, $line);
+    my @fields = split(/\t/, $line, -1);
     # apply all filters
     if (($pick) && (! $fields[$title2index{"PICK"}])) {
 	next;

@@ -274,7 +274,7 @@ while (my $inFile = readdir(INDIR)) {
     # body lines
     while(my $line = <INFILE>) {
 	chomp($line);
-	my @fields= split(/\t/,$line);
+	my @fields= split(/\t/,$line,-1);
 
 	# create new MODHIGH impact (do this first so we can "next"
 	# ignored LOWs without having filled %transcript2*)
