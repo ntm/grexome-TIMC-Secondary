@@ -7,12 +7,18 @@
 # some of the VCF info.
 # We need CSQ to be present, we're assuming the VCF went through VEP.
 #
+# We define a new MODHIGH impact, as follows:
+# - missense variants are upgraded from MODER to MODHIGH if they are
+#   considered deleterious by most methods (details in code, look for "missense");
+# - similarly, splice_region_variants are upgraded from LOW to MODHIGH if they
+#   are considered deleterious (look for "splice" in code).
+#
 # When a variant impacts several transcripts and/or for multi-allelic lines
 # (ie with several variants), we will print one line per transcript and per 
 # variant. This results in some redundancy but makes it much easier to filter
 # things and find the best candidates.
 # For multi-allelic positions, the GENOS columns are modified: 
-# HV or HET geotypes~samples for alleles other than ALLELE_NUM are moved to OTHER.
+# HV or HET genotypes~samples for alleles other than ALLELE_NUM are moved to OTHER.
 
 use strict;
 use warnings;
@@ -21,6 +27,9 @@ use warnings;
 # CSQ==VEP, but we only want some VEP fields
 
 # @goodVeps: VEP fields we want, in the order we want them printed.
+# Some of these are hard-coded in the "missense" and "splice"
+# upgrade-to-MODHIGH code, make sure they get fixed there as
+# well if they change names.
 # Current available annotations (11/07/2019) are:
 # Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|EXON|INTRON|
 # HGVSc|HGVSp|cDNA_position|CDS_position|Protein_position|Amino_acids|Codons|
@@ -68,6 +77,18 @@ while (my $line = <STDIN>) {
 (@vepNames) || 
     die "E: done parsing headers but vepNames still empty!\n" ;
 
+# sanity: make sure all my @goodVeps fields exist
+{
+    my %vepNames;
+    foreach my $v (@vepNames) {
+	$vepNames{$v} = 1;
+    }
+    foreach my $v (@goodVeps) {
+	($vepNames{$v} == 1) ||
+	    die "E: the VEP field $v doesn't seem to exist anymore, update goodVeps and maybe other things!\n";
+    }
+}
+
 # Make our own headers for the TSV
 my $headerTsv = "POSITION\tREF\tALT";
 # POSITION will be chrom:pos
@@ -88,9 +109,9 @@ print $headerTsv ;
 while (my $line =<STDIN>) {
     chomp($line);
 
-    my ($chr,$pos,$id,$ref,$alt,$qual,$filter,$info,$format,@dataCols) = split(/\t/,$line);
+    my ($chr,$pos,$id,$ref,$alt,$qual,$filter,$info,$format,@dataCols) = split(/\t/,$line,-1);
 
-    # VEP removed trailing empty fields, fill them if needed
+    # VEP removed trailing empty fields (did it? nvm), fill them if needed
     while (@dataCols < 4) {
 	push(@dataCols, "");
     }
@@ -121,6 +142,51 @@ while (my $line =<STDIN>) {
 	}
 	# HGVSp has %3D for = in synonymous variants, substitute
 	($thisCsq{"HGVSp"}) && ($thisCsq{"HGVSp"} =~ s/%3D$/=/);
+
+	# upgrade splice_region_variant from LOW to MODHIGH if:
+	# (ada_score > 0.6) AND (rf_score > 0.6)
+	if (($thisCsq{"IMPACT"} eq "LOW") && ($thisCsq{"Consequence"}) &&
+	    ($thisCsq{"Consequence"} =~ /splice_region_variant/)) {
+	    # NOTE: VEP consequence column can have several &-separated consequences,
+	    # we just want splice_region_variant to be present somewhere
+	    if (($thisCsq{"ada_score"}) && ($thisCsq{"ada_score"} > 0.6) &&
+		($thisCsq{"rf_score"}) && ($thisCsq{"rf_score"} > 0.6)) {
+		$thisCsq{"IMPACT"} = "MODHIGH";
+	    }
+	}
+
+	# upgrade putatively deleterious missense variants:
+	if (($thisCsq{"IMPACT"} eq "MODERATE") && ($thisCsq{"Consequence"}) &&
+	    ($thisCsq{"Consequence"} =~ /missense_variant/)) {
+	    # upgrade to MODHIGH if at least 3 criteria are passed, among the following:
+	    # - SIFT -> deleterious
+	    # - Polyphen -> probably_damaging
+	    # - CADD_raw_rankscore >= 0.7
+	    # - MutationTaster_pred contains at least one A or D
+	    # - REVEL_rankscore >= 0.7
+	    my $passed = 0;
+	    if (($thisCsq{"SIFT"}) && ($thisCsq{"SIFT"} =~ /deleterious\(/)) {
+		# deleterious\( so we don't get deleterious_low_confidence
+		$passed++;
+	    }
+	    if (($thisCsq{"PolyPhen"}) && ($thisCsq{"PolyPhen"} =~ /probably_damaging/)) {
+		$passed++;
+	    }
+	    if (($thisCsq{"CADD_raw_rankscore"}) && ($thisCsq{"CADD_raw_rankscore"} >= 0.7)) {
+		$passed++;
+	    }
+	    if (($thisCsq{"MutationTaster_pred"}) && ($thisCsq{"MutationTaster_pred"} =~ /[AD]/)) {
+		$passed++;
+	    }
+	    if (($thisCsq{"REVEL_rankscore"}) && ($thisCsq{"REVEL_rankscore"} >= 0.7)) {
+		$passed++;
+	    }
+
+	    if ($passed >= 3) {
+		$thisCsq{"IMPACT"} = "MODHIGH";
+	    }
+	}
+	
 	# build vepToPrint string based on @goodVeps
 	my $vepToPrint = "";
 	foreach my $vepName (@goodVeps) {
