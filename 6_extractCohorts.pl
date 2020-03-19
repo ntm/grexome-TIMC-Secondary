@@ -8,12 +8,8 @@
 # reads on stdin a fully annotated TSV file;
 # makes $outDir and creates in it one gzipped TSV file per cohort.
 # The cohorts are defined in $metadata.
-#
-# Normally, for each sample, any identified causal (mutation in a) gene 
-# is grabbed from $metadata; except if --ignoreCausal was specificed,
-# in which case we ignore any known causal mutations for samples (but
-# still grab the causal genes, they will still be "known candidates level 5").
-# 
+# For each sample, any identified causal (mutation in a) gene 
+# is grabbed from $metadata.
 # @notControls defined at the top of this script says which cohorts
 # should NOT be used as negative controls for each other.
 # For optimal performance $tmpDir should be on a RAMDISK (eg tmpfs).
@@ -88,9 +84,6 @@ my ($metadata, $candidatesFile);
 # outDir and tmpDir, also no defaults
 my ($outDir, $tmpDir);
 
-# flag, if true we ignore known causal mutations. Default is "don't ignore".
-my $ignoreCausal = '';
-
 # help: if true just print $USAGE and exit
 my $help = '';
 
@@ -102,7 +95,6 @@ Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --outdir string [no default] : subdir where resulting cohort files will be created, must not pre-exist
 --tmpdir string [no default] : subdir where tmp files will be created (on a RAMDISK if possible), must not pre-exist and will be removed after execution
 --jobs N [default = $numJobs] : number of parallel jobs=threads to run
---ignoreCausal : if specified, confirmed causal mutations from metadata file are ignored
 --help : print this USAGE";
 
 GetOptions ("metadata=s" => \$metadata,
@@ -110,7 +102,6 @@ GetOptions ("metadata=s" => \$metadata,
 	    "outdir=s" => \$outDir,
 	    "tmpdir=s" => \$tmpDir,
 	    "jobs=i" => \$numJobs,
-	    "ignoreCausal" => \$ignoreCausal,
 	    "help" => \$help)
     or die("Error in command line arguments\n$USAGE\n");
 
@@ -198,8 +189,7 @@ my %knownCandidateGenes = ();
 my %sample2cohort = ();
 # cohort names
 my @cohorts = ();
-# causal gene, key==sample id, value == HGNC gene name, will 
-# stay empty if --ignoreCausal was specificed
+# causal gene, key==sample id, value == HGNC gene name
 my %sample2causal = ();
 
 {
@@ -247,8 +237,7 @@ my %sample2causal = ();
 	    # clean up a bit, remove leading or trailing whitespace
 	    $causal =~ s/^\s+//;
 	    $causal =~ s/\s+$//;
-	    # store $grexome->$causal EXCEPT IF $ignoreCausal is true
-	    ($ignoreCausal) || ($sample2causal{$grexome} = $causal);
+	    $sample2causal{$grexome} = $causal;
 	    # add to knownCandidateGenes with level 5
 	    (defined $knownCandidateGenes{$cohort}) || ($knownCandidateGenes{$cohort} = {});
 	    $knownCandidateGenes{$cohort}->{$causal} = 5;
