@@ -4,27 +4,15 @@
 # NTM
 
 # Takes as arguments a $metadata xlsx file, a $candidatesFile
-#  xlsx file, an $outDir and a $tmpDir that don't exist; 
+# xlsx file, an $outDir and a $tmpDir that don't exist; 
 # reads on stdin a fully annotated TSV file;
 # makes $outDir and creates in it one gzipped TSV file per cohort.
 # The cohorts are defined in $metadata.
 # For each sample, any identified causal (mutation in a) gene 
 # is grabbed from $metadata.
-# @notControls defined at the top of this script says which cohorts
+# @compatible defined at the top of this script says which cohorts
 # should NOT be used as negative controls for each other.
 # For optimal performance $tmpDir should be on a RAMDISK (eg tmpfs).
-#
-# For each $cohort, the GENO columns HV/HET/OTHER/HR are modified as follows:
-# - the HR GENO column is removed (but samples are COUNTed, see below).
-# - we make new NEGCTRL_* columns placed immediately after the HV/HET/OTHER columns.
-# - NEGCTRL_* columns list all samples falling in that GENO category and:
-#   * having an identified $causalGene, whatever their cohort (except in lines where 
-#     SYMBOL==$causalGene, see below), or
-#   * belonging to another cohort that isn't defined in @notControls for $cohort.
-# - for samples with an identified $causalGene and lines where SYMBOL==$causalGene,
-#   the sample is dealt with as if it didn't have a $causalGene, ie it stays 
-#   HV/HET/OTHER for his cohort, is ignored in his @notControls cohorts, and 
-#   goes in NEGCTRL_* columns in other cohorts.
 #
 # A new KNOWN_CANDIDATE_GENE column is inserted right after SYMBOL:
 # it holds the "Level" value parsed from  $candidatesFile if SYMBOL is a known 
@@ -32,11 +20,20 @@
 # 0 otherwise. Any $causalGene from $metadata is considered a
 # known candidate gene with Level=5.
 #
-# New COUNT_$cohort_$geno and COUNT_NEGCTRL_$geno columns are created
-# for each  GENO (HV, HET, OTHER, HR) in that order.
-# These columns contain the total number of samples listed in the
-# corresponding GENO column (except for HR, which has no GENO column).
-# For HR we count all samples (ie don't care about @notControls or $causalGene).
+# The HV/HET/OTHER/HR columns are removed and used to produce the following
+# columns in each $cohort outfile, in this order and starting whre HV was:
+# - $cohort_HV, $cohort_HET -> samples from $cohort (except those having
+#   a causal variant in another gene)
+# - $cohort_OTHERCAUSE_HV, $cohort_OTHERCAUSE_HET -> samples from $cohort
+#   that have a causal variant in aother gene
+# - COMPAT_HV, COMPAT_HET -> samples from compatible cohorts as defined
+#   in @compatible
+# - NEGCTRL_HV, NEGCTRL_HET -> samples from all other cohorts
+# - OTHERGENO -> samples with OTHER genotypes (from any cohort)
+#
+# In addition, new COUNT_* columns are created for each of the above columns,
+# in the same order, followed by a single COUNT_HR column (counting HR samples
+# from any cohort without caring about @compatible or $causalGene).
 # The COUNTs are inserted right after the new KNOWN_CANDIDATE_GENE column.
 #
 # Lines where no samples from the cohort are HV|HET (for this alt allele)
@@ -55,15 +52,15 @@ use Parallel::ForkManager;
 #############################################
 ## hard-coded stuff that shouldn't change much
 
-# @notControls: array of arrayrefs, each arrayref holds cohorts that
+# @compatible: array of arrayrefs, each arrayref holds cohorts that
 # should NOT be used as neg controls for each other.
 # The cohort names must match the "pathology" column of the $metadata xlsx
 # (this is checked).
-# NOTE: @notControls IS DUPLICATED IN extractTranscripts.pl, IF IT IS CHANGED HERE IT 
+# NOTE: @compatible IS DUPLICATED IN extractTranscripts.pl, IF IT IS CHANGED HERE IT 
 # MUST ALSO BE CHANGED THERE 
-my @notControls = (["Flag","Astheno","Headless"],
-		   ["Azoo","Ovo","Macro","IOP"],
-		   ["Globo","Macro","Terato"]);
+my @compatible = (["Flag","Astheno","Headless"],
+		  ["Azoo","Ovo","Macro","IOP"],
+		  ["Globo","Macro","Terato"]);
 
 
 # max number of lines to read in a single batch. Each batch is then
@@ -88,7 +85,7 @@ my ($outDir, $tmpDir);
 my $help = '';
 
 
-my $USAGE = "Parse on STDIN a fully annotated TSV file as produced by steps 1-5 of this secondaryAnalysis pipeline; create in outDir one gzipped TSV file per cohort.\n
+my $USAGE = "\nParse on STDIN a fully annotated TSV file as produced by steps 1-5 of this secondaryAnalysis pipeline; create in outDir one gzipped TSV file per cohort.\n
 Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --metadata string [no default] : patient metadata xlsx file, with path
 --candidateGenes string [no default] : known candidate genes in xlsx file, with path
@@ -256,21 +253,21 @@ foreach my $c (keys(%knownCandidateGenes)) {
 }
 
 #########################################################
-# check @notControls cohort names and store in %notControls hash
+# check @compatible cohort names and store in %compatible hash
 
-# %notControls: key is a cohort name, value is a hashref
+# %compatible: key is a cohort name, value is a hashref
 # with keys == cohorts that shouldn't be used as negative 
 # controls for this cohort, value==1
-my %notControls = ();
+my %compatible = ();
 
-foreach my $notConR (@notControls) {
+foreach my $notConR (@compatible) {
     foreach my $cohort (@$notConR) {
 	(grep($cohort eq $_, @cohorts)) ||
-	    die "E in extractCohorts: cohort $cohort from notControls is not in cohorts @cohorts\n";
-	(defined $notControls{$cohort}) || ($notControls{$cohort} = {});
+	    die "E in extractCohorts: cohort $cohort from compatible is not in cohorts @cohorts\n";
+	(defined $compatible{$cohort}) || ($compatible{$cohort} = {});
 	foreach my $notC (@$notConR) {
 	    ($notC eq $cohort) && next;
-	    $notControls{$cohort}->{$notC} = 1;
+	    $compatible{$cohort}->{$notC} = 1;
 	}
     }
 }
@@ -292,31 +289,24 @@ my $header = <STDIN>;
 chomp($header);
 my @headers = split(/\t/, $header);
 
-# the genotype categories (don't change this)
-my @genoCategories = ("HV","HET","OTHER","HR");
-
-# useful columns: SYMBOL and genos in @genoCategories order
+# useful columns from infile: SYMBOL and genotypes
 my $symbolCol;
-my @genoCols;
+# key is one of "HV","HET","OTHER","HR", value is the column index in infile
+my %genoCols;
 foreach my $i (0..$#headers) {
     ($headers[$i] eq "SYMBOL") && ($symbolCol = $i);
-    foreach my $gi (0..$#genoCategories) {
-	($headers[$i] eq $genoCategories[$gi]) && 
-	    ($genoCols[$gi] = $i);
+    foreach my $geno ("HV","HET","OTHER","HR") {
+	($headers[$i] eq $geno) && ($genoCols{$geno} = $i);
     }
 }
 ($symbolCol) || die "could not find SYMBOL in headers\n";
-foreach my $gi (0..$#genoCategories) {
-    ($genoCols[$gi]) || die "cound not find $genoCategories[$gi] in headers\n";
-    ($genoCols[$gi] == ($genoCols[0]+$gi)) || 
-	die "E: GENO columns are not subsequent and in genoCategories order, the code relies on this\n";
-    # actually maybe the code just requires that they be 
-    # consecutive columns and start with HV (not sure)
+foreach my $geno ("HV","HET","OTHER","HR") {
+    ($genoCols{$geno}) || die "cound not find $geno in headers\n";
 }
 
 # print new headers
 foreach my $cohorti (0..$#cohorts) {
-    # we always want to keep the first column and 
+    # we always want to keep the first column (chr:coord) and 
     # this simplifies things (no \t)
     my $toPrint = "$headers[0]";
     foreach my $i (1..$#headers) {
@@ -324,20 +314,29 @@ foreach my $cohorti (0..$#cohorts) {
 	    $toPrint .= "\t$headers[$i]";
 	    # KNOWN_CANDIDATE_GENE and COUNTs go right after SYMBOL
 	    $toPrint .= "\tKNOWN_CANDIDATE_GENE";
-	    foreach my $geno (@genoCategories) {
-		$toPrint .= "\tCOUNT_".$cohorts[$cohorti]."_$geno";
+	    foreach my $group ($cohorts[$cohorti], $cohorts[$cohorti]."_OTHERCAUSE",
+			       "COMPAT", "NEGCTRL") {
+		foreach my $geno ("HV", "HET") {
+		    $toPrint .= "\tCOUNT_$group"."_$geno";
+		}
 	    }
-	    # COUNT_NEGCTRL_* right after
-	    foreach my $geno (@genoCategories) {
-		$toPrint .= "\tCOUNT_NEGCTRL_$geno";
+	    # OTHERGENO and HR get a single count for all cohorts
+	    $toPrint .= "\tCOUNT_OTHERGENO";
+	    $toPrint .= "\tCOUNT_HR";
+	}
+	elsif ($i == $genoCols{"HV"}) {
+	    # HV gets replaced by the new cohort-genotype categories
+	    foreach my $group ($cohorts[$cohorti], $cohorts[$cohorti]."_OTHERCAUSE",
+			       "COMPAT", "NEGCTRL") {
+		foreach my $geno ("HV", "HET") {
+		    $toPrint .= "\t$group"."_$geno";
+		}
 	    }
+	    # OTHERGENOs go in a single column for all cohorts, HRs are not listed
+	    $toPrint .= "\tOTHERGENO";
 	}
-	elsif (($i == $genoCols[0]) || ($i == $genoCols[1]) || ($i == $genoCols[2])) {
-	    # HV/HET/OTHER
-	    $toPrint .= "\t$headers[$i]\tNEGCTRL_$headers[$i]";
-	}
-	elsif ($i == $genoCols[3]) {
-	    # HR is not printed
+	elsif (($i == $genoCols{"HET"}) || ($i == $genoCols{"OTHER"}) || ($i == $genoCols{"HR"})) {
+	    # NOOP, all sample lists taken care of above
 	}
 	else {
 	    # all other columns are kept as-is
@@ -407,7 +406,7 @@ while (!$lastBatch) {
 
     # process this batch
     &processBatch(\@lines,\%knownCandidateGenes,\%sample2cohort,\@cohorts,
-		  \%sample2causal,\%notControls,$symbolCol,\@genoCols,\@tmpOutFHs,$tmpSeenFH);
+		  \%sample2causal,\%compatible,$symbolCol,\%genoCols,\@tmpOutFHs,$tmpSeenFH);
 
     # done, close tmp FHs and create flag-file
     foreach my $outFH (@tmpOutFHs,$tmpSeenFH) {
@@ -465,9 +464,10 @@ warn "I: $now - DONE running $0\n";
 # - ref to array of chomped lines
 # - ref to %knownCandidateGenes
 # - refs to %sample2cohort, to @cohorts, and to %sample2causal
-# - ref to %notControls
+# - ref to %compatible
 # - $symbolCol, the column index of the SYMBOL column (in data lines)
-# - ref to @genoCols holding column indexes of GENO columns (in @genoCategories order)
+# - ref to %genoCols whose keys are "HV","HET,"OTHER","HR" and values are the
+#   corresponding columns (in data lines)
 # - $tmpOutFilesR, ref to array of filehandles open for writing, one for each cohort,
 #   same indexes as @cohorts
 # - $tmpSeen, a filehandle open for writing, we will print one line per different
@@ -475,7 +475,7 @@ warn "I: $now - DONE running $0\n";
 sub processBatch {
     (@_ == 10) || die "E: processBatch needs 10 args\n";
     my ($linesR,$knownCandidateGenesR,$sample2cohortR,$cohortsR,$sample2causalR,
-	$notControlsR,$symbolCol,$genoColsR,$tmpOutFilesR,$tmpSeen) = @_;
+	$compatibleR,$symbolCol,$genoColsR,$tmpOutFilesR,$tmpSeen) = @_;
 
     # key == known candidate gene seen in this batch of lines, value==1
     my %candidatesSeen = ();
@@ -485,87 +485,120 @@ sub processBatch {
 
 	# $symbol doesn't depend on cohorts
 	my $symbol = $fields[$symbolCol];
-	
-      COHORT:
-	foreach my $cohorti (0..$#$cohortsR) {
-	    my $cohort = $cohortsR->[$cohorti];
-	    # build array of 8 counts for $cohort: HV,HET,OTHER,HR and again for NEGCTRLs
-	    my @counts = (0) x 8;
-	    # also build array of 6 GENO columns: HV,NEGCTRL_HV,HET,NEGCTRL_HET,OTHER,NEGCTRL_OTHER
-	    my @genos = ("") x 6;
 
-	    # parse data
-	    foreach my $gi (0..3) {
-		my @genoData = split(/\|/,$fields[$genoColsR->[$gi]]);
-		# sanity: at most one genotype except for OTHER column
-		(@genoData <= 1) || ($gi==2) || 
-		    die "E: more than one genoData for genotype $genoColsR->[$gi], impossible. Line:\n$line\n";
-		foreach my $genoData (@genoData) {
-		    ($genoData =~ /^(\d+\/\d+)~([^~\|]+)$/) ||
-			die "E: cannot parse GENOS data $genoData in line:\n$line\n";
-		    # $geno is the genotype (eg 1/1 or 0/2)
-		    my $geno = $1;
-		    my @samples = split(/,/,$2);
-		    # @goodSamples will hold samples that should be counted for $cohort
-		    # @badSamples will hold samples that should be counted as NEGCTRLs for $cohort
-		    my @goodSamples = ();
-		    my @badSamples = ();
-		    foreach my $sample (@samples) {
-			my $grexome = $sample;
-			# remove trailing [DP:AF] if it's there (allowing AF > 1 for Strelka bug)
-			$grexome =~ s/\[\d+:\d+\.\d\d\]$//;
-			# sanity check
-			($grexome =~ /^grexome\d+$/) || die "E grexome id $grexome illegal, sample was $sample\n";
-			if ($sample2cohortR->{$grexome} eq $cohort) {
-			    # $sample belongs to cohort
-			    if (($gi == 3) || (! defined $sample2causalR->{$grexome}) || ($sample2causalR->{$grexome} eq $symbol)) {
-				# we are HR or sample has no causal gene or it's the current gene
-				push(@goodSamples,$sample);
+	# array of references (to sampleList arrays), one per cohort, same order
+	# as in $cohortsR:
+	# each element of @cohort2samplelists is a ref to a sampleLists array, ie
+	# for each $cohort we build an array of 8 lists of samples (from the HV and
+	# HET columns), in the following order and as defined at the top of this file:
+	# $cohort_HV, $cohort_HET, $cohort_OTHERCAUSE_HV, $cohort_OTHERCAUSE_HET,
+	# COMPAT_HV, COMPAT_HET, NEGCTRL_HV, NEGCTRL_HET
+	# Each "list of samples" is actually a "genoData", ie it could look like:
+	# 0/1~grexome0112[39:0.95],grexome0129[43:1.00]
+	# If there is no sample in the category the array element remains empty.
+	my @cohort2sampleLists;
+
+	# similary for each cohort store a ref to an array of 8 COUNTs corresponding
+	# to the sampleLists
+	my @cohort2SLcounts;
+
+	# initialize both arrays with refs to arrays holding empty strings / zeroes
+	foreach my $cohorti (0..$#$cohortsR) {
+	    $cohort2sampleLists[$cohorti] = ["","","","","","","",""];
+	    $cohort2SLcounts[$cohorti] = [0,0,0,0,0,0,0,0];
+	}
+	
+	# parse the HV and HET data fields and fill @cohort2samplelists,
+	# @genoNames MUST BE in same order as in @cohort2sampleLists
+	my @genoNames = ("HV","HET");
+	foreach my $gni (0..$#genoNames) {
+	    my $genoData = $fields[$genoColsR->{$genoNames[$gni]}];
+	    # skip if no sample has this genotype
+	    ($genoData) || next;
+	    # sanity: at most one genotype (except for OTHER column)
+	    ($genoData =~ /\|/) &&
+		die "E: more than one genotype for geno $genoNames[$gni], impossible. Line:\n$line\n";
+	    ($genoData =~ /^(\d+\/\d+)~([^~\|]+)$/) ||
+		die "E: cannot parse GENOS data $genoData in line:\n$line\n";
+	    # $geno is the genotype (eg 1/1 or 0/2)
+	    my $geno = $1;
+	    my @samples = split(/,/,$2);
+	    foreach my $sample (@samples) {
+		my $grexome = $sample;
+		# remove trailing [DP:AF] if it's there (allowing AF > 1 for Strelka bug)
+		$grexome =~ s/\[\d+:\d+\.\d\d\]$//;
+		# sanity check
+		($grexome =~ /^grexome\d+$/) || die "E grexome id $grexome illegal, sample was $sample\n";
+
+		foreach my $cohorti (0..$#$cohortsR) {
+		    my $cohort = $cohortsR->[$cohorti];
+		    if ($sample2cohortR->{$grexome} eq $cohort) {
+			# $sample belongs to $cohort
+			if ((! defined $sample2causalR->{$grexome}) || ($sample2causalR->{$grexome} eq $symbol)) {
+			    # sample has no causal gene or it's the current gene: add to $cohort_HV or HET
+			    if ($cohort2sampleLists[$cohorti]->[$gni]) {
+				$cohort2sampleLists[$cohorti]->[$gni] .= ",$sample";
 			    }
 			    else {
-				# HV/HET/OTHER geno and this sample has a causal gene but not this gene:
-				# this sample counts as NEGCTRL
-				push(@badSamples,$sample);
+				$cohort2sampleLists[$cohorti]->[$gni] = "$geno~$sample";
 			    }
+			    $cohort2SLcounts[$cohorti]->[$gni]++;
 			}
-			elsif (($gi==3) || (! defined ${$notControlsR->{$cohort}}{$sample2cohortR->{$grexome}})) {
-			    # sample is HR, or it is from another cohort that can be used as control 
-			    # for $cohort
-			    push(@badSamples,$sample);
-			}
-			elsif ((defined $sample2causalR->{$grexome}) && ($sample2causalR->{$grexome} ne $symbol)) {
-			    # sample is from a notControls cohort but it has a causal gene (and it's not this gene)
-			    push(@badSamples,$sample);
-			}
-			# else sample is from a different cohort but it's in @notControls, and it doesn't have
-			# a causal gene (or it does but it is the current gene): ignore this sample, ie NOOP
-		    }
-		    
-		    # OK, store counts and GENOs (careful with indexes)
-		    if (@goodSamples) {
-			$counts[$gi] += scalar(@goodSamples);
-			if ($gi < 3) {
-			    # don't store the GENO for HR ie gi==3
-			    ($genos[$gi * 2]) && ($genos[$gi * 2] .= '|');
-			    $genos[$gi * 2] .= "$geno~".join(',',@goodSamples);
+			else {
+			    # sample has a causal variant in another gene: OTHERCAUSE is at index 2+$gni
+			    if ($cohort2sampleLists[$cohorti]->[2+$gni]) {
+				$cohort2sampleLists[$cohorti]->[2+$gni] .= ",$sample";
+			    }
+			    else {
+				$cohort2sampleLists[$cohorti]->[2+$gni] = "$geno~$sample";
+			    }
+			    $cohort2SLcounts[$cohorti]->[2+$gni]++;
 			}
 		    }
-		    if (@badSamples) {
-			$counts[$gi + 4] += scalar(@badSamples);
-			if ($gi < 3) {
-			    ($genos[1 + $gi * 2]) && ($genos[1 + $gi * 2] .= '|');
-			    $genos[1 + $gi * 2] .= "$geno~".join(',',@badSamples);
+		    elsif (defined $compatibleR->{$sample2cohortR->{$grexome}}->{$cohort}) {
+			# $sample belongs to a cohort compatible with $cohort, store at index 4+$gni
+			if ($cohort2sampleLists[$cohorti]->[4+$gni]) {
+			    $cohort2sampleLists[$cohorti]->[4+$gni] .= ",$sample";
 			}
+			else {
+			    $cohort2sampleLists[$cohorti]->[4+$gni] = "$geno~$sample";
+			}
+			$cohort2SLcounts[$cohorti]->[4+$gni]++;
+		    }
+		    else {
+			# $sample belongs to another cohort, use as NEGCTRL ie index 6+$gni
+			if ($cohort2sampleLists[$cohorti]->[6+$gni]) {
+			    $cohort2sampleLists[$cohorti]->[6+$gni] .= ",$sample";
+			}
+			else {
+			    $cohort2sampleLists[$cohorti]->[6+$gni] = "$geno~$sample";
+			}
+			$cohort2SLcounts[$cohorti]->[6+$gni]++;
 		    }
 		}
-
-		# if we just finished with HV and HET but there's no sample in either,
-		# we can skip this line in this cohort
-		if (($gi == 1) && ($counts[0] == 0) && ($counts[1] == 0)) {
-		    next COHORT;
-		}
-		# otherwise: parse OTHER and HR data
 	    }
+	}
+
+	# OTHERGENO is the same for every $cohort, it's simply copied:
+	my $otherGeno = $fields[$genoColsR->{"OTHER"}];
+	# COUNT the otherGeno samples: we don'"t care about the |-separated lists
+	# of different genotypes and the ,-separated lists of samples, just count
+	# the number of occurences of "grexome"
+	my @otherGenoCount = ($otherGeno =~ /grexome/g);
+	my $otherGenoCount = scalar(@otherGenoCount);
+
+	# COUNT_HR is also the same for every cohort, use the same method
+	my @hrCount = ($fields[$genoColsR->{"HR"}] =~ /grexome/g);
+	my $hrCount = scalar(@hrCount);
+
+  	# OK, now print stuff for every cohort that has at least one sample in
+	# $cohort_HV or $cohort_HET
+	foreach my $cohorti (0..$#$cohortsR) {
+	    my $cohort = $cohortsR->[$cohorti];
+
+	    # skip if no HV or HET sample in this cohort
+	    ($cohort2SLcounts[$cohorti]->[0] > 0) ||
+		($cohort2SLcounts[$cohorti]->[1] > 0) || next;
 
 	    # OK we have some data to print for $cohort
 	    # always keep first field 
@@ -582,15 +615,22 @@ sub processBatch {
 			# if not a known candidate use zero
 			$toPrint .= "0";
 		    }
-		    # print all COUNTs
-		    $toPrint .= "\t".join("\t",@counts);
+		    # print all cohort-specific COUNTs
+		    $toPrint .= "\t".join("\t",@{$cohort2SLcounts[$cohorti]});
+		    # also print OTHERGENO and HR counts
+		    $toPrint .= "\t$otherGenoCount\t$hrCount";
 		}
-		elsif ($i == $genoColsR->[0]) {
-		    # HV -> print all 6 GENO columns
-		    # NOTE: we rely on the fact that the GENOs are consecutive and start with HV
-		    $toPrint .= "\t".join("\t",@genos);
+		elsif ($i == $genoColsR->{"HV"}) {
+		    # HV -> print all 8 sampleLists followed by OTHERGENO column
+		    $toPrint .= "\t".join("\t",@{$cohort2sampleLists[$cohorti]});
+		    $toPrint .= "\t$otherGeno";
 		}
-		elsif (! grep(/^$i$/, @$genoColsR)) {
+		elsif (($i == $genoColsR->{"HET"}) || ($i == $genoColsR->{"OTHER"}) ||
+		       ($i == $genoColsR->{"HR"})) {
+		    # NOOP: skip these columns
+		}
+		else {
+		    # print other columns as-is
 		    $toPrint .= "\t$fields[$i]";
 		}
 	    }
