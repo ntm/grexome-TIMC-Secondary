@@ -18,7 +18,7 @@ use warnings;
 
 # columns to be printed first, in that order (replace COHORT
 # with the current cohort)
-my @newOrder = qw(POSITION REF ALT SYMBOL KNOWN_CANDIDATE_GENE COUNT_COHORT_HV COUNT_COHORT_HET COUNT_COHORT_HR COUNT_NEGCTRL_HV COUNT_NEGCTRL_HET COUNT_NEGCTRL_HR HV HET IMPACT Consequence HGVSc HGVSp Protein_position SIFT PolyPhen CADD_raw_rankscore MutationTaster_pred gnomAD_AF GTEX_testis_RATIO GTEX_ovary_RATIO GTEX_testis GTEX_ovary GTEX_blood GTEX_cerebellar_hemisphere GTEX_liver GTEX_lung);
+my @newOrder = qw(POSITION REF ALT SYMBOL KNOWN_CANDIDATE_GENE COUNT_HR COUNT_COHORT_HV COUNT_COHORT_HET COUNT_COHORT_OTHERCAUSE_HV COUNT_COHORT_OTHERCAUSE_HET COUNT_COMPAT_HV COUNT_COMPAT_HET COUNT_NEGCTRL_HV COUNT_NEGCTRL_HET COUNT_OTHERGENO COHORT_HV COHORT_HET IMPACT Consequence HGVSc HGVSp Protein_position gnomAD_AF GTEX_testis_RATIO GTEX_ovary_RATIO GTEX_testis GTEX_ovary GTEX_blood GTEX_cerebellar_hemisphere GTEX_liver GTEX_lung);
 
 
 # build hash of @newOrder headers, value is the new column index
@@ -27,7 +27,6 @@ my %title2index;
 foreach my $i (0..$#newOrder) {
     $title2index{$newOrder[$i]} = $i;
 }
-
 
 # mapping from old to new column indexes:
 # column that used to be at index $i will be printed at index $old2new[$i]
@@ -41,25 +40,35 @@ chomp($header);
 my @titles = split(/\t/, $header);
 foreach my $i (0..$#titles) {
     my $title = $titles[$i];
-    if ($title =~ /^COUNT_(\w+)_H[VRE]/) {
-	# replace cohort name with COHORT in COUNT_*_HV HR HET 
-	# (only in $title not in @titles)
-	($1 ne "NEGCTRL") && ($title =~ s/$1/COHORT/);
+    if (($title =~ /^COUNT_(\w+)_OTHERCAUSE_/) || ($title =~ /^(\w+)_OTHERCAUSE_/)) {
+	# replace $cohort with COHORT in COUNT_$cohort_OTHERCAUSE_* and
+	# in $cohort_OTHERCAUSE_* (only in $title not in @titles)
+	$title =~ s/$1/COHORT/;
+    }
+    elsif (($title !~ /NEGCTRL_/) && ($title !~ /COMPAT_/) &&
+	   (($title =~ /^COUNT_(\w+)_/) || ($title =~ /^(\w+)_HV$/) || ($title =~ /^(\w+)_HET$/))) {
+	# also replace $cohort with COHORT in COUNT_$cohort_* and in $cohort_* ,
+	# careful not to touch NEGCTRL or COMPAT or other random titles...
+	$title =~ s/$1/COHORT/;
     }
 
     if (defined $title2index{$title}) {
+	($title2index{$title} == -1) &&
+	    die "E: title $titles[$i] was converted to $title but this has been seen already, fix the regexps!\n";
 	$old2new[$i] = $title2index{$title};
-	# delete so we can make sure every @newOrder title was seen
-	delete($title2index{$title});
+	# set to -1 so we can make sure every @newOrder title was seen exactly once
+	$title2index{$title} = -1;
     }
     else {
 	$old2new[$i] = $nextNotNewOrder;
 	$nextNotNewOrder++;
     }
-
 }
 
-# sanity: make sure every @newOrder column exists
+# sanity: make sure every @newOrder column was seen exactly once
+foreach my $t (keys(%title2index)) {
+    ($title2index{$t} == -1) && (delete $title2index{$t});
+}
 if (my @missingTitles = keys(%title2index)) {
     die "E: some newOrder titles were not found: ".join(" ", keys(%title2index))."\n";
 }
