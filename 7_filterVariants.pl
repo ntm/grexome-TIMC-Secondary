@@ -17,7 +17,7 @@ use Getopt::Long;
 my $max_ctrl_hv = 3; # COUNT_NEGCTRL_HV <= $x
 my $max_ctrl_het = 10; # COUNT_NEGCTRL_HET <= $x
 my $min_cohort_hv = 0; # COUNT_$cohort_HV >= $x
-my $min_hr = 100; # COUNT_$cohort_HR + COUNT_NEGCTRL_HR >= $x
+my $min_hr = 100; # COUNT_HR >= $x
 
 my $no_mod = ''; # if enabled, filter out MODIFIER impacts
 my $no_low = ''; # if enabled, filter out LOW impacts
@@ -61,14 +61,16 @@ my %title2index;
 my @titles = split(/\t/, $header);
 foreach my $i (0..$#titles) {
     my $title = $titles[$i];
-    if ($title =~ /^COUNT_(\w+)_HV/) {
-	# replace cohort name with COHORT in COUNT_*_HV (only for the hash key, not in the outFile)
-	($1 ne "NEGCTRL") && ($title = "COUNT_COHORT_HV");
+    # need COUNT_$cohort_HV , we want a uniform hash key COUNT_COHORT_HV
+    # in %title2index but we must ignore the other COUNT_*_HV columns
+    if (($title !~ /_NEGCTRL_/) && ($title !~ /_COMPAT_/) && ($title !~ /_OTHERCAUSE_/) &&
+	($title =~ /^COUNT_(\w+)_HV/)) {
+	# OK replace cohort name with COHORT as hash key
+	$title = "COUNT_COHORT_HV";
     }
-    elsif ($title =~ /^COUNT_(\w+)_HR/) {
-	# same for HR, replace cohort name with COHORT in COUNT_*_HR hash key
-	($1 ne "NEGCTRL") && ($title = "COUNT_COHORT_HR");
-    }
+    # sanity (eg if some column titles change)
+    (defined $title2index{$title}) &&
+	die "E in $0: title $title defined twice\n";
     $title2index{$title} = $i;
 }
 
@@ -84,16 +86,16 @@ while(my $line = <STDIN>) {
     if ($fields[$title2index{"COUNT_NEGCTRL_HV"}] > $max_ctrl_hv) {
 	next;
     }
+    if ($fields[$title2index{"COUNT_NEGCTRL_HET"}] > $max_ctrl_het) {
+	next;
+    }
     if ($fields[$title2index{"COUNT_COHORT_HV"}] < $min_cohort_hv) {
 	next;
     }
-    if ($fields[$title2index{"COUNT_COHORT_HR"}] + $fields[$title2index{"COUNT_NEGCTRL_HR"}]  < $min_hr) {
+    if ($fields[$title2index{"COUNT_HR"}]  < $min_hr) {
 	next;
     }
-    if ((defined $max_ctrl_het) && ($fields[$title2index{"COUNT_NEGCTRL_HET"}] > $max_ctrl_het)) {
-	next;
-    }
-    if (($no_mod) && ($fields[$title2index{"IMPACT"}] eq "MODIFIER")) {
+   if (($no_mod) && ($fields[$title2index{"IMPACT"}] eq "MODIFIER")) {
 	next;
     }
     if (($no_low) && ($fields[$title2index{"IMPACT"}] eq "LOW")) {
