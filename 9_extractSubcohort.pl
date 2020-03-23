@@ -9,7 +9,8 @@
 # filtered and reordered, possibly gone through addPatientIDs (but NOT
 # gzipped, just "gunzip -c |" if needed);
 # print to stdout a sub-cohort file, identical to the infile except it
-# only has the lines where one of the samples of the sub-cohort is HET or HV.
+# only has the lines where one of the samples of the sub-cohort is HET
+# or HV (possibly with OTHERCAUSE).
 
 use strict;
 use warnings;
@@ -44,33 +45,35 @@ while (my $line = <SUBC>) {
 my $header = <STDIN>;
 chomp($header);
 my @header = split(/\t/,$header);
-# indexes of HV and HET columns
-my ($colHv,$colHet);
+# indexes of $cohort_* columns
+my @genoCols = ();
 foreach my $i (0..$#header) {
-    if ($header[$i] eq "HV") {
-	$colHv = $i;
+    # start by ignoring COUNT*, NEGCTRL, and COMPAT
+    if (($header[$i] =~ /^COUNT_/) || ($header[$i] =~ /^NEGCTRL_/) || ($header[$i] =~ /^COMPAT_/)) {
+	next;
     }
-    elsif ($header[$i] eq "HET") {
-	$colHet = $i;
+    # any other _HV or _HET column should be good
+    elsif (($header[$i] =~ /_HV$/) || ($header[$i] =~ /_HET$/)) {
+	push(@genoCols, $i);
     }
 }
-($colHv) || die "E: can't find HV header in:\n$header\n";
-($colHet) || die "E: can't find HET header in:\n$header\n";
+# we should have found exactly 4 columns (HV, HET, OTHERCAUSE_HV, OTHERCAUSE_HET) 
+(@genoCols == 4) || die "E: can't find 4 good geno headers in:\n$header\n";
 print "$header\n";
 
 # data
  LINE: while (my $line = <STDIN>) {
      chomp($line);
      my @fields = split(/\t/, $line, -1) ;
-     foreach my $i ($colHv,$colHet) {
+     foreach my $i (@genoCols) {
 	 if ($fields[$i]) {
 	     ($fields[$i] =~ /^[^~]+~([^~\|]+)$/) || 
-		 die "cannot parse HV/HET data $fields[$i]\n";
+		 die "cannot parse genoData $fields[$i]\n";
 	     my $samples = $1;
 	     foreach my $sample (split(/,/,$samples)) {
 		 # no ending $ so we're fine with [DP:AF] and/or if infile went through addPatientIDs.pl
 		 ($sample =~ /^(grexome\d\d\d\d)/) ||
-		     die "E: inFile has a genotype call for a sample I can't recognize: $sample\n";
+		     die "E: inFile has a genoData for a sample I can't recognize: $sample\n";
 		 if ($subcohort{$1}) {
 		     print "$line\n";
 		     next LINE;
