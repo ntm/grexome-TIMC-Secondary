@@ -10,7 +10,7 @@
 # and possibly gzipped;
 # $outDir doesn't exist, it will be created and filled with 
 # similar TSVs (gzipped if infiles were gzipped), but where every
-# $grexome identifier in the GENO columns becomes "$grexome($patientID)",
+# $grexome identifier in the genoData columns becomes "$grexome($patientID)",
 # with $patientID taken from patientID column if it's not empty, 
 # specimenID otherwise.
 # Filenames get ".patientIDs" added before .csv.
