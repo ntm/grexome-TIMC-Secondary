@@ -7,7 +7,7 @@
 # $metadata is the patient_summary xlsx file (with grexomeID etc columns);
 # $inDir must contain cohort TSVs as produced by extractCohorts.pl,
 # possibly filtered and reordered with 7_filterAndReorderAll.pl, and 
-# possibly gzipped;
+# possibly gzipped (but not with PatientIDs);
 # $covDir is a subdir containing per-grexome coverage files, as produced
 # by 0_coverage.pl;
 # $outDir doesn't exist, it will be created and filled with one TSV
@@ -18,12 +18,12 @@
 # For a sample, we only print lines from its cohort file and where 
 # it has an HV or HET genotype: this genotype is printed in new columns
 # GENOTYPE and DP:AF, inserted right after KNOWN_CANDIDATE_GENE.
-# Between GENOTYPE and DP:AF we insert new columns NB_$geno_$impact_ThisSample_ThisTranscript
-# with $geno == HV or HET and $impact == HIGH or MODER, counting the total
+# Between GENOTYPE and DP:AF we insert new columns NB_$geno_$impact_ThisSampleInThisTranscript
+# with $geno == HV or HET and $impact == HIGH or MODHIGH or MODER, counting the total
 # number of $geno-$impact variants (passing all filters and) affecting
-# this transcript in this grexome; and then NB_ALLVARIANTS_ThisSample_ThisTranscript
+# this transcript in this grexome; and then NB_ALLVARIANTS_ThisSampleInThisTranscript
 # with all variants affecting this transcript in this grexome.
-# Also the HV, NEGCTRL_HV, HET etc... columns are not printed.
+# Also the genoData columns ($cohort_HV, NEGCTRL_HV, etc...) are not printed.
 
 use strict;
 use warnings;
@@ -128,31 +128,44 @@ while (my $inFile = readdir(INDIR)) {
     chomp($header);
     my @header = split(/\t/,$header);
 
-    # need HV HET and other Geno columns (will all be removed)
-    my ($hvCol,$hetCol) = (-1,-1);
+    # need $cohort_HV, $cohort_HET, $cohort_OTHERCAUSE_HV, $cohort_OTHERCAUSE_HET
+    # and also other genoData columns (will all be removed)
+    my ($hvCol,$hetCol,$hvColOC,$hetColOC) = (-1,-1,-1,-1);
     # $colsToRemove[$i] == 1 if column $i in infile must be removed
     my @colsToRemove;
     # reverse so we can splice out elements
     foreach my $i (reverse(0..$#header)) {
-	if ($header[$i] eq "HV") {
+	# $toRemove: boolean, true iff column must be removed
+	my $toRemove = 0;
+	if ($header[$i] eq $cohort."_HV") {
 	    $hvCol = $i;
-	    $colsToRemove[$i] = 1;
-	    splice(@header,$i,1);
+	    $toRemove = 1;
 	}
-	elsif ($header[$i] eq "HET") {
+	elsif ($header[$i] eq $cohort."_OTHERCAUSE_HV") {
+	    $hvColOC = $i;
+	    $toRemove = 1;
+	}
+	elsif ($header[$i] eq $cohort."_HET") {
 	    $hetCol = $i;
-	    $colsToRemove[$i] = 1;
-	    splice(@header,$i,1);
+	    $toRemove = 1;
 	}
-	elsif (grep(/$header[$i]/, ("NEGCTRL_HV","NEGCTRL_HET","OTHER","NEGCTRL_OTHER"))) {
+	elsif ($header[$i] eq $cohort."_OTHERCAUSE_HET") {
+	    $hetColOC = $i;
+	    $toRemove = 1;
+	}
+	elsif (grep(/^$header[$i]$/, ("COMPAT_HV","COMPAT_HET","NEGCTRL_HV","NEGCTRL_HET","OTHERGENO"))) {
+	    $toRemove = 1;
+	}
+
+	if ($toRemove) {
 	    $colsToRemove[$i] = 1;
 	    splice(@header,$i,1);
 	}
     }
-    ($hvCol >= 0) || 
-	die "E: couldn't find HV in header of infile $inFile\n";
-    ($hetCol >= 0) || 
-	die "E: couldn't find HET in header of infile $inFile\n";
+    ($hvCol >= 0) || ($hvColOC >= 0) || 
+	die "E: couldn't find {$cohort}_HV or {$cohort}_OTHERCAUSE_HV in header of infile $inFile\n";
+    ($hetCol >= 0) || ($hetColOC >= 0) || 
+	die "E: couldn't find HET or OC_HET in header of infile $inFile\n";
 
     # KNOWN_CANDIDATE_GENE, Feature and IMPACT column indexes after
     # removing @colsToRemove columns
@@ -163,11 +176,11 @@ while (my $inFile = readdir(INDIR)) {
 	    $knownCandidateCol = $i;
 	    $header[$i] .= "\tGENOTYPE";
 	    foreach my $g ("HV", "HET") {
-		foreach my $im ("HIGH", "MODER") {
-		    $header[$i] .= "\tNB_$g"."_$im"."_ThisSample_ThisTranscript";
+		foreach my $im ("HIGH", "MODHIGH", "MODER") {
+		    $header[$i] .= "\tNB_$g"."_$im"."_ThisSampleInThisTranscript";
 		}
 	    }
-	    $header[$i] .= "\tNB_ALLVARIANTS_ThisSample_ThisTranscript";
+	    $header[$i] .= "\tNB_ALLVARIANTS_ThisSampleInThisTranscript";
 	    $header[$i] .= "\tDP:AF";
 	}
 	elsif ($header[$i] eq "Feature") {
@@ -235,18 +248,39 @@ while (my $inFile = readdir(INDIR)) {
     # the transcript that this line deals with
     my %grex2transcripts;
     # key == grexome, value is a hashref whose keys are transcripts and values
-    # are arrayrefs with 5 ints: numbers of HV_HIGH, HV_MODER, HET_HIGH, HET_MODER and ALL
-    # found for this transcript in this grexome
+    # are arrayrefs with 7 ints:
+    # numbers of HV_HIGH,HV_MODHIGH,HV_MODER, HET_HIGH,HET_MODHIGH,HET_MODER and ALL
+    # found for this transcript in this grexome, the columns here must be in the
+    # same order as in the new NB_* headers we produced
     my %grex2trans2counters;
 
     while (my $line = <IN>) {
 	chomp($line);
 	my @fields = split(/\t/, $line, -1) ;
-	# grab needed GENO data: HV at index 0 and HET at index 1
-	my @genoData;
-	($fields[$hvCol]) && ($genoData[0] = $fields[$hvCol]);
-	($fields[$hetCol]) && ($genoData[1] = $fields[$hetCol]);
-	# splice all GENO data out
+	# grab needed GENO data: rip out the actual geno (eg 1/1, we will just use HV
+	# or HET for geno, the actual allele is in ALLELE_NUM), and store the
+	# comma-separated lists of samples, HV and HVOC at index 0, HET and HETOC at index 1
+	my @genoData = ("","");
+	foreach my $fi ($hvCol,$hvColOC) {
+	    my $gd = $fields[$fi];
+	    if ($gd) {
+		($gd =~ s/^[^~]+~//) || 
+		    die "cannot rip out geno from $gd, infile $inFile\n";
+		($genoData[0]) && ($genoData[0] .= ",");
+		$genoData[0] .= $gd;
+	    }
+	}
+	foreach my $fi ($hetCol,$hetColOC) {
+	    my $gd = $fields[$fi];
+	    if ($gd) {
+		($gd =~ s/^[^~]+~//) || 
+		    die "cannot rip out geno from $gd, infile $inFile\n";
+		($genoData[1]) && ($genoData[1] .= ",");
+		$genoData[1] .= $gd;
+	    }
+	}
+
+	# splice all genoData columns out
 	foreach my $i (reverse(0..$#colsToRemove)) {
 	    ($colsToRemove[$i]) && splice(@fields,$i,1);
 	}
@@ -258,18 +292,14 @@ while (my $inFile = readdir(INDIR)) {
 
 	foreach my $i (0,1) {
 	    if ($genoData[$i]) {
-		($genoData[$i] =~ /^([^~]+)~([^~\|]+)$/) || 
-		    die "cannot parse HV/HET data $genoData[$i] from infile $inFile\n";
-		my ($geno,$samples) = ($1,$2);
-		# actually, just use HV or HET for geno, the actual allele is in ALLELE_NUM
-		# we will still add DP:AF after HV/HET
+		my $geno;
 		($i == 0) && ($geno = "HV");
 		($i == 1) && ($geno = "HET");
-		foreach my $sample (split(/,/,$samples)) {
-		    # grab grexome and [DP:AF], we know it must be there in HV and HET columns
+		foreach my $sample (split(/,/,$genoData[$i])) {
+		    # grab grexome and [DP:AF], we know it must be there
 		    # (allowing AF > 1 for Strelka bug)
 		    ($sample =~ /^(grexome\d\d\d\d)\[(\d+:\d+\.\d\d)\]$/) ||
-			die  "E: inFile $inFile has a genotype call for a sample I can't parse: $sample\n";
+			die  "E: inFile $inFile has a sampleData (in a genoData) that I can't parse: $sample\n";
 		    my ($grexome,$dpaf) = ($1,$2);
 
 		    # initialize everything for this grexome if needed
@@ -277,22 +307,25 @@ while (my $inFile = readdir(INDIR)) {
 		    ($grex2lineEnds{$grexome}) || ($grex2lineEnds{$grexome} = []);
 		    ($grex2transcripts{$grexome}) || ($grex2transcripts{$grexome} = []);
 		    ($grex2trans2counters{$grexome}) || ($grex2trans2counters{$grexome} = {});
-		    ($grex2trans2counters{$grexome}->{$transcript}) || ($grex2trans2counters{$grexome}->{$transcript} = [0,0,0,0]);
+		    ($grex2trans2counters{$grexome}->{$transcript}) || ($grex2trans2counters{$grexome}->{$transcript} = [0,0,0,0,0,0,0]);
 
 		    # now fill our data structures
 		    push(@{$grex2lineStarts{$grexome}}, "$toPrintStart$geno");
 		    push(@{$grex2lineEnds{$grexome}}, "\t$dpaf\t$toPrintEnd");
 		    push(@{$grex2transcripts{$grexome}}, $transcript);
 		    my $indexToIncr = 0;
-		    ($geno eq "HET") && ($indexToIncr += 2);
+		    ($geno eq "HET") && ($indexToIncr += 3);
 		    if ($impact eq "HIGH") {
 			$grex2trans2counters{$grexome}->{$transcript}->[$indexToIncr]++;
 		    }
-		    elsif ($impact eq "MODERATE") {
+		    elsif ($impact eq "MODHIGH") {
 			$grex2trans2counters{$grexome}->{$transcript}->[$indexToIncr+1]++;
 		    }
+		    elsif ($impact eq "MODERATE") {
+			$grex2trans2counters{$grexome}->{$transcript}->[$indexToIncr+2]++;
+		    }
 		    # in any case increment the ALL counter
-		    $grex2trans2counters{$grexome}->{$transcript}->[4]++;
+		    $grex2trans2counters{$grexome}->{$transcript}->[6]++;
 		}
 	    }
 	}
