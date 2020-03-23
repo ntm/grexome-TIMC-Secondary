@@ -11,36 +11,35 @@
 #
 # We expect that cohort files were filtered to consider only rare variants 
 # (max_af_*) in picked transcripts, that aren't seen in too many CTRLs 
-# (max_ctrl_*), that are well genotyped in our dataset (min_hr), and that 
-# have HIGH, MODERATE or LOW impact (no_mod).
+# (max_ctrl_*) and that are well genotyped in our dataset (min_hr).
 #
-# We will define a new MODHIGH impact, as follows:
-# - missense variants are upgraded from MODER to MODHIGH if they are
-#   considered deleterious by most methods (details in code, look for "missense");
-# - splice_region_variant is upgraded from LOW to MODHIGH.
 # We then produce one TSV for each cohort.
 # In each TSV we print one line for each transcript (=="Feature"), with:
-# - COUNT_$cohort_HV_HIGH = number of distinct samples with at
-#   least one HV HIGH variant
-# - COUNT_$cohort_HV_MODHIGH = number of distinct samples with at
+# - COUNT_HV_HIGH = number of distinct samples with at least
+#   one HV HIGH variant
+# - COUNT_HV_MODHIGH = number of distinct samples with at
 #   least one HV MODHIGH-or-HIGH variant
-# - COUNT_$cohort_HV_MODER = number of distinct samples with at
+# - COUNT_HV_MODER = number of distinct samples with at
 #   least one HV MODERATE-or-MODHIGH-or-HIGH variant
-# - COUNT_$cohort_COMPHET_HIGH = number of distinct samples with at
+# - COUNT_COMPHET_HIGH = number of distinct samples with at
 #   least TWO HET (or one HV) HIGH variants
-# - COUNT_$cohort_COMPHET_MODHIGH = number of distinct samples with at
+# - COUNT_COMPHET_MODHIGH = number of distinct samples with at
 #   least TWO HET (or one HV) MODHIGH-or-HIGH variants
-# - COUNT_$cohort_COMPHET_MODER = number of distinct samples with at
+# - COUNT_COMPHET_MODER = number of distinct samples with at
 #   least TWO HET (or one HV) MODERATE-or-MODHIGH-or-HIGH variants
-# - 6 more columns COUNT_COMPATIBLE_* with similar counts but counting
-#   the samples belonging to notControls cohorts (as defined in extractCohorts)
-# - another 6 columns COUNT_NEGCTRL_* with similar counts but counting
+# - 6 more columns COUNT_OTHERCAUSE_* with similar counts but counting
+#   the samples with a "known causal variant" in another gene
+# - another 6 columns COUNT_COMPAT_* with similar counts but counting
+#   the samples belonging to compatible cohorts (as defined in extractCohorts)
+# - 6 final columns COUNT_NEGCTRL_* with similar counts but counting
 #   the control samples (as in extractCohorts again).
-# - HV_HIGH, HV_MODHIGH, HV_MODER, COMPHET_HIGH, COMPHET_MODHIGH, COMPHET_MODER: 
-#   list of samples counted in the corresponding COUNT columns (so eg the
-#   *MODER columns contain the corresponding *HIGH and *MODHIGH samples,
-#   and the COMPHET* columns contain the corresponding HV* samples);
-#   we don't list the COMPATIBLE or NEGCTRL samples.
+# - HV_HIGH, HV_MODHIGH, HV_MODER, COMPHET_HIGH, COMPHET_MODHIGH, COMPHET_MODER:
+#   non-redundant list of samples counted in the corresponding COUNT columns
+#   (so eg the *MODHIGH columns don't list the corresponding *HIGH samples,
+#   even though COUNT*MODHIGH counts them);
+# - OTHERCAUSE_COMPHET_MODHIGH, COMPAT_COMPHET_MODHIGH, NEGCTRL_COMPHET_MODHIGH:
+#   all samples counted in corresponding COUNT columns (we don't list the
+#   MODER samples).
 # In addition, several useful columns from the source file are
 # retained, see @keptColumns.
 # A transcript line is not printed if all 6 COUNT_$cohort columns
@@ -54,15 +53,15 @@ use POSIX qw(strftime);
 #############################################
 ## hard-coded stuff that shouldn't change much
 
-# @notControls: array of arrayrefs, each arrayref holds cohorts that
+# @compatible: array of arrayrefs, each arrayref holds cohorts that
 # should NOT be used as neg controls for each other.
 # The cohort names must match the "pathology" column of the $metadata xlsx
 # (this is checked).
-# NOTE: @notControls IS DUPLICATED IN 6_extractCohorts.pl, IF IT IS CHANGED HERE IT 
+# NOTE: @compatible IS DUPLICATED IN 6_extractCohorts.pl, IF IT IS CHANGED HERE IT 
 # MUST ALSO BE CHANGED THERE 
-my @notControls = (["Flag","Astheno","Headless"],
-		   ["Azoo","Ovo","Macro","IOP"],
-		   ["Globo","Macro","Terato"]);
+my @compatible = (["Flag","Astheno","Headless"],
+		  ["Azoo","Ovo","Macro","IOP"],
+		  ["Globo","Macro","Terato"]);
 
 
 # columns we want to keep, in this order:
@@ -96,17 +95,17 @@ foreach my $col (@keptColumnsSpecific) {
     delete($keptCols{$col});
 }
 
-# %notControls: key is a cohort name, value is a hashref
+# %compatible: key is a cohort name, value is a hashref
 # with keys == cohorts that shouldn't be used as negative 
 # controls for this cohort, value==1
-my %notControls = ();
+my %compatible = ();
 
-foreach my $notConR (@notControls) {
+foreach my $notConR (@compatible) {
     foreach my $cohort (@$notConR) {
-	(defined $notControls{$cohort}) || ($notControls{$cohort} = {});
+	(defined $compatible{$cohort}) || ($compatible{$cohort} = {});
 	foreach my $notC (@$notConR) {
 	    ($notC eq $cohort) && next;
-	    $notControls{$cohort}->{$notC} = 1;
+	    $compatible{$cohort}->{$notC} = 1;
 	}
     }
 }
@@ -127,7 +126,7 @@ mkdir($outDir) || die "cannot mkdir outDir $outDir\n";
 # Accumulators for all the data we want to print:
 # lines describing each transcript in a given infile can be interspersed,
 # and we need to parse all infiles before printing anything (for the 
-# NEGCTRL and COMPATIBLE counters, otherwise we can't count variants
+# NEGCTRL and COMPAT counters, otherwise we can't count variants
 # that don't occur in $cohort).
 # Some data concerning a given transcript must be identical in every infile, 
 # some other is cohort-specific...
@@ -188,11 +187,6 @@ while (my $inFile = readdir(INDIR)) {
     my $transCol;
     # column of POSITION
     my $posCol;
-    # columns of IMPACT and Consequence
-    my ($impactCol, $conseqCol);
-    # columns of the missense effect predictors we use
-    my ($siftCol,$polyphenCol,$caddCol,$tasteCol,$revelCol);
-
     # columns of HV,HET
     my ($colHv,$colHet);
     # @destCols and @destColsSpec: for each column $i in infile: 
@@ -211,7 +205,7 @@ while (my $inFile = readdir(INDIR)) {
     # separator column
     $newHeaders .= "\tCOMPAT";
     foreach my $ct (@countTypes) {
-	$newHeaders .= "\tCOUNT_COMPATIBLE_$ct";
+	$newHeaders .= "\tCOUNT_COMPAT_$ct";
     }
     # separator column
     $newHeaders .= "\tNEGCTRL";
@@ -237,27 +231,6 @@ while (my $inFile = readdir(INDIR)) {
 	elsif ($headers[$hi] eq "POSITION") {
 	    $posCol = $hi;
 	}
-	elsif ($headers[$hi] eq "IMPACT") {
-	    $impactCol = $hi;
-	}
-	elsif ($headers[$hi] eq "Consequence") {
-	    $conseqCol = $hi;
-	}
-	elsif ($headers[$hi] eq "SIFT") {
-	    $siftCol = $hi;
-	}
-	elsif ($headers[$hi] eq "PolyPhen") {
-	    $polyphenCol = $hi;
-	}
-	elsif ($headers[$hi] eq "CADD_raw_rankscore") {
-	    $caddCol = $hi;
-	}
-	elsif ($headers[$hi] eq "MutationTaster_pred") {
-	    $tasteCol = $hi;
-	}
-	elsif ($headers[$hi] eq "REVEL_rankscore") {
-	    $revelCol = $hi;
-	}
 	elsif ($headers[$hi] eq "HV") {
 	    $colHv = $hi;
 	}
@@ -276,49 +249,9 @@ while (my $inFile = readdir(INDIR)) {
 	chomp($line);
 	my @fields= split(/\t/,$line,-1);
 
-	# create new MODHIGH impact (do this first so we can "next"
-	# ignored LOWs without having filled %transcript2*)
-	my $impact = $fields[$impactCol];
-	my $conseq = $fields[$conseqCol];
-	if (($impact eq "LOW") && ($conseq =~ /splice_region_variant/)) {
-	    # NOTE: VEP consequence column can have several &-separated consequences,
-	    # we just want splice_region_variant to be present somewhere
-	    # LOW->splice_region_variant becomes MODHIGH
-	    $impact = "MODHIGH";
-	}
-	elsif ($impact eq "LOW") {
-	    # other LOW variants are ignored
-	    next;
-	}
-	elsif (($impact eq "MODERATE") && ($conseq =~ /missense_variant/)) {
-	    # upgrade to MODHIGH if at least 3 criteria are passed, among the following:
-	    # - SIFT -> deleterious
-	    # - Polyphen -> probably_damaging
-	    # - CADD_raw_rankscore >= 0.7
-	    # - MutationTaster_pred contains at least one A or D
-	    # - REVEL_rankscore >= 0.7
-	    my $passed = 0;
-	    if (($fields[$siftCol]) && ($fields[$siftCol] =~ /deleterious\(/)) {
-		# deleterious\( so we don't get deleterious_low_confidence
-		$passed++;
-	    }
-	    if (($fields[$polyphenCol]) && ($fields[$polyphenCol] =~ /probably_damaging/)) {
-		$passed++;
-	    }
-	    if (($fields[$caddCol]) && ($fields[$caddCol] >= 0.7)) {
-		$passed++;
-	    }
-	    if (($fields[$tasteCol]) && ($fields[$tasteCol] =~ /[AD]/)) {
-		$passed++;
-	    }
-	    if (($fields[$revelCol]) && ($fields[$revelCol] >= 0.7)) {
-		$passed++;
-	    }
-
-	    if ($passed >= 3) {
-		$impact = "MODHIGH";
-	    }
-	}
+	# LOW and MODIFIER variants are ignored
+	($impact eq "LOW") && next;
+	($impact eq "MODIFIER") && next;
 
 	my $transcript = $fields[$transCol];
 	if (! $transcript2start{$transcript}) {
@@ -469,14 +402,14 @@ foreach my $transcript (@transcripts) {
 	}
 	my $toPrint = join("\t",@{$transcript2start{$transcript}});
 
-	# COUNT_* values: 6 for $cohort, "COMPAT", then 6 for COMPATIBLE, "NEGCTRL", and finally 6 for NEGCTRLS
+	# COUNT_* values: 6 for $cohort, "COMPAT", then 6 for COMPATs, "NEGCTRL", and finally 6 for NEGCTRLS
 	my @counts = (0) x 20;
 	$counts[6] = "COMPAT";
 	$counts[13] = "NEGCTRL";
 	foreach my $thisCohort (keys(%cohort2header)) {
 	    # $indexInCounts is 0 ($cohort), 7 (a compatible cohort), or 14 (a negctrl cohort)
 	    my $indexInCounts = 14;
-	    if ($notControls{$cohort}->{$thisCohort}) {
+	    if ($compatible{$cohort}->{$thisCohort}) {
 		$indexInCounts = 7;
 	    }
 	    elsif ($cohort eq $thisCohort) {
