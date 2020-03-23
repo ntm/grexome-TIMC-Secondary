@@ -592,13 +592,14 @@ sub processBatch {
 	my $hrCount = scalar(@hrCount);
 
   	# OK, now print stuff for every cohort that has at least one sample in
-	# $cohort_HV or $cohort_HET
+	# $cohort_HV or $cohort_HET or $cohort_OTHERCAUSE_*
 	foreach my $cohorti (0..$#$cohortsR) {
 	    my $cohort = $cohortsR->[$cohorti];
 
-	    # skip if no HV or HET sample in this cohort
-	    ($cohort2SLcounts[$cohorti]->[0] > 0) ||
-		($cohort2SLcounts[$cohorti]->[1] > 0) || next;
+	    # skip if no HV or HET sample (possibly with other known causal variant)
+	    # in this cohort
+	    ($cohort2SLcounts[$cohorti]->[0] > 0) || ($cohort2SLcounts[$cohorti]->[1] > 0) ||
+		($cohort2SLcounts[$cohorti]->[2] > 0) || ($cohort2SLcounts[$cohorti]->[3] > 0) || next;
 
 	    # OK we have some data to print for $cohort
 	    # always keep first field 
