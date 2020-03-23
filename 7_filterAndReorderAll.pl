@@ -4,13 +4,14 @@
 # 26/03/2018
 # NTM
 
-# Takes 3 arguments: $pick $inDir $outDir
-# - $pick is 0 or 1, if true we apply --pick as a filter;
+# Takes 2 or 3 arguments: $inDir $outDir [$pick]
 # - $inDir must contain cohort or sample TSVs (possibly gzipped) as 
 #   produced by extractCohorts.pl or extractSamples.pl;
 # - $outDir doesn't exist, it will be created and filled with one TSV
 #   per infile (never gzipped), adding .filtered or .filtered.pick to 
-#   the filename.
+#   the filename;
+# - $pick is optional, it's value must be 0 or 1, default is 1, if true
+#   we apply --pick as a filter.
 # Every infile is filtered and columns are reordered.
 
 use strict;
@@ -41,16 +42,19 @@ foreach my $path (@possibleBinPaths) {
 
 
 
-(@ARGV == 3) || die "needs 3 args: PICK (boolean), an inDir and a non-existant outDir\n";
-my ($pick, $inDir, $outDir) = @ARGV;
-($pick == 0) || ($pick == 1) || die "first arg must be 0 or 1\n";
+(@ARGV == 2) || (@ARGV == 3) ||
+    die "E: needs 2 or 3 args: an inDir, a non-existant outDir, and optionally PICK (value 0 or 1, default 1)\n";
+my ($inDir, $outDir,$pick) = (@ARGV,1);
+($pick == 0) || ($pick == 1) ||
+    die "E: last arg, if present, must be 0 or 1\n";
 (-d $inDir) ||
-    die "inDir $inDir doesn't exist or isn't a directory\n";
+    die "E: inDir $inDir doesn't exist or isn't a directory\n";
 opendir(INDIR, $inDir) ||
-    die "cannot opendir inDir $inDir\n";
+    die "E: cannot opendir inDir $inDir\n";
 (-e $outDir) && 
-    die "found argument $outDir but it already exists, remove it or choose another name.\n";
-mkdir($outDir) || die "cannot mkdir outDir $outDir\n";
+    die "E: found argument $outDir but it already exists, remove it or choose another name.\n";
+mkdir($outDir) ||
+    die "cannot mkdir outDir $outDir\n";
 
 
 # create fork manager
