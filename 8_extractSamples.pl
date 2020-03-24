@@ -162,9 +162,9 @@ while (my $inFile = readdir(INDIR)) {
 	    splice(@header,$i,1);
 	}
     }
-    ($hvCol >= 0) || ($hvColOC >= 0) || 
+    (($hvCol >= 0) && ($hvColOC >= 0)) || 
 	die "E: couldn't find {$cohort}_HV or {$cohort}_OTHERCAUSE_HV in header of infile $inFile\n";
-    ($hetCol >= 0) || ($hetColOC >= 0) || 
+    (($hetCol >= 0) && ($hetColOC >= 0)) || 
 	die "E: couldn't find HET or OC_HET in header of infile $inFile\n";
 
     # KNOWN_CANDIDATE_GENE, Feature and IMPACT column indexes after
