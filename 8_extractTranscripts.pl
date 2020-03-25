@@ -155,6 +155,9 @@ my %transcript2cohort2start;
 # and HIGH samples,
 # COMPHET also lists the samples that are HV (but these count as 2 variants)
 my %transcript2cohort2samples;
+# %transcript2cohort2samplesOC: same as %transcript2cohort2samples but counting
+# OTHERCAUSE variants
+my %transcript2cohort2samplesOC;
 
 # for each $cohort found in $inDir, store the header line to print
 my %cohort2header;
@@ -187,8 +190,10 @@ while (my $inFile = readdir(INDIR)) {
     my $transCol;
     # column of POSITION
     my $posCol;
-    # columns of HV,HET
-    my ($colHv,$colHet);
+    # column of IMPACT
+    my $impactCol;
+    # columns of HV,HET, OTHERCAUSE_HV, OTHERCAUSE_HET
+    my ($hvCol,$hetCol,$hvColOC,$hetColOC) = (-1,-1,-1,-1);
     # @destCols and @destColsSpec: for each column $i in infile: 
     # if $destCols[$i] >= 0 it is the column where that info goes in transcript2start
     # elsif $destCols[$i] == -1 source column is a GTEX
@@ -198,9 +203,14 @@ while (my $inFile = readdir(INDIR)) {
 
     # new headers
     my $newHeaders = join("\t",@keptColumns);
-    # add COUNTs and SAMPLES
+    # COUNTs
     foreach my $ct (@countTypes) {
-	$newHeaders .= "\tCOUNT_$cohort"."_$ct";
+	$newHeaders .= "\tCOUNT_$ct";
+    }
+    # separator column
+    $newHeaders .= "\tOTHERCAUSE";
+    foreach my $ct (@countTypes) {
+	$newHeaders .= "\tCOUNT_OTHERCAUSE_$ct";
     }
     # separator column
     $newHeaders .= "\tCOMPAT";
@@ -212,9 +222,15 @@ while (my $inFile = readdir(INDIR)) {
     foreach my $ct (@countTypes) {
 	$newHeaders .= "\tCOUNT_NEGCTRL_$ct";
     }
+    # SAMPLES from $cohort (excluding OCs)
     foreach my $ct (@countTypes) {
 	$newHeaders .= "\t$ct";
     }
+    # other SAMPLES: OC, COMPAT, NEGCTRL -> only list COMPHET_MODHIGH cumulatively
+    $newHeaders .= "\tOTHERCAUSE_COMPHET_MODHIGH";
+    $newHeaders .= "\tCOMPAT_COMPHET_MODHIGH";
+    $newHeaders .= "\tNEGCTRL_COMPHET_MODHIGH";
+    
     # GTEX headers are added when parsing $headers and filling @destCols
     foreach my $hi (0..$#headers) {
 	if (defined $keptCols{$headers[$hi]}) {
@@ -231,14 +247,26 @@ while (my $inFile = readdir(INDIR)) {
 	elsif ($headers[$hi] eq "POSITION") {
 	    $posCol = $hi;
 	}
-	elsif ($headers[$hi] eq "HV") {
-	    $colHv = $hi;
+	elsif ($headers[$hi] eq "IMPACT") {
+	    $impactCol = $hi;
 	}
-	elsif ($headers[$hi] eq "HET") {
-	    $colHet = $hi;
+	elsif ($headers[$hi] eq $cohort."_HV") {
+	    $hvCol = $hi;
+	}
+	elsif ($headers[$hi] eq $cohort."_OTHERCAUSE_HV") {
+	    $hvColOC = $hi;
+	}
+	elsif ($headers[$hi] eq $cohort."_HET") {
+	    $hetCol = $hi;
+	}
+	elsif ($headers[$hi] eq $cohort."_OTHERCAUSE_HET") {
+	    $hetColOC = $hi;
 	}
 	# else ignore this column
     }
+    # sanity check
+    (($hvCol >= 0) && ($hvColOC >= 0) && ($hetCol >= 0) && ($hetColOC >= 0)) || 
+	die "E: couldn't find one of HV/HET/OCHV/OCHET for $cohort\n";
 
     # add filter params at the end and store
     $cohort2header{$cohort} = "$newHeaders\t$headers[$#headers]";
@@ -249,6 +277,7 @@ while (my $inFile = readdir(INDIR)) {
 	chomp($line);
 	my @fields= split(/\t/,$line,-1);
 
+	my $impact = $fields[$impactCol];
 	# LOW and MODIFIER variants are ignored
 	($impact eq "LOW") && next;
 	($impact eq "MODIFIER") && next;
@@ -281,9 +310,10 @@ while (my $inFile = readdir(INDIR)) {
 	    }
 	    $transcript2start{$transcript} = \@start;
 	    $transcript2gtex{$transcript} = $gtex;
-	    # also initialize transcript2cohort2samples and %transcript2cohort2start
-	    # with empty hashrefs
+	    # also initialize %transcript2cohort2samples, %transcript2cohort2samplesOC,
+	    # and %transcript2cohort2start with empty hashrefs
 	    $transcript2cohort2samples{$transcript} = {};
+	    $transcript2cohort2samplesOC{$transcript} = {};
 	    $transcript2cohort2start{$transcript} = {};
 	}
 
@@ -299,14 +329,16 @@ while (my $inFile = readdir(INDIR)) {
 
 	    # initialize samples: arrayref with 6 hashrefs to empty hashes
 	    $transcript2cohort2samples{$transcript}->{$cohort} = [{},{},{},{},{},{}];
+	    # same for OTHERCAUSE samples
+	    $transcript2cohort2samplesOC{$transcript}->{$cohort} = [{},{},{},{},{},{}];
 	}
 
-	# in any case, update %transcript2cohort2samples
-	# HV and HET columns are processed very similarly, use flag to know
-	# where we are: $isHV == 0 if HET, 1 if HV, init to -1 because we always 
-	# increment $isHV immediately in loop
-	my $isHV = -1;
-	# Similarly we pocess the various IMPACTs homogeneously with $impactStart:
+	# in any case, update %transcript2cohort2samples and transcript2cohort2samplesOC
+	# we will read the sample columns in this order:
+	my @cols = ($hetCol,$hvCol,$hetColOC,$hvColOC);
+	# HV and HET columns are processed very similarly, index in @cols must
+	# be even for HETs and odd for HVs;
+	# similarly we pocess the various IMPACTs homogeneously with $impactStart:
 	# $impactStart == 0 if impact is HIGH (need to update counters HIGH, MODHIGH and MODER),
 	# 1 if it's MODHIGH (update MODHIGH and MODER), 2 if it's MODER (just update MODER)
 	my $impactStart;
@@ -317,47 +349,63 @@ while (my $inFile = readdir(INDIR)) {
 	    die "E: impact is $impact, should have been skipped earlier. Line:\n$line\n";
 	}
 
-	foreach my $col ($colHet,$colHv) {
-	    # increment immediately, even if no samples
-	    $isHV++;
-	    my $samples = $fields[$col];
+	foreach my $coli (0..$#cols) {
+	    # $isHV = 0 for HETs and 1 for HVs
+	    my $isHV = $coli % 2;
+	    # $isOC is 0 for undiagnosed $cohort samples and 1 for OTHERCAUSE samples
+	    my $isOC = int($coli / 2);
+	    my $samples = $fields[$cols[$coli]];
 	    ($samples) || next;
+
 	    # remove genotype, we only want the grexome IDs
 	    $samples =~ s/^\d+\/\d+~//;
 	    
 	    foreach my $sample (split(/,/,$samples)) {
-		# ignore [DP:AF]
+		# ignore [DP:AF] and possibly patientIDs
 		($sample =~ /^(grexome\d\d\d\d)/) || 
 		    die "E: cannot grab grexome from sample $sample\n";
 		my $grexome = $1;
 
 		# always initialize to zero if needed before incrementing
 		if ($isHV) {
-		    # COUNT_HV_HIGH, COUNT_HV_MODHIGH and COUNT_HV_MODER may get +1 
-		    # (depending on $impactStart)
+		    # COUNT_HV_HIGH, COUNT_HV_MODHIGH and COUNT_HV_MODER or their
+		    # OTHERCAUSE counterparts may get +1 (depending on $impactStart)
 		    foreach my $ai ($impactStart..2) {
 			($transcript2cohort2samples{$transcript}->{$cohort}->[$ai]->{$grexome}) ||
 			    ($transcript2cohort2samples{$transcript}->{$cohort}->[$ai]->{$grexome} = 0);
-			$transcript2cohort2samples{$transcript}->{$cohort}->[$ai]->{$grexome}++;
+			($transcript2cohort2samplesOC{$transcript}->{$cohort}->[$ai]->{$grexome}) ||
+			    ($transcript2cohort2samplesOC{$transcript}->{$cohort}->[$ai]->{$grexome} = 0);
+			if ($isOC) {
+			    $transcript2cohort2samplesOC{$transcript}->{$cohort}->[$ai]->{$grexome}++;
+			}
+			else {
+			    $transcript2cohort2samples{$transcript}->{$cohort}->[$ai]->{$grexome}++;
+			}
 		    }
 		}
 		# whether $isHV or not, COUNT_COMPHET_HIGH COUNT_COMPHET_MODHIGH and
-		# COUNT_COMPHET_MODER may get updated, but HV variants count as 2
+		# COUNT_COMPHET_MODER (or their OC counterparts) may get updated, but
+		# HV variants count as 2
 		foreach my $ai (3+$impactStart..5) {
 		    ($transcript2cohort2samples{$transcript}->{$cohort}->[$ai]->{$grexome}) ||
 			($transcript2cohort2samples{$transcript}->{$cohort}->[$ai]->{$grexome} = 0);
-		    $transcript2cohort2samples{$transcript}->{$cohort}->[$ai]->{$grexome} += (1+$isHV);
+		    ($transcript2cohort2samplesOC{$transcript}->{$cohort}->[$ai]->{$grexome}) ||
+			($transcript2cohort2samplesOC{$transcript}->{$cohort}->[$ai]->{$grexome} = 0);
+		    if ($isOC) {
+			$transcript2cohort2samplesOC{$transcript}->{$cohort}->[$ai]->{$grexome} += (1+$isHV);
+		    }
+		    else {
+			$transcript2cohort2samples{$transcript}->{$cohort}->[$ai]->{$grexome} += (1+$isHV);
+		    }
 		}
 	    }
 	}
     }
-
     $now = strftime("%F %T", localtime);
     warn "I: $now - Finished parsing $cohort infile\n";
     close(INFILE);
 }
 closedir(INDIR);
-
 
 #########################################################
 # now print all results
@@ -367,13 +415,33 @@ closedir(INDIR);
 my @transcripts = sort {($transcript2chr{$a} <=> $transcript2chr{$b}) || ($transcript2coord{$a} <=> $transcript2coord{$b})} keys(%transcript2chr);
 
 
-# for COMPHET counts and lists we only want samples with at least 2 variants
+# for HV counts and lists we want samples with at least one variant (some
+# keys got created at zero and stayed there, delete them);
+# and for COMPHET counts and lists we only want samples with at least 2 variants.
+# the OC version is defined for exactly the same transcripts and cohorts as the
+# normal version, but samples can be different
 foreach my $transcript (keys %transcript2cohort2samples) {
     foreach my $cohort (keys %{$transcript2cohort2samples{$transcript}}) {
+	# HVs
+	foreach my $t2si (0..2) {
+	    foreach my $sample (keys %{$transcript2cohort2samples{$transcript}->{$cohort}->[$t2si]}) {
+		($transcript2cohort2samples{$transcript}->{$cohort}->[$t2si]->{$sample} >= 1) ||
+		    (delete $transcript2cohort2samples{$transcript}->{$cohort}->[$t2si]->{$sample});
+	    }
+	    foreach my $sample (keys %{$transcript2cohort2samplesOC{$transcript}->{$cohort}->[$t2si]}) {
+		($transcript2cohort2samplesOC{$transcript}->{$cohort}->[$t2si]->{$sample} >= 1) ||
+		    (delete $transcript2cohort2samplesOC{$transcript}->{$cohort}->[$t2si]->{$sample});
+	    }
+	}
+	# COMPHETs
 	foreach my $t2si (3..5) {
 	    foreach my $sample (keys %{$transcript2cohort2samples{$transcript}->{$cohort}->[$t2si]}) {
 		($transcript2cohort2samples{$transcript}->{$cohort}->[$t2si]->{$sample} >= 2) ||
 		    (delete $transcript2cohort2samples{$transcript}->{$cohort}->[$t2si]->{$sample});
+	    }
+	    foreach my $sample (keys %{$transcript2cohort2samplesOC{$transcript}->{$cohort}->[$t2si]}) {
+		($transcript2cohort2samplesOC{$transcript}->{$cohort}->[$t2si]->{$sample} >= 2) ||
+		    (delete $transcript2cohort2samplesOC{$transcript}->{$cohort}->[$t2si]->{$sample});
 	    }
 	}
     }
@@ -398,38 +466,55 @@ foreach my $transcript (@transcripts) {
 	# fill the cohort-specific fields in $transcript2start{$transcript}
 	foreach my $i (0..$#{$transcript2cohort2start{$transcript}->{$cohort}}) {
 	    (defined $transcript2cohort2start{$transcript}->{$cohort}->[$i]) || next;
+	    # we modify the cohort-independant transcript2start data, but it's OK
+	    # because if a field is defined in one cohort it must be defined in
+	    # every cohort (possibly with value "", which is what we want)
 	    $transcript2start{$transcript}->[$i] = $transcript2cohort2start{$transcript}->{$cohort}->[$i];
 	}
 	my $toPrint = join("\t",@{$transcript2start{$transcript}});
 
-	# COUNT_* values: 6 for $cohort, "COMPAT", then 6 for COMPATs, "NEGCTRL", and finally 6 for NEGCTRLS
-	my @counts = (0) x 20;
-	$counts[6] = "COMPAT";
-	$counts[13] = "NEGCTRL";
-	foreach my $thisCohort (keys(%cohort2header)) {
-	    # $indexInCounts is 0 ($cohort), 7 (a compatible cohort), or 14 (a negctrl cohort)
-	    my $indexInCounts = 14;
-	    if ($compatible{$cohort}->{$thisCohort}) {
-		$indexInCounts = 7;
+	# COUNT_* values: 6 for $cohort, "OTHERCAUSE", 6 for OCs, "COMPAT", then 6 for COMPATs,
+	# "NEGCTRL", and finally 6 for NEGCTRLS
+	my @counts = (0) x 27;
+	$counts[6] = "OTHERCAUSE";
+	$counts[13] = "COMPAT";
+	$counts[20] = "NEGCTRL";
+	foreach my $thisCohort (keys(%{$transcript2cohort2samples{$transcript}})) {
+	    if ($cohort eq $thisCohort) {
+		# update non-OC $cohort...
+		foreach my $i (0..5) {
+		    $counts[$i] += scalar(keys(%{$transcript2cohort2samples{$transcript}->{$thisCohort}->[$i]}));
+		}
+		# and also $cohort_OC, at indexes 7..12
+		foreach my $i (0..5) {
+		    $counts[7 + $i] += scalar(keys(%{$transcript2cohort2samplesOC{$transcript}->{$thisCohort}->[$i]}));
+		}
 	    }
-	    elsif ($cohort eq $thisCohort) {
-		$indexInCounts = 0;
-	    }
-	    # else $thisCohort is a NEGCTRL, use the default == 12
-
-	    foreach my $i (0..5) {
-		$counts[$indexInCounts + $i] += scalar(keys(%{$transcript2cohort2samples{$transcript}->{$thisCohort}->[$i]}));
+	    else {
+		# for COMPATs and NEGCTRLs we need to add non-OC and OC counts
+		# $indexInCounts is 14 if $thisCohort is compatible with $cohort and 21 if it's a NEGCTRL
+		my $indexInCounts = 21;
+		if ($compatible{$cohort}->{$thisCohort}) {
+		    $indexInCounts = 14;
+		}
+		foreach my $i (0..5) {
+		    $counts[$indexInCounts + $i] += scalar(keys(%{$transcript2cohort2samples{$transcript}->{$thisCohort}->[$i]}));
+		    $counts[$indexInCounts + $i] += scalar(keys(%{$transcript2cohort2samplesOC{$transcript}->{$thisCohort}->[$i]}));
+		}
 	    }
 	}
 	$toPrint .= "\t".join("\t",@counts);
-	
-	$toPrint{$cohort} = $toPrint;
-    }
 
-    foreach my $cohort (keys(%toPrint)) {
-	# lists of samples from this cohort: don't print redundantly.
-	# Doing this now so the counts still include all samples satisfying the condition,
-	# I just want to avoid redundancy in the lists of samples
+	# $toPrint{$cohort} stays undef for this cohort if it doesn't at least have a
+	# COMPHET_MODER sample, otherwise save $toPrint
+	if ($counts[5] > 0) {
+	    $toPrint{$cohort} = $toPrint;
+	}
+    }
+    
+    # done counting, now remove redundancy (eg between HV_MODHIGH and HV_HIGH) in lists of
+    # non-OTHERCAUSE samples from every cohort
+    foreach my $cohort (keys(%{$transcript2cohort2start{$transcript}})) {
 	foreach my $t (keys(%{$transcript2cohort2samples{$transcript}->{$cohort}->[0]})) {
 	    # HV_HIGH -> remove from all others
 	    foreach my $i (1..5) {
@@ -456,19 +541,48 @@ foreach my $transcript (@transcripts) {
 	    # COMPHET_MODHIGH -> remove from COMPHET_MODER
 	    delete($transcript2cohort2samples{$transcript}->{$cohort}->[5]->{$t});
 	}
+    }
 
-	# we will actually print line except if all 6 sample lists are empty
-	my $printOK = 0;
-	my $toPrintEnd = "";
+    # now finish building %toPrint, adding the lists of samples and GTEX data
+    foreach my $cohort (keys(%toPrint)) {
+	my $toPrint = $toPrint{$cohort};
+	# the 6 cohort samplelists
 	foreach my $i (0..5) {
-	    $toPrintEnd .= "\t".join(',',sort(keys(%{$transcript2cohort2samples{$transcript}->{$cohort}->[$i]})));
-	    (scalar(keys(%{$transcript2cohort2samples{$transcript}->{$cohort}->[$i]})) != 0) && ($printOK = 1);
+	    $toPrint .= "\t".join(',',sort(keys(%{$transcript2cohort2samples{$transcript}->{$cohort}->[$i]})));
 	}
 	
-	# transcript2gtex already starts with \t
-	$toPrintEnd .= $transcript2gtex{$transcript};
+	#  OTHERCAUSE_COMPHET_MODHIGH is complete, just copy it (COMPHET_MODHIGH -> index 4)
+	$toPrint .= "\t".join(',',sort(keys(%{$transcript2cohort2samplesOC{$transcript}->{$cohort}->[4]})));
+	
+	# COMPAT_COMPHET_MODHIGH, NEGCTRL_COMPHET_MODHIGH: need to examine all other cohorts
+	my @compat = ();
+	my @negctrl = ();
+	foreach my $thisCohort (keys(%cohort2header)) {
+	    ($cohort eq $thisCohort) && next;
+	    # otherwise we want all COMPHET_MODHIGH (or better) samples from $thisCohort,
+	    # including the OTHERCAUSE ones
+	    my @goodSamples;
+	    # rebuild full $cohort_COMPHET_MODHIGH: need indexes 0,1,3,4
+	    foreach my $i (0,1,3,4) {
+		push(@goodSamples, keys(%{$transcript2cohort2samples{$transcript}->{$thisCohort}->[$i]}));
+	    }
+	    # add OCs (it's complete, just grab list at index 4)
+	    push(@goodSamples, keys(%{$transcript2cohort2samplesOC{$transcript}->{$thisCohort}->[4]}));
 
-	($printOK) && (print {$outFHs{$cohort}} $toPrint{$cohort}."$toPrintEnd\n");
+	    if ($compatible{$cohort}->{$thisCohort}) {
+		push(@compat, @goodSamples); 
+	    }
+	    else {
+		push(@negctrl, @goodSamples); 
+	    }
+	}
+	$toPrint .= "\t".join(',',sort(@compat));
+	$toPrint .= "\t".join(',',sort(@negctrl));
+
+	# transcript2gtex already starts with \t
+	$toPrint .= $transcript2gtex{$transcript};
+
+	print {$outFHs{$cohort}} "$toPrint\n";
     }
 }
 
