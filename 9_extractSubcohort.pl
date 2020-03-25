@@ -10,7 +10,7 @@
 # gzipped, just "gunzip -c |" if needed);
 # print to stdout a sub-cohort file, identical to the infile except it
 # only has the lines where one of the samples of the sub-cohort is HET
-# or HV (possibly with OTHERCAUSE).
+# or HV (OTHERCAUSE is not enough).
 
 use strict;
 use warnings;
@@ -45,20 +45,21 @@ while (my $line = <SUBC>) {
 my $header = <STDIN>;
 chomp($header);
 my @header = split(/\t/,$header);
-# indexes of $cohort_* columns
+# indexes of $cohort_* columns we want to look at
 my @genoCols = ();
 foreach my $i (0..$#header) {
-    # start by ignoring COUNT*, NEGCTRL, and COMPAT
-    if (($header[$i] =~ /^COUNT_/) || ($header[$i] =~ /^NEGCTRL_/) || ($header[$i] =~ /^COMPAT_/)) {
+    # start by ignoring COUNT*, NEGCTRL, COMPAT, and OTHERCAUSE
+    if (($header[$i] =~ /^COUNT_/) || ($header[$i] =~ /^NEGCTRL_/) ||
+	($header[$i] =~ /^COMPAT_/) || ($header[$i] =~ /_OTHERCAUSE_/)) {
 	next;
     }
-    # any other _HV or _HET column should be good
+    # remaining _HV or _HET column should be good
     elsif (($header[$i] =~ /_HV$/) || ($header[$i] =~ /_HET$/)) {
 	push(@genoCols, $i);
     }
 }
-# we should have found exactly 4 columns (HV, HET, OTHERCAUSE_HV, OTHERCAUSE_HET) 
-(@genoCols == 4) || die "E: can't find 4 good geno headers in:\n$header\n";
+# we should have found exactly 2 columns (HV, HET)
+(@genoCols == 2) || die "E: can't find 2 good geno headers in:\n$header\n";
 print "$header\n";
 
 # data
