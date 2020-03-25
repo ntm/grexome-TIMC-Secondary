@@ -18,11 +18,13 @@
 # For a sample, we only print lines from its cohort file and where 
 # it has an HV or HET genotype: this genotype is printed in new columns
 # GENOTYPE and DP:AF, inserted right after KNOWN_CANDIDATE_GENE.
-# Between GENOTYPE and DP:AF we insert new columns NB_$geno_$impact_ThisSampleInThisTranscript
-# with $geno == HV or HET and $impact == HIGH or MODHIGH or MODER, counting the total
-# number of $geno-$impact variants (passing all filters and) affecting
-# this transcript in this grexome; and then NB_ALLVARIANTS_ThisSampleInThisTranscript
-# with all variants affecting this transcript in this grexome.
+# Immediately after DP:AF we insert a new column BOTH_ALLELES, value is one of:
+#   HIGH -> patient has >=2 HET or at >=1 HV HIGH variants;
+#   MODHIGH -> patient has >=2 HET or >=1 HV variants of impact HIGH or MODHIGH,
+#     but isn't in HIGH category;
+#   MODERATE -> same for impact >= MODERATE;
+#   LOW -> same for impact >= LOW;
+#   NO -> patient has at most one allele >= LOW.
 # Also the genoData columns ($cohort_HV, NEGCTRL_HV, etc...) are not printed.
 
 use strict;
@@ -175,13 +177,8 @@ while (my $inFile = readdir(INDIR)) {
 	if ($header[$i] eq "KNOWN_CANDIDATE_GENE") {
 	    $knownCandidateCol = $i;
 	    $header[$i] .= "\tGENOTYPE";
-	    foreach my $g ("HV", "HET") {
-		foreach my $im ("HIGH", "MODHIGH", "MODER") {
-		    $header[$i] .= "\tNB_$g"."_$im"."_ThisSampleInThisTranscript";
-		}
-	    }
-	    $header[$i] .= "\tNB_ALLVARIANTS_ThisSampleInThisTranscript";
 	    $header[$i] .= "\tDP:AF";
+	    $header[$i] .= "\tBOTH_ALLELES";
 	}
 	elsif ($header[$i] eq "Feature") {
 	    $featureCol = $i;
@@ -248,10 +245,9 @@ while (my $inFile = readdir(INDIR)) {
     # the transcript that this line deals with
     my %grex2transcripts;
     # key == grexome, value is a hashref whose keys are transcripts and values
-    # are arrayrefs with 7 ints:
-    # numbers of HV_HIGH,HV_MODHIGH,HV_MODER, HET_HIGH,HET_MODHIGH,HET_MODER and ALL
-    # found for this transcript in this grexome, the columns here must be in the
-    # same order as in the new NB_* headers we produced
+    # are arrayrefs with 4 ints:
+    # numbers of HIGH, MODHIGH, MODER, and LOW variant alleles found for this
+    # transcript in this grexome (so, an HV counts as 2 and a HET as 1)
     my %grex2trans2counters;
 
     while (my $line = <IN>) {
@@ -307,25 +303,29 @@ while (my $inFile = readdir(INDIR)) {
 		    ($grex2lineEnds{$grexome}) || ($grex2lineEnds{$grexome} = []);
 		    ($grex2transcripts{$grexome}) || ($grex2transcripts{$grexome} = []);
 		    ($grex2trans2counters{$grexome}) || ($grex2trans2counters{$grexome} = {});
-		    ($grex2trans2counters{$grexome}->{$transcript}) || ($grex2trans2counters{$grexome}->{$transcript} = [0,0,0,0,0,0,0]);
+		    ($grex2trans2counters{$grexome}->{$transcript}) || ($grex2trans2counters{$grexome}->{$transcript} = [0,0,0,0]);
 
 		    # now fill our data structures
 		    push(@{$grex2lineStarts{$grexome}}, "$toPrintStart$geno");
 		    push(@{$grex2lineEnds{$grexome}}, "\t$dpaf\t$toPrintEnd");
 		    push(@{$grex2transcripts{$grexome}}, $transcript);
-		    my $indexToIncr = 0;
-		    ($geno eq "HET") && ($indexToIncr += 3);
+
 		    if ($impact eq "HIGH") {
-			$grex2trans2counters{$grexome}->{$transcript}->[$indexToIncr]++;
+			# 2-$i is 1 for HET and 2 for HV...
+			$grex2trans2counters{$grexome}->{$transcript}->[0] += 2-$i;
 		    }
 		    elsif ($impact eq "MODHIGH") {
-			$grex2trans2counters{$grexome}->{$transcript}->[$indexToIncr+1]++;
+			$grex2trans2counters{$grexome}->{$transcript}->[1] += 2-$i;
 		    }
 		    elsif ($impact eq "MODERATE") {
-			$grex2trans2counters{$grexome}->{$transcript}->[$indexToIncr+2]++;
+			$grex2trans2counters{$grexome}->{$transcript}->[2] += 2-$i;
 		    }
-		    # in any case increment the ALL counter
-		    $grex2trans2counters{$grexome}->{$transcript}->[6]++;
+		    elsif ($impact eq "LOW") {
+			$grex2trans2counters{$grexome}->{$transcript}->[3] += 2-$i;
+		    }
+		    else {
+			die "E: unknown impact $impact in inFile $inFile, line:\n$line\n";
+		    }
 		}
 	    }
 	}
@@ -337,9 +337,37 @@ while (my $inFile = readdir(INDIR)) {
 	foreach my $i (0..$#{$grex2lineStarts{$grexome}}) {
 	    my $toPrint = $grex2lineStarts{$grexome}->[$i];
 	    my $transcript = $grex2transcripts{$grexome}->[$i];
-	    $toPrint .= "\t".join("\t", @{$grex2trans2counters{$grexome}->{$transcript}});
+	    # $numAlleles: number of alleles of severity >= X, X is initially HIGH
+	    # and will go down gradually
+	    my $numAlleles = $grex2trans2counters{$grexome}->{$transcript}->[0];
+	    if ($numAlleles >= 2) {
+		$toPrint .= "\tHIGH";
+	    }
+	    else {
+		# add the number of MODHIGH alleles
+		$numAlleles += $grex2trans2counters{$grexome}->{$transcript}->[1];
+		if ($numAlleles >= 2) {
+		    $toPrint .= "\tMODHIGH";
+		}
+		else {
+		    # add MODERATEs
+		    $numAlleles += $grex2trans2counters{$grexome}->{$transcript}->[2];
+		    if ($numAlleles >= 2) {
+			$toPrint .= "\tMODERATE";
+		    }
+		    else {
+			# add LOWs
+			$numAlleles += $grex2trans2counters{$grexome}->{$transcript}->[3];
+			if ($numAlleles >= 2) {
+			    $toPrint .= "\tLOW";
+			}
+			else {
+			    $toPrint .= "\tNO";
+			}
+		    }
+		}
+	    }
 	    $toPrint .= $grex2lineEnds{$grexome}->[$i];
-
 	    print { $outFHs{$grexome} } $toPrint;
 	}
     }
