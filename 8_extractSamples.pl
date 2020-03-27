@@ -306,8 +306,8 @@ while (my $inFile = readdir(INDIR)) {
 		    ($grex2trans2counters{$grexome}->{$transcript}) || ($grex2trans2counters{$grexome}->{$transcript} = [0,0,0,0]);
 
 		    # now fill our data structures
-		    push(@{$grex2lineStarts{$grexome}}, "$toPrintStart$geno");
-		    push(@{$grex2lineEnds{$grexome}}, "\t$dpaf\t$toPrintEnd");
+		    push(@{$grex2lineStarts{$grexome}}, "$toPrintStart$geno\t$dpaf");
+		    push(@{$grex2lineEnds{$grexome}}, "\t$toPrintEnd");
 		    push(@{$grex2transcripts{$grexome}}, $transcript);
 
 		    if ($impact eq "HIGH") {
