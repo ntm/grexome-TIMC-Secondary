@@ -32,7 +32,7 @@
 # This is an initial cleanup of multiallelic sites: for example with 
 # grexomes_0050-0520, 48.4% of sites with 2 ALTs will become monoallelic.
 #
-# UPDATE 20/08/2019: for HV and HET genos, "sample" is now: grexomeXXXX[$dp:$af]
+# UPDATE 20/08/2019: for HV and HET genos, "sample" is now: $sample[$dp:$af]
 
 use strict;
 use warnings;
