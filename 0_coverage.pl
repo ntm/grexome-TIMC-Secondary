@@ -8,7 +8,7 @@
 # tabix-indexed), and an $outDir.
 # If $outDir doesn't exist it is created; if it exists any pre-existing
 # coverage*tsv file in it is not remade (considered good).
-# For each grexome* sample found in $gvcf and lacking a coverage*tsv
+# For each sample found in $gvcf and lacking a coverage*tsv
 # in $outDir, produce $outDir/coverage*.tsv with:
 # for each coding transcript in $transcriptsFile that is transcribed
 # from a candidate gene listed in $candidatesFile, print
@@ -101,12 +101,12 @@ my @samples = @fields[9..$#fields];
 # samples that already have a coverage file are ignored (value 1)
 my @samplesIgnored = (0) x scalar(@samples);
 
-# array of filehandles open for writing, one for each non-ignored grexome,
+# array of filehandles open for writing, one for each non-ignored sample,
 # same indexes as @samples
 my @outFHs;
 foreach my $i (0..$#samples) {
-    my $grexome = $samples[$i];
-    my $outFile = "$outDir/coverage_$grexome.csv";
+    my $sample = $samples[$i];
+    my $outFile = "$outDir/coverage_$sample.csv";
     if (-e $outFile) {
 	$samplesIgnored[$i] = 1;
     }
@@ -121,7 +121,7 @@ foreach my $i (0..$#samples) {
 #########################################################
 
 # counters for global stats:
-# for each non-ignored grexome, we will count the number of bases of
+# for each non-ignored sample, we will count the number of bases of
 # candidate genes whose  coverage $cov is 
 # >= 50x, 20x <= $cov < 50x, 10x <= $cov < 20x, or < 10x respectively
 my @bases50Candidates = (0) x scalar(@samples);
@@ -173,7 +173,7 @@ while (my $line = <GENES>) {
     # we will print one line per exon for candidate genes, but also a final 
     # line for the whole gene/transcript
     my $lengthGene = 0;
-    # for each grexome, count the bases whose cov is:
+    # for each sample, count the bases whose cov is:
     # $cov >= 50x, 20x <= $cov < 50x, 10x <= $cov < 20x, or $cov < 10x respectively
     my @bases50Gene = (0) x scalar(@samples);
     my @bases20Gene = (0) x scalar(@samples);
@@ -205,7 +205,7 @@ while (my $line = <GENES>) {
 	$toPrint .= "$lengthExon\t";
 	$lengthGene += $lengthExon;
 
-	# count the bases of this exon covered at 50x / 20x / 10x / 0x for each grexome
+	# count the bases of this exon covered at 50x / 20x / 10x / 0x for each sample
 	my @bases50Exon = (0) x scalar(@samples);
 	my @bases20Exon = (0) x scalar(@samples);
 	my @bases10Exon = (0) x scalar(@samples);
@@ -250,7 +250,7 @@ while (my $line = <GENES>) {
 	    }
 
 	    foreach my $i (0..$#samples) {
-		# skip ignored grexomes
+		# skip ignored samples
 		($samplesIgnored[$i]) && next;
 		# what's the coverage for this sample?
 		my $coverage = 0;
