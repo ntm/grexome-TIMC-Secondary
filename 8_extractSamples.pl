@@ -4,17 +4,17 @@
 # NTM
 
 # Take 4 arguments: $metadata $inDir $covDir $outDir
-# $metadata is the patient_summary xlsx file (with grexomeID etc columns);
+# $metadata is the patient_summary xlsx file (with sampleID etc columns);
 # $inDir must contain cohort TSVs as produced by extractCohorts.pl,
 # possibly filtered and reordered with 7_filterAndReorderAll.pl, and 
 # possibly gzipped (but not with PatientIDs);
-# $covDir is a subdir containing per-grexome coverage files, as produced
+# $covDir is a subdir containing per-sample coverage files, as produced
 # by 0_coverage.pl;
 # $outDir doesn't exist, it will be created and filled with one TSV
 # per sample. 
 # Filenames will include patientID/specimenID.
 # The global coverage data (ALL_CANDIDATES and ALL_SAMPLED) for each
-# grexome is grabbed from $covDir and added at the end of the header line.
+# sample is grabbed from $covDir and added at the end of the header line.
 # For a sample, we only print lines from its cohort file and where 
 # it has an HV or HET genotype: this genotype is printed in new columns
 # GENOTYPE and DP:AF, inserted right after KNOWN_CANDIDATE_GENE.
@@ -48,11 +48,11 @@ mkdir($outDir) || die "cannot mkdir outDir $outDir\n";
 #########################################################
 # parse metadata file
 
-# key==cohort name, value is an arrayref of all grexomes from this cohort
-my %cohort2grexomes = ();
+# key==cohort name, value is an arrayref of all samples from this cohort
+my %cohort2samples = ();
 
-# key==grexome, value is patientID if it exists, specimenID otherwise
-my %grexome2patient = ();
+# key==sample, value is patientID if it exists, specimenID otherwise
+my %sample2patient = ();
 
 (-f $metadata) ||
     die "E: the supplied metadata file doesn't exist\n";
@@ -66,17 +66,17 @@ my %grexome2patient = ();
     my ($colMin, $colMax) = $worksheet->col_range();
     my ($rowMin, $rowMax) = $worksheet->row_range();
     # check the column titles and grab indexes of our columns of interest
-    my ($grexCol, $cohortCol, $specimenCol, $patientCol) = (-1,-1,-1,-1);
+    my ($sampleCol, $cohortCol, $specimenCol, $patientCol) = (-1,-1,-1,-1);
     foreach my $col ($colMin..$colMax) {
 	my $cell = $worksheet->get_cell($rowMin, $col);
 	(defined $cell) || next;
-	($cell->value() eq "grexomeID") && ($grexCol = $col);
+	($cell->value() eq "sampleID") && ($sampleCol = $col);
 	($cell->value() eq "pathology") && ($cohortCol = $col);
 	($cell->value() eq "specimenID") && ($specimenCol = $col);
 	($cell->value() eq "patientID") && ($patientCol = $col);
     }
-    ($grexCol >= 0) ||
-	die "E parsing xlsx: no column title is grexomeID\n";
+    ($sampleCol >= 0) ||
+	die "E parsing xlsx: no column title is sampleID\n";
     ($cohortCol >= 0) ||
 	die "E parsing xlsx: no col title is pathology\n";
     ($specimenCol >= 0) ||
@@ -85,14 +85,14 @@ my %grexome2patient = ();
 	die "E parsing xlsx: no column title is patientID\n";
     
     foreach my $row ($rowMin+1..$rowMax) {
-	(defined $worksheet->get_cell($row, $grexCol)) ||
-	    die "E: cell undefined for row $row, col $grexCol\n";
-	my $grexome = $worksheet->get_cell($row, $grexCol)->value;
+	(defined $worksheet->get_cell($row, $sampleCol)) ||
+	    die "E: cell undefined for row $row, col $sampleCol\n";
+	my $sample = $worksheet->get_cell($row, $sampleCol)->value;
 	# skip "none" lines
-	($grexome eq "none") && next;
+	($sample eq "none") && next;
 	my $cohort = $worksheet->get_cell($row, $cohortCol)->value;
-	(defined $cohort2grexomes{$cohort}) || ($cohort2grexomes{$cohort} = []);
-	push(@{$cohort2grexomes{$cohort}}, $grexome);
+	(defined $cohort2samples{$cohort}) || ($cohort2samples{$cohort} = []);
+	push(@{$cohort2samples{$cohort}}, $sample);
 	my $patient = $worksheet->get_cell($row, $specimenCol)->unformatted();
 	if ($worksheet->get_cell($row, $patientCol)) {
 	    my $tmp = $worksheet->get_cell($row, $patientCol)->unformatted();
@@ -100,7 +100,7 @@ my %grexome2patient = ();
 	    $tmp =~ s/\s+$//;
 	    ($tmp) && ($patient = $tmp);
 	}
-	$grexome2patient{$grexome} = $patient;
+	$sample2patient{$sample} = $patient;
     }
 }
 
@@ -196,25 +196,25 @@ while (my $inFile = readdir(INDIR)) {
 
     $header = join("\t",@header);
 
-    # hash of filehandles open for writing, one for each grexome
+    # hash of filehandles open for writing, one for each sample
     # from this cohort
     # will be gzipped if infiles were
     my %outFHs;
 
-    ($cohort2grexomes{$cohort}) || 
+    ($cohort2samples{$cohort}) || 
 	die "cohort $cohort parsed from filename of infile $inFile is not in $metadata\n";
-    foreach my $grexome (@{$cohort2grexomes{$cohort}}) {
-	my $patient = $grexome2patient{$grexome};
-	my $outFile = "$outDir/$cohort.$grexome.$patient.$fileEnd";
+    foreach my $sample (@{$cohort2samples{$cohort}}) {
+	my $patient = $sample2patient{$sample};
+	my $outFile = "$outDir/$cohort.$sample.$patient.$fileEnd";
 	($gz) && ($outFile .= ".gz");
 	my $outFull = " > $outFile";
 	($gz) && ($outFull = " | gzip -c $outFull");
 	open (my $FH, $outFull) || die "cannot (gzip-?)open $outFile for writing (as $outFull)\n";
 
-	# grab global coverage data for $grexome
-	my $covFile = "$covDir/coverage_$grexome.csv";
+	# grab global coverage data for $sample
+	my $covFile = "$covDir/coverage_$sample.csv";
 	(-f $covFile) || 
-	    die "E: trying to grab coverage data for $grexome but covFile doesn't exist: $covFile\n";
+	    die "E: trying to grab coverage data for $sample but covFile doesn't exist: $covFile\n";
 	# global coverage data is in last 2 lines
 	open(COV, "tail -n 2 $covFile |") ||
 	    die "cannot tail-grab cov data from covFile with: tail -n 2 $covFile\n";
@@ -231,24 +231,24 @@ while (my $inFile = readdir(INDIR)) {
 	(@covFields == 8) || die "E: expecting 8 fields from sampled coverage line $covLine\n";
 	$headerCov .= "   Coverage_AllGenes_50x=$covFields[5] Coverage_AllGenes_20x=$covFields[6] Coverage_AllGenes_10x=$covFields[7]";
 	print $FH "$header$headerCov\n";
-	$outFHs{$grexome} = $FH ;
+	$outFHs{$sample} = $FH ;
 	close(COV);
     }
 
     # now read the data
     # in order to print NB_* we need:
-    # key == grexome, values are arrayrefs of the beginnings and ends of lines
-    # (respectively) that must be printed for this grexome
-    my %grex2lineStarts;
-    my %grex2lineEnds;
-    # key == grexome, value is an arrayref, for each line to print it holds
+    # key == sample, values are arrayrefs of the beginnings and ends of lines
+    # (respectively) that must be printed for this sample
+    my %sample2lineStarts;
+    my %sample2lineEnds;
+    # key == sample, value is an arrayref, for each line to print it holds
     # the transcript that this line deals with
-    my %grex2transcripts;
-    # key == grexome, value is a hashref whose keys are transcripts and values
+    my %sample2transcripts;
+    # key == sample, value is a hashref whose keys are transcripts and values
     # are arrayrefs with 4 ints:
     # numbers of HIGH, MODHIGH, MODER, and LOW variant alleles found for this
-    # transcript in this grexome (so, an HV counts as 2 and a HET as 1)
-    my %grex2trans2counters;
+    # transcript in this sample (so, an HV counts as 2 and a HET as 1)
+    my %sample2trans2counters;
 
     while (my $line = <IN>) {
 	chomp($line);
@@ -291,37 +291,37 @@ while (my $inFile = readdir(INDIR)) {
 		my $geno;
 		($i == 0) && ($geno = "HV");
 		($i == 1) && ($geno = "HET");
-		foreach my $sample (split(/,/,$genoData[$i])) {
-		    # grab grexome and [DP:AF], we know it must be there
+		foreach my $sampleData (split(/,/,$genoData[$i])) {
+		    # grab sample and [DP:AF], we know it must be there
 		    # (allowing AF > 1 for Strelka bug)
-		    ($sample =~ /^(grexome\d\d\d\d)\[(\d+:\d+\.\d\d)\]$/) ||
-			die  "E: inFile $inFile has a sampleData (in a genoData) that I can't parse: $sample\n";
-		    my ($grexome,$dpaf) = ($1,$2);
+		    ($sampleData =~ /^([^\[\s]+)\[(\d+:\d+\.\d\d)\]$/) ||
+			die  "E: inFile $inFile has a sampleData (in a genoData) that I can't parse: $sampleData\n";
+		    my ($sample,$dpaf) = ($1,$2);
 
-		    # initialize everything for this grexome if needed
-		    ($grex2lineStarts{$grexome}) || ($grex2lineStarts{$grexome} = []);
-		    ($grex2lineEnds{$grexome}) || ($grex2lineEnds{$grexome} = []);
-		    ($grex2transcripts{$grexome}) || ($grex2transcripts{$grexome} = []);
-		    ($grex2trans2counters{$grexome}) || ($grex2trans2counters{$grexome} = {});
-		    ($grex2trans2counters{$grexome}->{$transcript}) || ($grex2trans2counters{$grexome}->{$transcript} = [0,0,0,0]);
+		    # initialize everything for this sample if needed
+		    ($sample2lineStarts{$sample}) || ($sample2lineStarts{$sample} = []);
+		    ($sample2lineEnds{$sample}) || ($sample2lineEnds{$sample} = []);
+		    ($sample2transcripts{$sample}) || ($sample2transcripts{$sample} = []);
+		    ($sample2trans2counters{$sample}) || ($sample2trans2counters{$sample} = {});
+		    ($sample2trans2counters{$sample}->{$transcript}) || ($sample2trans2counters{$sample}->{$transcript} = [0,0,0,0]);
 
 		    # now fill our data structures
-		    push(@{$grex2lineStarts{$grexome}}, "$toPrintStart$geno\t$dpaf");
-		    push(@{$grex2lineEnds{$grexome}}, "\t$toPrintEnd");
-		    push(@{$grex2transcripts{$grexome}}, $transcript);
+		    push(@{$sample2lineStarts{$sample}}, "$toPrintStart$geno\t$dpaf");
+		    push(@{$sample2lineEnds{$sample}}, "\t$toPrintEnd");
+		    push(@{$sample2transcripts{$sample}}, $transcript);
 
 		    if ($impact eq "HIGH") {
 			# 2-$i is 1 for HET and 2 for HV...
-			$grex2trans2counters{$grexome}->{$transcript}->[0] += 2-$i;
+			$sample2trans2counters{$sample}->{$transcript}->[0] += 2-$i;
 		    }
 		    elsif ($impact eq "MODHIGH") {
-			$grex2trans2counters{$grexome}->{$transcript}->[1] += 2-$i;
+			$sample2trans2counters{$sample}->{$transcript}->[1] += 2-$i;
 		    }
 		    elsif ($impact eq "MODERATE") {
-			$grex2trans2counters{$grexome}->{$transcript}->[2] += 2-$i;
+			$sample2trans2counters{$sample}->{$transcript}->[2] += 2-$i;
 		    }
 		    elsif ($impact eq "LOW") {
-			$grex2trans2counters{$grexome}->{$transcript}->[3] += 2-$i;
+			$sample2trans2counters{$sample}->{$transcript}->[3] += 2-$i;
 		    }
 		    else {
 			die "E: unknown impact $impact in inFile $inFile, line:\n$line\n";
@@ -333,31 +333,31 @@ while (my $inFile = readdir(INDIR)) {
     close(IN);
 
     # now print everything we accumulated
-    foreach my $grexome (keys %grex2lineStarts) {
-	foreach my $i (0..$#{$grex2lineStarts{$grexome}}) {
-	    my $toPrint = $grex2lineStarts{$grexome}->[$i];
-	    my $transcript = $grex2transcripts{$grexome}->[$i];
+    foreach my $sample (keys %sample2lineStarts) {
+	foreach my $i (0..$#{$sample2lineStarts{$sample}}) {
+	    my $toPrint = $sample2lineStarts{$sample}->[$i];
+	    my $transcript = $sample2transcripts{$sample}->[$i];
 	    # $numAlleles: number of alleles of severity >= X, X is initially HIGH
 	    # and will go down gradually
-	    my $numAlleles = $grex2trans2counters{$grexome}->{$transcript}->[0];
+	    my $numAlleles = $sample2trans2counters{$sample}->{$transcript}->[0];
 	    if ($numAlleles >= 2) {
 		$toPrint .= "\tHIGH";
 	    }
 	    else {
 		# add the number of MODHIGH alleles
-		$numAlleles += $grex2trans2counters{$grexome}->{$transcript}->[1];
+		$numAlleles += $sample2trans2counters{$sample}->{$transcript}->[1];
 		if ($numAlleles >= 2) {
 		    $toPrint .= "\tMODHIGH";
 		}
 		else {
 		    # add MODERATEs
-		    $numAlleles += $grex2trans2counters{$grexome}->{$transcript}->[2];
+		    $numAlleles += $sample2trans2counters{$sample}->{$transcript}->[2];
 		    if ($numAlleles >= 2) {
 			$toPrint .= "\tMODERATE";
 		    }
 		    else {
 			# add LOWs
-			$numAlleles += $grex2trans2counters{$grexome}->{$transcript}->[3];
+			$numAlleles += $sample2trans2counters{$sample}->{$transcript}->[3];
 			if ($numAlleles >= 2) {
 			    $toPrint .= "\tLOW";
 			}
@@ -367,8 +367,8 @@ while (my $inFile = readdir(INDIR)) {
 		    }
 		}
 	    }
-	    $toPrint .= $grex2lineEnds{$grexome}->[$i];
-	    print { $outFHs{$grexome} } $toPrint;
+	    $toPrint .= $sample2lineEnds{$sample}->[$i];
+	    print { $outFHs{$sample} } $toPrint;
 	}
     }
     foreach my $fh (values %outFHs) {
