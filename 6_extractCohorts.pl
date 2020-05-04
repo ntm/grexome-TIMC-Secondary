@@ -582,15 +582,22 @@ sub processBatch {
 
 	# OTHERGENO is the same for every $cohort, it's simply copied:
 	my $otherGeno = $fields[$genoColsR->{"OTHER"}];
-	# COUNT the otherGeno samples: we have |-separated lists of different genotypes and each
-	# of these is a  ,-separated lists of samples... therefore every sample is followed
-	# by , or | except the lsat sample
-	my @otherGenoCount = ($otherGeno =~ /[,|]/g);
-	my $otherGenoCount = 1 + scalar(@otherGenoCount);
+	# COUNT the otherGeno samples: set to zero if empty, otherwise 
+	# we have |-separated lists of different genotypes and each
+	# of these is a  ,-separated lists of samples... therefore every
+	# sample is followed by , or | except the last sample
+	my $otherGenoCount = 0;
+	if ($otherGeno) {
+	    my @otherGenoCount = ($otherGeno =~ /[,|]/g);
+	    $otherGenoCount = 1 + scalar(@otherGenoCount);
+	}
 
 	# COUNT_HR is also the same for every cohort, use the same method
-	my @hrCount = ($fields[$genoColsR->{"HR"}] =~ /[,|]/g);
-	my $hrCount = 1 + scalar(@hrCount);
+	my $hrCount = 0;
+	if ($fields[$genoColsR->{"HR"}]) {
+	    my @hrCount = ($fields[$genoColsR->{"HR"}] =~ /[,|]/g);
+	    $hrCount = 1 + scalar(@hrCount);
+	}
 
   	# OK, now print stuff for every cohort that has at least one sample in
 	# $cohort_HV or $cohort_HET or $cohort_OTHERCAUSE_*
