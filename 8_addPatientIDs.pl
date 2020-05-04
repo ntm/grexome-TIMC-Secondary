@@ -4,13 +4,13 @@
 # NTM
 
 # Take 3 arguments: $metadata $inDir $outDir
-# $metadata is the patient_summary xlsx file (with grexomeID etc columns);
+# $metadata is the patient_summary xlsx file (with sampleID etc columns);
 # $inDir must contain cohort TSVs as produced by extractCohorts.pl,
 # possibly filtered and reordered with 7_filterAndReorderAll.pl,
 # and possibly gzipped;
 # $outDir doesn't exist, it will be created and filled with 
 # similar TSVs (gzipped if infiles were gzipped), but where every
-# $grexome identifier in the genoData columns becomes "$grexome($patientID)",
+# $sample identifier in the genoData columns becomes "$sample($patientID)",
 # with $patientID taken from patientID column if it's not empty, 
 # specimenID otherwise.
 # Filenames get ".patientIDs" added before .csv.
@@ -33,8 +33,8 @@ mkdir($outDir) || die "cannot mkdir outDir $outDir\n";
 #########################################################
 # parse metadata file
 
-# key==grexome, value is patientID if it exists, specimenID otherwise
-my %grexome2patient = ();
+# key==sample, value is patientID if it exists, specimenID otherwise
+my %sample2patient = ();
 
 (-f $metadata) ||
     die "E: the supplied metadata file doesn't exist\n";
@@ -48,25 +48,25 @@ my %grexome2patient = ();
     my ($colMin, $colMax) = $worksheet->col_range();
     my ($rowMin, $rowMax) = $worksheet->row_range();
     # check the column titles and grab indexes of our columns of interest
-    my ($grexCol, $specimenCol, $patientCol) = (-1,-1,-1);
+    my ($sampleCol, $specimenCol, $patientCol) = (-1,-1,-1);
     foreach my $col ($colMin..$colMax) {
 	my $cell = $worksheet->get_cell($rowMin, $col);
 	(defined $cell) || next;
-	($cell->value() eq "grexomeID") && ($grexCol = $col);
+	($cell->value() eq "sampleID") && ($sampleCol = $col);
 	($cell->value() eq "specimenID") && ($specimenCol = $col);
 	($cell->value() eq "patientID") && ($patientCol = $col);
     }
-    ($grexCol >= 0) ||
-	die "E parsing xlsx: no column title is grexomeID\n";
+    ($sampleCol >= 0) ||
+	die "E parsing xlsx: no column title is sampleID\n";
     ($specimenCol >= 0) ||
 	die "E parsing xlsx: no column title is specimenID\n";
       ($patientCol >= 0) ||
 	  die "E parsing xlsx: no column title is patientID\n";
     
     foreach my $row ($rowMin+1..$rowMax) {
-	my $grexome = $worksheet->get_cell($row, $grexCol)->value;
+	my $sample = $worksheet->get_cell($row, $sampleCol)->value;
 	# skip "none" lines
-	($grexome eq "none") && next;
+	($sample eq "none") && next;
 	my $patient = $worksheet->get_cell($row, $specimenCol)->unformatted();
 	if ($worksheet->get_cell($row, $patientCol)) {
 	    my $tmp = $worksheet->get_cell($row, $patientCol)->unformatted();
@@ -74,7 +74,7 @@ my %grexome2patient = ();
 	    $tmp =~ s/\s+$//;
 	    ($tmp) && ($patient = $tmp);
 	}
-	$grexome2patient{$grexome} = $patient;
+	$sample2patient{$sample} = $patient;
     }
 }
 
@@ -108,14 +108,14 @@ while (my $inFile = readdir(INDIR)) {
 
     while (my $line = <IN>) {
 	chomp($line);
-	# add trailing _ so we know grexomeXXXX is always followed by some char
-	$line .= "_";
+        # add trailing ',' so we know sampleID is always followed by some char
+        $line .= ',';
 	# chuck norris style: brutal but it works...
-	while ($line =~ s/(grexome\d\d\d\d)([^(])/$1($grexome2patient{$1})$2/) {
-	    # NOOP, everything is in the s///
+	foreach my $sample (keys %sample2patient) {
+	    $line =~ s/$sample([\[,\s])/$sample($sample2patient{$sample})$1/g ;
 	}
-	# remove the trailing _
-	($line =~ s/_$//) || die "E: cannot remove trailing _ in:\n$line\n";
+	# remove the trailing ,
+	($line =~ s/,$//) || die "E: cannot remove trailing , in:\n$line\n";
 	print OUT "$line\n";
     }
     close(IN);
