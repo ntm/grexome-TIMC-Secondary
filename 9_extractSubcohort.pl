@@ -3,7 +3,7 @@
 # 18/08/2019
 # NTM
 
-# Takes 1 argument: $subcohortFile, a text file with a list of grexomes
+# Takes 1 argument: $subcohortFile, a text file with a list of samples
 # of interest, one per line;
 # read on stdin one of:
 # - a cohort TSV as produced by extractCohorts.pl, probably filtered
@@ -23,13 +23,13 @@
 use strict;
 use warnings;
 
-(@ARGV == 1) || die "E $0, needs 1 arg: a text file with one grexomeID per line\n";
+(@ARGV == 1) || die "E $0, needs 1 arg: a text file with one sampleID per line\n";
 my ($subcohortFile) = @ARGV;
 
 #########################################################
 # parse subcohort file
 
-# key==grexomeID, value is 1 if grexome is of interest
+# key==sampleID, value is 1 if sample is of interest
 my %subcohort = ();
 
 (-f $subcohortFile) ||
@@ -40,11 +40,15 @@ while (my $line = <SUBC>) {
     chomp($line);
     # skip blank lines
     ($line =~ /^\s*$/) && next;
-    ($line =~ /^\s*(grexome\d\d\d\d)\s*$/) ||
-	die "E $0: cannot find grexomeID in line $line from subcohort file\n";
+    # remove leading or trailing blank chars and make sure we have a reasonable ID (no blanks,
+    # no ( or [)
+    ($line =~ /^\s*(\S+)\s*$/) ||
+	die "E $0: cannot find reasonable sampleID in line $line from subcohort file\n";
+    ($1 =~ /[(\[]/) && 
+	die "E $0: sampleID $1 from subcohort file contains ( or [, illegal\n";
     $subcohort{$1} = 1;
 }
- 
+
 
 #########################################################
 # read cohort file on stdin and detect type
@@ -110,8 +114,9 @@ print "$header\n";
 		     die "E $0: cohortfile but cannot parse genoData $fields[$i]\n";
 	     }
 	     foreach my $sample (split(/,/,$fields[$i])) {
-		 # no ending $ so we're fine with [DP:AF] and/or if infile went through addPatientIDs.pl
-		 ($sample =~ /^(grexome\d\d\d\d)/) ||
+		 # valid sampleIDs cannot have '(' or '[' ,  so with the below regexp we're fine 
+		 # with [DP:AF] and/or if infile went through addPatientIDs.pl
+		 ($sample =~ /^([^(\[]+)/) ||
 		     die "E $0: inFile has a genoData for a sample I can't recognize: $sample\n";
 		 if ($subcohort{$1}) {
 		     print "$line\n";
