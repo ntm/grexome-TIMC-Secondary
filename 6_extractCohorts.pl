@@ -201,40 +201,40 @@ my %sample2causal = ();
     my ($colMin, $colMax) = $worksheet->col_range();
     my ($rowMin, $rowMax) = $worksheet->row_range();
     # check the column titles and grab indexes of our columns of interest
-    my ($grexCol, $cohortCol,$causalCol) = (-1,-1,-1);
+    my ($sampleCol, $cohortCol,$causalCol) = (-1,-1,-1);
     foreach my $col ($colMin..$colMax) {
 	my $cell = $worksheet->get_cell($rowMin, $col);
 	# if column has no header just ignore it
 	(defined $cell) || next;
-	($cell->value() eq "grexomeID") &&
-	    ($grexCol = $col);
+	($cell->value() eq "sampleID") &&
+	    ($sampleCol = $col);
 	($cell->value() eq "pathology") &&
 	    ($cohortCol = $col);
 	($cell->value() eq "Causal gene") &&
 	    ($causalCol = $col);
      }
-    ($grexCol >= 0) ||
-	die "E parsing xlsx: no column title is grexomeID\n";
+    ($sampleCol >= 0) ||
+	die "E parsing xlsx: no column title is sampleID\n";
     ($cohortCol >= 0) ||
 	die "E parsing xlsx: no col title is pathology\n";
     ($causalCol >= 0) ||
 	die "E parsing xlsx: no col title is Causal gene\n";
     
     foreach my $row ($rowMin+1..$rowMax) {
-	my $grexome = $worksheet->get_cell($row, $grexCol)->value;
+	my $sample = $worksheet->get_cell($row, $sampleCol)->value;
 	# skip "none" lines
-	($grexome eq "none") && next;
-	(defined $sample2cohort{$grexome}) && 
-	    die "E parsing xlsx: have 2 lines with grexome $grexome\n";
+	($sample eq "none") && next;
+	(defined $sample2cohort{$sample}) && 
+	    die "E parsing xlsx: have 2 lines with sample $sample\n";
 	my $cohort = $worksheet->get_cell($row, $cohortCol)->value;
-	$sample2cohort{$grexome} = $cohort;
+	$sample2cohort{$sample} = $cohort;
 	$cohorts{$cohort} = 1;
 	if ($worksheet->get_cell($row, $causalCol)) {
 	    my $causal = $worksheet->get_cell($row, $causalCol)->value;
 	    # clean up a bit, remove leading or trailing whitespace
 	    $causal =~ s/^\s+//;
 	    $causal =~ s/\s+$//;
-	    $sample2causal{$grexome} = $causal;
+	    $sample2causal{$sample} = $causal;
 	    # add to knownCandidateGenes with level 5
 	    (defined $knownCandidateGenes{$cohort}) || ($knownCandidateGenes{$cohort} = {});
 	    $knownCandidateGenes{$cohort}->{$causal} = 5;
@@ -494,7 +494,7 @@ sub processBatch {
 	# $cohort_HV, $cohort_HET, $cohort_OTHERCAUSE_HV, $cohort_OTHERCAUSE_HET,
 	# COMPAT_HV, COMPAT_HET, NEGCTRL_HV, NEGCTRL_HET
 	# Each "list of samples" is actually a "genoData", ie it could look like:
-	# 0/1~grexome0112[39:0.95],grexome0129[43:1.00]
+	# 0/1~sample0112[39:0.95],sample0129[43:1.00]
 	# If there is no sample in the category the array element remains empty.
 	my @cohort2sampleLists;
 
@@ -524,17 +524,18 @@ sub processBatch {
 	    my $geno = $1;
 	    my @samples = split(/,/,$2);
 	    foreach my $sample (@samples) {
-		my $grexome = $sample;
+		my $sampleID = $sample;
 		# remove trailing [DP:AF] if it's there (allowing AF > 1 for Strelka bug)
-		$grexome =~ s/\[\d+:\d+\.\d\d\]$//;
+		$sampleID =~ s/\[\d+:\d+\.\d\d\]$//;
 		# sanity check
-		($grexome =~ /^grexome\d+$/) || die "E grexome id $grexome illegal, sample was $sample\n";
+		(defined $sample2cohortR->{$sampleID}) ||
+		    die "E sampleID $sampleID doesn't exist, sample was $sample\n";
 
 		foreach my $cohorti (0..$#$cohortsR) {
 		    my $cohort = $cohortsR->[$cohorti];
-		    if ($sample2cohortR->{$grexome} eq $cohort) {
+		    if ($sample2cohortR->{$sampleID} eq $cohort) {
 			# $sample belongs to $cohort
-			if ((! defined $sample2causalR->{$grexome}) || ($sample2causalR->{$grexome} eq $symbol)) {
+			if ((! defined $sample2causalR->{$sampleID}) || ($sample2causalR->{$sampleID} eq $symbol)) {
 			    # sample has no causal gene or it's the current gene: add to $cohort_HV or HET
 			    if ($cohort2sampleLists[$cohorti]->[$gni]) {
 				$cohort2sampleLists[$cohorti]->[$gni] .= ",$sample";
@@ -555,7 +556,7 @@ sub processBatch {
 			    $cohort2SLcounts[$cohorti]->[2+$gni]++;
 			}
 		    }
-		    elsif (defined $compatibleR->{$sample2cohortR->{$grexome}}->{$cohort}) {
+		    elsif (defined $compatibleR->{$sample2cohortR->{$sampleID}}->{$cohort}) {
 			# $sample belongs to a cohort compatible with $cohort, store at index 4+$gni
 			if ($cohort2sampleLists[$cohorti]->[4+$gni]) {
 			    $cohort2sampleLists[$cohorti]->[4+$gni] .= ",$sample";
@@ -581,15 +582,15 @@ sub processBatch {
 
 	# OTHERGENO is the same for every $cohort, it's simply copied:
 	my $otherGeno = $fields[$genoColsR->{"OTHER"}];
-	# COUNT the otherGeno samples: we don'"t care about the |-separated lists
-	# of different genotypes and the ,-separated lists of samples, just count
-	# the number of occurences of "grexome"
-	my @otherGenoCount = ($otherGeno =~ /grexome/g);
-	my $otherGenoCount = scalar(@otherGenoCount);
+	# COUNT the otherGeno samples: we have |-separated lists of different genotypes and each
+	# of these is a  ,-separated lists of samples... therefore every sample is followed
+	# by , or | except the lsat sample
+	my @otherGenoCount = ($otherGeno =~ /[,|]/g);
+	my $otherGenoCount = 1 + scalar(@otherGenoCount);
 
 	# COUNT_HR is also the same for every cohort, use the same method
-	my @hrCount = ($fields[$genoColsR->{"HR"}] =~ /grexome/g);
-	my $hrCount = scalar(@hrCount);
+	my @hrCount = ($fields[$genoColsR->{"HR"}] =~ /[,|]/g);
+	my $hrCount = 1 + scalar(@hrCount);
 
   	# OK, now print stuff for every cohort that has at least one sample in
 	# $cohort_HV or $cohort_HET or $cohort_OTHERCAUSE_*
