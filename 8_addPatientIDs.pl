@@ -112,7 +112,7 @@ while (my $inFile = readdir(INDIR)) {
         $line .= ',';
 	# chuck norris style: brutal but it works...
 	foreach my $sample (keys %sample2patient) {
-	    $line =~ s/$sample([\[,\s])/$sample($sample2patient{$sample})$1/g ;
+	    $line =~ s/$sample([\[,\s|])/$sample($sample2patient{$sample})$1/g ;
 	}
 	# remove the trailing ,
 	($line =~ s/,$//) || die "E: cannot remove trailing , in:\n$line\n";
