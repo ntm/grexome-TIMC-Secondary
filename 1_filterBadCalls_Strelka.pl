@@ -7,8 +7,9 @@
 # Parses on stdin a Strelka GVCF file with one or more sample data columns;
 # Args: see $USAGE.
 # Prints to stdout a VCF file where:
-# - grexomes that don't appear in $metadata "grexomeID" column are removed
-#   (alows to discard data for ex-grexomes that were obsoleted as dupes);
+# - samples that don't appear in $metadata "sampleID" column are removed
+#   (allows to discard data for samples that are in the GVCF but were
+#   obsoleted as dupes);
 # - non-variant lines are removed;
 # - the variant calls in data columns are replaced by ./. if a call-condition
 #   is not met (see "heuristics"), or if previous call was '.' (the Strelka NOCALL);
@@ -107,8 +108,8 @@ mkdir($tmpDir) ||
 #########################################################
 # parse patient metadata file
 
-# key==existing grexome, value==1
-my %grexomes = ();
+# key==existing sample, value==1
+my %samples = ();
 
 {
     my $workbook = Spreadsheet::XLSX->new("$metadata");
@@ -120,24 +121,24 @@ my %grexomes = ();
     my ($colMin, $colMax) = $worksheet->col_range();
     my ($rowMin, $rowMax) = $worksheet->row_range();
     # check the column titles and grab indexes of our columns of interest
-    my ($grexCol) = (-1);
+    my ($sampleCol) = (-1);
     foreach my $col ($colMin..$colMax) {
 	my $cell = $worksheet->get_cell($rowMin, $col);
 	# if column has no header just ignore it
 	(defined $cell) || next;
-	($cell->value() eq "grexomeID") &&
-	    ($grexCol = $col);
+	($cell->value() eq "sampleID") &&
+	    ($sampleCol = $col);
     }
-    ($grexCol >= 0) ||
-	die "E parsing xlsx: no column title is grexomeID\n";
+    ($sampleCol >= 0) ||
+	die "E parsing xlsx: no column title is sampleID\n";
 
     foreach my $row ($rowMin+1..$rowMax) {
-	my $grexome = $worksheet->get_cell($row, $grexCol)->value;
+	my $sample = $worksheet->get_cell($row, $sampleCol)->value;
 	# skip "none" lines
-	($grexome eq "none") && next;
-	(defined $grexomes{$grexome}) && 
-	    die "E parsing xlsx: have 2 lines with grexome $grexome\n";
-	$grexomes{$grexome} = 1;
+	($sample eq "none") && next;
+	(defined $samples{$sample}) && 
+	    die "E parsing xlsx: have 2 lines with sample $sample\n";
+	$samples{$sample} = 1;
     }
 }
 
@@ -149,11 +150,11 @@ warn "I: $now - starting to run: ".join(" ", $0, @ARGV)."\n";
 
 # array, same number of elements as there are columns in the #CHROM line
 # (and hence in each data line), value is true iff column must be skipped
-# (corresponding to grexomes that no longer exist in the metadata file, 
-# eg they were dupes of other grexomes with better sequencing)
+# (corresponding to samples that no longer exist in the metadata file, 
+# eg they were dupes of other samples with better sequencing)
 my @skippedCols = ();
 
-# parse header, just copy it except we remove grexomes that don't exist anymore
+# parse header, just copy it except we remove samples that don't exist anymore
 while(my $line = <STDIN>) {
     if ($line =~ /^##/) {
 	print $line;
@@ -170,12 +171,12 @@ while(my $line = <STDIN>) {
 	chomp($com);
 	print "##filterBadCalls=<commandLine=\"$com\">\n";
 
-	# remove grexomes that don't exist in $metadata (anymore)
+	# remove samples that don't exist in $metadata (anymore)
 	chomp($line);
 	my @fields = split(/\t/,$line);
 	foreach my $i (reverse(9..$#fields)) {
 	    # reverse so we can splice bad columns out
-	    if (! $grexomes{$fields[$i]}) {
+	    if (! $samples{$fields[$i]}) {
 		splice(@fields,$i,1);
 		$skippedCols[$i] = 1;
 	    }
@@ -397,7 +398,7 @@ sub processBatch {
 		$fixedToHV++;
 		if ($verbose >= 2) {
 		    # warn with chrom pos ref > alts sample dp af
-		    warn "I: fix to HV, $data[0]:$data[1] $data[3] > $data[4] grexome".(50+$i-9)." DP=$thisDP AF=$af\n";
+		    warn "I: fix to HV, $data[0]:$data[1] $data[3] > $data[4] sample ".($i-9)." DP=$thisDP AF=$af\n";
 		}
 	    }
 	    if (($thisDP >= $filterParamsR->{"minDP_HET"}) && ($geno1 != 0) && ($af ne '.') && 
@@ -407,7 +408,7 @@ sub processBatch {
 		$fixedToHET++;
 		if ($verbose >= 2) {
 		    # warn with chrom pos ref > alts sample dp af
-		    warn "I: fix to HET, $data[0]:$data[1] $data[3] > $data[4] grexome".(50+$i-9)." DP=$thisDP AF=$af\n";
+		    warn "I: fix to HET, $data[0]:$data[1] $data[3] > $data[4] sample ".($i-9)." DP=$thisDP AF=$af\n";
 		}
 	    }
 
