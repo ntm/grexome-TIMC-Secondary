@@ -151,7 +151,7 @@ my %transcript2coord;
 my %transcript2cohort2start;
 # %transcript2cohort2samples: key==$transcript, value==hashref with key==cohort,
 # value is an arrayref with 6 hashrefs, one each for @countTypes,
-# each hash has key==$grexome, value==number of variants (of that
+# each hash has key==$sample, value==number of variants (of that
 # category), MODHIGH includes HIGH samples and MODER includes MODHIGH
 # and HIGH samples,
 # COMPHET also lists the samples that are HV (but these count as 2 variants)
@@ -350,29 +350,29 @@ while (my $inFile = readdir(INDIR)) {
 	    my $samples = $fields[$cols[$coli]];
 	    ($samples) || next;
 
-	    # remove genotype, we only want the grexome IDs
+	    # remove genotype, we only want the sample IDs
 	    $samples =~ s/^\d+\/\d+~//;
 	    
 	    foreach my $sample (split(/,/,$samples)) {
 		# ignore [DP:AF] and possibly patientIDs
-		($sample =~ /^(grexome\d\d\d\d)/) || 
-		    die "E: cannot grab grexome from sample $sample\n";
-		my $grexome = $1;
+		($sample =~ /^([^(\[]+)/) ||
+		    die "E: cannot grab sampleID from sample $sample\n";
+		my $sampleID = $1;
 
 		# always initialize to zero if needed before incrementing
 		if ($isHV) {
 		    # COUNTSAMPLES_HV_HIGH, COUNTSAMPLES_HV_MODHIGH and COUNTSAMPLES_HV_MODER or their
 		    # OTHERCAUSE counterparts may get +1 (depending on $impactStart)
 		    foreach my $ai ($impactStart..2) {
-			($transcript2cohort2samples{$transcript}->{$cohort}->[$ai]->{$grexome}) ||
-			    ($transcript2cohort2samples{$transcript}->{$cohort}->[$ai]->{$grexome} = 0);
-			($transcript2cohort2samplesOC{$transcript}->{$cohort}->[$ai]->{$grexome}) ||
-			    ($transcript2cohort2samplesOC{$transcript}->{$cohort}->[$ai]->{$grexome} = 0);
+			($transcript2cohort2samples{$transcript}->{$cohort}->[$ai]->{$sampleID}) ||
+			    ($transcript2cohort2samples{$transcript}->{$cohort}->[$ai]->{$sampleID} = 0);
+			($transcript2cohort2samplesOC{$transcript}->{$cohort}->[$ai]->{$sampleID}) ||
+			    ($transcript2cohort2samplesOC{$transcript}->{$cohort}->[$ai]->{$sampleID} = 0);
 			if ($isOC) {
-			    $transcript2cohort2samplesOC{$transcript}->{$cohort}->[$ai]->{$grexome}++;
+			    $transcript2cohort2samplesOC{$transcript}->{$cohort}->[$ai]->{$sampleID}++;
 			}
 			else {
-			    $transcript2cohort2samples{$transcript}->{$cohort}->[$ai]->{$grexome}++;
+			    $transcript2cohort2samples{$transcript}->{$cohort}->[$ai]->{$sampleID}++;
 			}
 		    }
 		}
@@ -380,15 +380,15 @@ while (my $inFile = readdir(INDIR)) {
 		# COUNTSAMPLES_COMPHET_MODER (or their OC counterparts) may get updated, but
 		# HV variants count as 2
 		foreach my $ai (3+$impactStart..5) {
-		    ($transcript2cohort2samples{$transcript}->{$cohort}->[$ai]->{$grexome}) ||
-			($transcript2cohort2samples{$transcript}->{$cohort}->[$ai]->{$grexome} = 0);
-		    ($transcript2cohort2samplesOC{$transcript}->{$cohort}->[$ai]->{$grexome}) ||
-			($transcript2cohort2samplesOC{$transcript}->{$cohort}->[$ai]->{$grexome} = 0);
+		    ($transcript2cohort2samples{$transcript}->{$cohort}->[$ai]->{$sampleID}) ||
+			($transcript2cohort2samples{$transcript}->{$cohort}->[$ai]->{$sampleID} = 0);
+		    ($transcript2cohort2samplesOC{$transcript}->{$cohort}->[$ai]->{$sampleID}) ||
+			($transcript2cohort2samplesOC{$transcript}->{$cohort}->[$ai]->{$sampleID} = 0);
 		    if ($isOC) {
-			$transcript2cohort2samplesOC{$transcript}->{$cohort}->[$ai]->{$grexome} += (1+$isHV);
+			$transcript2cohort2samplesOC{$transcript}->{$cohort}->[$ai]->{$sampleID} += (1+$isHV);
 		    }
 		    else {
-			$transcript2cohort2samples{$transcript}->{$cohort}->[$ai]->{$grexome} += (1+$isHV);
+			$transcript2cohort2samples{$transcript}->{$cohort}->[$ai]->{$sampleID} += (1+$isHV);
 		    }
 		}
 	    }
