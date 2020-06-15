@@ -62,6 +62,10 @@ my %filterParams = (
 # metadata XLSX, no default
 my $metadata;
 
+# comma-separated list of samples of interest, if not empty all
+# other samples are skipped. If empty every sample is kept.
+my $samplesOfInterest;
+
 # for multi-threading, need to create a tmpDir. It will
 # be removed when we are done and must not pre-exist.
 # To improve performance it should be on a ramdisk.
@@ -77,15 +81,20 @@ my $verbose = 0;
 # help: if true just print $USAGE and exit
 my $help = '';
 
-my $USAGE = "Parse a Strelka GVCF on stdin, print to stdout a similar GVCF where calls that fail basic quality filters are changed to NOCALL, calls that are blatantly wrong are fixed, and lines are only printed if at least one sample has a non-HR genotype call.\n
+my $USAGE = "Parse a Strelka GVCF on stdin, print to stdout a similar GVCF where:
+- calls that fail basic quality filters are changed to NOCALL,
+- calls that are blatantly wrong are fixed,
+- lines are only printed if at least one sample has a non-HR genotype call.\n
 Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --metadata string [no default] : patient metadata xlsx file, with path
+--samplesOfInterest string [default = all samples in metadata xlsx] : comma-separated list of sampleIDs of interest (other samples are ignored)
 --tmpdir string [default = $tmpDir] : subdir where tmp files will be created (on a RAMDISK if possible), must not pre-exist and will be removed after execution
 --jobs N [default = $numJobs] : number of parallel jobs=threads to run
 --verbose N [default 0] : if > 0 increase verbosity on stderr
 --help : print this USAGE";
 
 GetOptions ("metadata=s" => \$metadata,
+	    "samplesOfInterest=s" => \$samplesOfInterest,
 	    "jobs=i" => \$numJobs,
 	    "verbose=i" => \$verbose,
 	    "tmpdir=s" => \$tmpDir,
@@ -104,11 +113,11 @@ GetOptions ("metadata=s" => \$metadata,
 mkdir($tmpDir) || 
     die "E: cannot mkdir tmpDir $tmpDir\n";
 
-
+    
 #########################################################
-# parse patient metadata file
+# parse patient metadata file to grab sampleIDs, limit to samples of interest
 
-# key==existing sample, value==1
+# key==existing sample of interest, value==1
 my %samples = ();
 
 {
@@ -142,6 +151,26 @@ my %samples = ();
     }
 }
 
+if ($samplesOfInterest) {
+    # make sure every listed sample is in %samples and promote it's value to 2
+    foreach my $soi (split(/,/, $samplesOfInterest)) {
+	($samples{$soi}) ||
+	    die "E processing samplesOfInterest: a specified sample $soi does not exist in the metadata file\n";
+	($samples{$soi} == 1) ||
+	    warn "W processing samplesOfInterest: sample $soi was specified twice, is that a typo?\n";
+	$samples{$soi} = 2;
+    }
+    # now demote the SOIs to 1 and ignore all other samples
+    foreach my $s (keys %samples) {
+	if ($samples{$s} == 2) {
+	    $samples{$s} = 1;
+	}
+	else {
+	    delete($samples{$s});
+	}
+    }
+}
+    
 #############################################
 # deal with headers
 
@@ -171,7 +200,7 @@ while(my $line = <STDIN>) {
 	chomp($com);
 	print "##filterBadCalls=<commandLine=\"$com\">\n";
 
-	# remove samples that don't exist in $metadata (anymore)
+	# remove samples that don't exist in $metadata (anymore) or are not of interest
 	chomp($line);
 	my @fields = split(/\t/,$line);
 	foreach my $i (reverse(9..$#fields)) {
