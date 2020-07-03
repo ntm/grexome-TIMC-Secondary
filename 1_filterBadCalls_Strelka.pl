@@ -10,6 +10,7 @@
 # - samples that don't appear in $metadata "sampleID" column are removed
 #   (allows to discard data for samples that are in the GVCF but were
 #   obsoleted as dupes);
+# - ignore all samples except the $samplesOfInterest, if specified;
 # - non-variant lines are removed;
 # - the variant calls in data columns are replaced by ./. if a call-condition
 #   is not met (see "heuristics"), or if previous call was '.' (the Strelka NOCALL);
