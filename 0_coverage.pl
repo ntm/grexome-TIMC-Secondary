@@ -62,8 +62,8 @@ my %candidateGenes = ();
     my $workbook = Spreadsheet::XLSX->new("$candidatesFile");
     (defined $workbook) ||
 	die "E when parsing xlsx\n";
-    ($workbook->worksheet_count() == 1) ||
-	die "E parsing xlsx: expecting a single worksheet, got ".$workbook->worksheet_count()."\n";
+    ($workbook->worksheet_count() == 1) || ($workbook->worksheet_count() == 2) ||
+	die "E parsing xlsx: expecting one or two worksheets, got ".$workbook->worksheet_count()."\n";
     my $worksheet = $workbook->worksheet(0);
     my ($colMin, $colMax) = $worksheet->col_range();
     my ($rowMin, $rowMax) = $worksheet->row_range();
