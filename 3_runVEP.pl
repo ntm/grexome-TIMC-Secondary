@@ -171,6 +171,9 @@ while (my $line = <VEPTEST_OUT>) {
 	my $lineClean = $line;
 	($lineClean =~ s/time="[^"]+" //) ||
 	    die "E in $0: cannot remove timestamp from ##VEP line:\n$line\n";
+	# also remove any path before /.vep/ in cache= so different users can use the
+	# same $cacheFile if they have their own VEP install with same cache versions
+	$lineClean =~ s~(cache=")[^"]+(/.vep/)~$1$2~; # no "||die", eg if the user changed his VEPDIR
 	if (defined $cache->{"VEPversion"}) {
 	    my $cacheLine = $cache->{"VEPversion"};
 	    if ($cacheLine ne $lineClean) {
@@ -180,7 +183,7 @@ while (my $line = <VEPTEST_OUT>) {
 		unlink($vcf4vep,$vcfFromCache,$vcf4vepTest);
 		rmdir($tmpDir) || warn "W: VEP version mismatch but can't rmdir tmpDir $tmpDir\n";
 		die "cached VEP version and ##VEP line from VCF are different:\n$cacheLine\n$lineClean\n".
-		    "if you really want to use this vcf from STDIN you need to rm $cacheFile (or change the cacheFile in $0)\n";
+		    "if you updated your VEP cache this script's cachefile is now stale, you need to rm $cacheFile (or change the cacheFile in $0)\n";
 	    }
 	}
 	else {
