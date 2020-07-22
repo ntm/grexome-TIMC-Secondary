@@ -15,6 +15,7 @@
 # - the variant calls in data columns are replaced by ./. if a call-condition
 #   is not met (see "heuristics"), or if previous call was '.' (the Strelka NOCALL);
 # - lines where every sample is now ./. or 0/0 are skipped;
+# - lines where the only called ALT is '*' (new in VCF 4.2) are skipped;
 # - AF is added to FORMAT right after GT, and every 0/x or x/x call gets
 #   for AF the fraction of variant reads (rounded to 2 decimals), HR
 #   and x/y calls get '.';
@@ -314,12 +315,19 @@ sub processBatch {
     my $fixedToHET = 0;
 
     foreach my $line (@$linesR) {
-	# $keepLine: boolean, true if at least one sample is not ./. and 0/0 after filtering
+	# $keepLine: boolean, true if at least one non-'*' ALT is called for at 
+	# least one sample after filtering
 	my $keepLine = 0;
 	my @data = split(/\t/, $line);
 	(@data >= 10) || die "no sample data in line?\n$line\n";
 	# if no ALT in line, skip immediately
 	($data[4] eq '.') && next;
+	# grab alleleNum of ALT '*' if it's present
+	my $starNum = -1;
+	my @alts = split(/,/,$data[4]);
+	foreach my $alti (0..$#alts) {
+	    ($alts[$alti] eq '*') && ($starNum = $alti + 1);
+	}
 	# first 9 fields are copied except AF is added to FORMAT after GT
 	my $lineToPrint = join("\t",@data[0..7]);
 	my $format = $data[8];
@@ -337,7 +345,15 @@ sub processBatch {
 	}
 	# sanity: make sure the fields we need are there
 	# don't check DP since AD is checked
-	(defined $format{"GQX"}) || die "no GQX key in FORMAT string for line:\n$line\n";
+	# $gq is either GQX (Strelka) or GQ (GATK)
+	my $gq = "";
+	if (defined $format{"GQX"}){
+		$gq = "GQX";
+	}elsif (defined $format{"GQ"}){
+		$gq = "GQ";
+	}else{
+		die "no GQ/GQX key in FORMAT string for line:\n$line\n";
+	}
 	(defined $format{"GT"}) || die "no GT key in FORMAT string for line:\n$line\n";
 	(defined $format{"AD"}) || die "no AD key in FORMAT string for line:\n$line\n";
 
@@ -353,8 +369,8 @@ sub processBatch {
 	    # otherwise examine content and apply filters
 	    my @thisData = split(/:/, $data) ;
 
-	    if ((! $thisData[$format{"GQX"}]) || ($thisData[$format{"GQX"}] eq '.') ||
-		($thisData[$format{"GQX"}] < $filterParamsR->{"minGQX"})) {
+	    if ((! $thisData[$format{$gq}]) || ($thisData[$format{$gq}] eq '.') ||
+		($thisData[$format{$gq}] < $filterParamsR->{"minGQX"})) {
 		# GQX undefined or too low, change to NOCALL
 		$lineToPrint .= "\t./.";
 		next;
@@ -445,11 +461,14 @@ sub processBatch {
 	    # other filters (eg strandDisc) would go here
 
 	    # OK data passed all filters but $thisData(GT) may have been changed
-	    # -> fix GT in $data and set $keepLine if not HOMOREF
+	    # -> fix GT in $data and set $keepLine if at least one called allele is not REF or '*'
 	    ($data =~ s/^([^:]+):/$thisData[$format{"GT"}]:$af:/) || 
 		die "cannot fix GT to $thisData[$format{'GT'}] and add AF $af after the geno in: $data\n";
 	    $lineToPrint .= "\t$data";
-	    ($thisData[$format{"GT"}] ne '0/0') && ($keepLine = 1);
+	    if (($thisData[$format{"GT"}] ne '0/0') && ($thisData[$format{"GT"}] ne "0/$starNum") &&
+		($thisData[$format{"GT"}] ne "$starNum/0") && ($thisData[$format{"GT"}] ne "$starNum/$starNum")) {
+		$keepLine = 1;
+	    }
 	}
 	# done with $line, print if at least one sample is not NOCALL|HOMOREF
 	($keepLine) && (print $outFH "$lineToPrint\n");
