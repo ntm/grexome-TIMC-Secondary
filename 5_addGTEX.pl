@@ -32,7 +32,8 @@ my $gtexFile;
 {
     # works on fauve and luxor
     my @possiblePaths = ("/home/nthierry/PierreRay/Grexome/SecondaryAnalyses/", 
-			 "/home/nthierry/VariantCalling/GrexomeFauve/SecondaryAnalyses/");
+			 "/home/nthierry/VariantCalling/GrexomeFauve/SecondaryAnalyses/",
+			"/home/bencheko/src/grexome-TIMC-Secondary/");
     foreach my $path (@possiblePaths) {
 	my $gtex = "$path/GTEX_Data/E-MTAB-5214-query-results.tpms.tsv";
 	(-f $gtex) && ($gtexFile = $gtex) && last;
