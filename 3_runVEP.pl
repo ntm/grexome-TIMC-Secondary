@@ -25,20 +25,9 @@ use Storable;
 ##########################################################################
 ## hard-coded stuff that shouldn't change much
 
-# full path to our cache file for VEP annotations (this is not the VEP cache!)
-my $cacheFile;
-{
-    # works on fauve and luxor, file is actually currently on luxor
-    my @possiblePaths = ("/data/nthierry/PierreRay/RunSecondaryAnalyses/",
-			 "/home/nthierry/sshMounts/luxor/data/nthierry/PierreRay/RunSecondaryAnalyses/");
-    foreach my $path (@possiblePaths) {
-	(-d $path) && ($cacheFile = "$path/VEP_cache") && last;
-    }
-    # we're OK if the cachefile doesn't exist (first run, it will be created),
-    # but we need a subdir to create it in
-    ($cacheFile) || 
-	die "E in $0 : can't find an existing dir in possiblePaths for cacheFile: @possiblePaths\n";
-}
+# name of our cache file for VEP annotations (this is not the VEP cache!),
+# the supplied path will be prepended
+my $cacheFile = "VEP_cache";
 
 # vep executable, with path if it's not in PATH
 my $vepBin = "vep";
@@ -46,34 +35,89 @@ my $vepBin = "vep";
 # number of jobs that VEP can run in parallel (--fork)
 my $vepJobs = 6;
 
-# full path to human genome fasta, for VEP --hgvs
+# this script also hard-codes the VEP command-line args, VEP plugins used,
+# etc... this can be adjusted in the "VEP command-line" section below
+
+
+#########################################################################
+## options / params from the command-line
+
+# path to our VEP cachefile
+my $cachePath;
+
+# human genome fasta, filename with path, for VEP --hgvs
 my $genome;
-{
-    # works on fauve or luxor, add other possibilities here if needed
-    my @possibleGenomes = ("/data/HumanGenome/hs38DH.fa", "/home/nthierry/HumanGenome/hs38DH.fa");
-    foreach my $gen (@possibleGenomes) {
-	(-e $gen) && ($genome = $gen) && last;
-    }
-    ($genome) || die "E in $0 : can't find a genome fasta file\n";
-}
+
+# dir containing subdirs with the data required by the VEP plugins 
+# we use (eg dbNSFP/ or CADD/)
+my $dataDir;
+
+# tmp dir, preferably on a RAM or SSD disk 
+my $tmpDir;
+
+# help: if true just print $USAGE and exit
+my $help = '';
+
+
+my $USAGE = "\nRead on stdin a VCF file, write to stdout a similar VCF file with added VEP annotations.\n
+Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
+--cachePath string [no default] : subdir where this script stores its cachefile
+--genome string [no default] : ref genome fasta, with path
+--dataDir string [no default] : dir containing subdirs with the data required by the VEP plugins we use (eg dbNSFP)
+--tmpDir string [no default] : tmp dir, must not pre-exist, will be removed after running
+--help : print this USAGE";
+
+GetOptions ("cachePath=s" => \$cachePath,
+	    "genome=s" => \$genome,
+	    "dataDir=s" => \$dataDir,
+	    "tmpDir=s" => \$tmpDir,
+	    "help" => \$help)
+    or die("Error in command line arguments\n$USAGE\n");
+
+# make sure required options were provided and sanity check them
+($help) && die "$USAGE\n\n";
+
+# we're OK if the cachefile doesn't exist (first run, it will be created),
+# but we need a subdir to create it in
+($cachePath) || 
+    die "E in $0: you must provide a cachePath where we will store our cacheFile\n";
+(-d $cachePath) ||
+    die "E in $0 : the provided cachePath $cachePath doesn't exist or isn't a dir\n";
+# prepend path to $cacheFile
+$cacheFile = "$cachePath/$cacheFile";
+
+($genome) || die "E in $0: you must provide a ref genome fasta file\n";
+(-f $genome) || die "E in $0 : provided genome fasta file doesn't exist\n";
+
+($dataDir) || 
+    die "E in $0: you must provide a dataDir containing the data required by the VEP plugins we use\n";
+(-d $dataDir) ||
+    die "E in $0 : the provided dataDir $dataDir doesn't exist or isn't a dir\n";
+
+($tmpDir) || die "E in $0: you must provide a non-existing tmpDir\n";
+(-e $tmpDir) &&
+    die "E: tmpDir $tmpDir exists, please rm -r $tmpDir or use another tmpDir as arg\n";
+mkdir($tmpDir) || die "E: cannot create tmpDir $tmpDir\n";
+
+
+#########################################################################
+# construct the full VEP command-line
 
 # full --plugin string with all VEP plugins we want to use and
 # associated datafiles (with paths)
 my $vepPlugins = "";
 {
-    # look for a data dir that works both on fauve and luxor
-    my $dataDir = "/data/";
-    (-d "$dataDir/nthierry/") && ($dataDir .= "nthierry/");
-
     my $plugins = "";
 
     # CADD - might not be needed if dbNSFP is good (it provides CADD 
     # among many other things), commenting out for now
     #my $caddPath = "$dataDir/CADD/";
+    # (-d $caddPath) || die "E: CADD datadir doesn't exist: $caddPath\n";
     #$plugins .= " --plugin CADD,$caddPath/whole_genome_SNVs.tsv.gz,$caddPath/InDels.tsv.gz ";
 
     # dbNSFP
     my $dbNsfpPath = "$dataDir/dbNSFP/";
+    (-d $dbNsfpPath) || die "E: dbNSFP datadir doesn't exist: $dbNsfpPath\n";
     # comma-separated list of fields to retrieve from dbNSFP, there are MANY
     # possibilities, check the README in $dbNsfpPath
     my $dbNsfpFields = "MutationTaster_pred,REVEL_rankscore,CADD_raw_rankscore";
@@ -109,15 +153,6 @@ $vepCommand .= $vepPlugins;
 # write output to stdout so we can pipe it to another program
 $vepCommand .= " -o STDOUT" ;
 
-
-##########################################################################
-## options / params from the command-line
-
-
-(@ARGV == 1) || die "runVep.pl needs a non-existing tmpdir as arg\n";
-my ($tmpDir) = @ARGV;
-(-e $tmpDir) && die "E: tmpDir $tmpDir exists, please rm -r $tmpDir or use another tmpDir as arg\n";
-mkdir($tmpDir) || die "E: cannot create tmpDir $tmpDir\n";
 
 my $now = strftime("%F %T", localtime);
 warn "I: $now - starting to run: ".join(" ", $0, @ARGV)."\n";
