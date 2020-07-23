@@ -71,6 +71,8 @@ my @favoriteTissues = split(/,/,$favoriteTissues);
 (@favoriteTissues) || 
     die "E: we expect at least one favoriteTissue, just use defaults and ignore them if you don't care\n";
 
+my $now = strftime("%F %T", localtime);
+warn "I: $now - starting to run: ".join(" ", $0, @ARGV)."\n";
 
 #############################################
 ## parse GTEX file
@@ -215,3 +217,6 @@ while (my $line = <STDIN>) {
 
     print join("\t",@toPrint)."\n";
 }
+
+$now = strftime("%F %T", localtime);
+warn "I: $now - DONE running: ".join(" ", $0, @ARGV)."\n";
