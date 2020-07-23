@@ -3,8 +3,11 @@
 # 25/03/2018
 # NTM
 
-# Take as args a list of "favorite tissues", these should be tissue names
-# as they appear in the header of $gtexFile.
+# Take as args:
+# - a GTEX file with full path, eg E-MTAB-5214-query-results.tpms.tsv
+#   from the GTEX_Data/ subdir;
+# - a list of "favorite tissues", at least one, these should be 
+#   tissue names as they appear in the header of $gtexFile.
 # Read on stdin a TSV file as produced by vcf2tsv.pl, 
 # print to stdout a TSV file with added columns holding
 # GTEX TPM values taken from $gtexFile.
@@ -22,24 +25,12 @@
 
 use strict;
 use warnings;
+use Getopt::Long;
+use POSIX qw(strftime);
 
 
 #############################################
 ## hard-coded stuff that shouldn't change much
-
-# full path to the GTEX datafile
-my $gtexFile;
-{
-    # works on fauve and luxor
-    my @possiblePaths = ("/home/nthierry/PierreRay/Grexome/SecondaryAnalyses/", 
-			 "/home/nthierry/VariantCalling/GrexomeFauve/SecondaryAnalyses/",
-			"/home/bencheko/src/grexome-TIMC-Secondary/");
-    foreach my $path (@possiblePaths) {
-	my $gtex = "$path/GTEX_Data/E-MTAB-5214-query-results.tpms.tsv";
-	(-f $gtex) && ($gtexFile = $gtex) && last;
-    }
-    ($gtexFile) || die "E in $0 : can't find a GTEX datafile\n";
-}
 
 # the GTEX columns will be placed just before the $insertBefore column,
 # which must exist (this is checked)
@@ -47,9 +38,42 @@ my $insertBefore = "HV";
 
 
 #############################################
-## parse GTEX file
+## options / params from the command-line
 
-my @favoriteTissues = @ARGV;
+# full path to the GTEX datafile, eg GTEX_Data/E-MTAB-5214-query-results.tpms.tsv
+my $gtexFile;
+
+# comma-separated list of favorite tissues with a default (working on infertility here)
+my $favoriteTissues = "testis,ovary";
+
+# help: if true just print $USAGE and exit
+my $help = '';
+
+
+my $USAGE = "\nParse on STDIN a TSV file as produced by steps 1-4 of this secondaryAnalysis pipeline; print to STDOUT a similar file with additional columns holding the GTEX expression data.\n
+Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
+--gtex string [no default] : TSV file holding the GTEX TPM values, with path
+--favoriteTissues string [default=$favoriteTissues] : comma-separated list of tissues of interest
+--help : print this USAGE";
+
+GetOptions ("gtex=s" => \$gtexFile,
+	    "favoriteTissues=s" => \$favoriteTissues,
+	    "help" => \$help)
+    or die("Error in command line arguments\n$USAGE\n");
+
+# make sure required options were provided and sanity check them
+($help) && die "$USAGE\n\n";
+
+($gtexFile) || die "E: you must provide a GTEX file\n";
+(-f $gtexFile) || die "E: the supplied GTEX file doesn't exist\n";
+
+my @favoriteTissues = split(/,/,$favoriteTissues);
+(@favoriteTissues) || 
+    die "E: we expect at least one favoriteTissue, just use defaults and ignore them if you don't care\n";
+
+
+#############################################
+## parse GTEX file
 
 # GTEX data will be stored in hash:
 # key is ENSG, value is a ref to an array holding the TPM values
