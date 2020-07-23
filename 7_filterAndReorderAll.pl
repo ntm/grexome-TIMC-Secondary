@@ -4,12 +4,13 @@
 # 26/03/2018
 # NTM
 
-# Takes 2 or 3 arguments: $inDir $outDir [$pick]
+# Takes as args: $inDir $outDir $secAnalPath [$pick]
 # - $inDir must contain cohort or sample TSVs (possibly gzipped) as 
 #   produced by extractCohorts.pl or extractSamples.pl;
 # - $outDir doesn't exist, it will be created and filled with one TSV
 #   per infile (never gzipped), adding .filtered or .filtered.pick to 
 #   the filename;
+# - $secAnalPath is the path to the secondary analysis scripts
 # - $pick is optional, it's value must be 0 or 1, default is 1, if true
 #   we apply --pick as a filter.
 # Every infile is filtered and columns are reordered.
@@ -19,47 +20,54 @@ use warnings;
 use POSIX qw(strftime);
 use Parallel::ForkManager;
 
+
+#############################################
+## hard-coded stuff that shouldn't change much
+
 # number of parallel jobs to run
 my $numJobs = 8;
 
+# names of the scripts that this wrapper actually calls
 my ($filterBin,$reorderBin) = ("7_filterVariants.pl","7_reorderColumns.pl");
 
-# possible paths to find $filterBin and $reorderBin
-my @possibleBinPaths = ("/home/nthierry/PierreRay/Grexome/SecondaryAnalyses/",
-			"/home/nthierry/VariantCalling/GrexomeFauve/SecondaryAnalyses/");
-my $binPath;
-foreach my $path (@possibleBinPaths) {
-    (-d $path) && ($binPath = $path) && last;
-}
-($binPath) || 
-    die "E: no possibleBinPaths exists, update \@possibleBinPaths\n";
 
-(-f "$binPath/$filterBin") || 
-    die "E: found binPath $binPath but it doesn't contain filterBin $filterBin\n";
+#############################################
+## options / params from the command-line
 
-(-f "$binPath/$reorderBin") || 
-    die "E: found binPath $binPath but it doesn't contain reorderBin $reorderBin\n";
+(@ARGV == 3) || (@ARGV == 4) ||
+    die "E: needs 3 or 4 args: an inDir, a non-existant outDir, the path to the secondary analysis scripts, ".
+    "and optionally PICK (value 0 or 1, default 1)\n";
+my ($inDir, $outDir,$binDir,$pick) = (@ARGV,1);
 
-
-
-(@ARGV == 2) || (@ARGV == 3) ||
-    die "E: needs 2 or 3 args: an inDir, a non-existant outDir, and optionally PICK (value 0 or 1, default 1)\n";
-my ($inDir, $outDir,$pick) = (@ARGV,1);
 ($pick == 0) || ($pick == 1) ||
     die "E: last arg, if present, must be 0 or 1\n";
+
+(-d $binDir) ||
+    die "E: binDir $binDir doesn't exist or isn't a directory\n";
+(-f "$binDir/$filterBin") || 
+    die "E: binDir $binDir doesn't contain filterBin $filterBin\n";
+
+(-f "$binDir/$reorderBin") || 
+    die "E: binDir $binDir doesn't contain reorderBin $reorderBin\n";
+
 (-d $inDir) ||
     die "E: inDir $inDir doesn't exist or isn't a directory\n";
 opendir(INDIR, $inDir) ||
     die "E: cannot opendir inDir $inDir\n";
+
 (-e $outDir) && 
     die "E: found argument $outDir but it already exists, remove it or choose another name.\n";
 mkdir($outDir) ||
     die "cannot mkdir outDir $outDir\n";
 
 
-# create fork manager
-my $pm = new Parallel::ForkManager($numJobs);
+#############################################
 
+
+my $now = strftime("%F %T", localtime);
+warn "I: $now - starting to run: ".join(" ", $0, @ARGV)."\n";
+
+my $pm = new Parallel::ForkManager($numJobs);
 
 while (my $inFile = readdir(INDIR)) {
     ($inFile =~ /^\./) && next;
@@ -82,7 +90,7 @@ while (my $inFile = readdir(INDIR)) {
     ($pick) && ($outFile .= ".pick");
     $outFile .= ".csv";
     
-    my $com = "perl $binPath/$filterBin --max_ctrl_hv 3 --max_ctrl_het 10 --no_mod";
+    my $com = "perl $binDir/$filterBin --max_ctrl_hv 3 --max_ctrl_het 10 --no_mod";
     # using defaults for AFs 
     # $com .= " --max_af_gnomad 0.01 --max_af_1kg 0.03 --max_af_esp 0.05"
     ($pick) && ($com .= " --pick");
@@ -93,7 +101,7 @@ while (my $inFile = readdir(INDIR)) {
 	$com = "cat $inDir/$inFile | $com ";
     }
     
-    $com .= " | perl $binPath/$reorderBin ";
+    $com .= " | perl $binDir/$reorderBin ";
     $com .= " > $outDir/$outFile";
     my $now = strftime("%F %T", localtime);
     warn "I: $now - starting $com\n";
@@ -105,3 +113,6 @@ while (my $inFile = readdir(INDIR)) {
 closedir(INDIR);
 
 $pm->wait_all_children;
+
+$now = strftime("%F %T", localtime);
+warn "I: $now - DONE running: ".join(" ", $0, @ARGV)."\n";
