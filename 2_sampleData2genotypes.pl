@@ -51,7 +51,7 @@ while(my $line = <STDIN>) {
     elsif ($line =~ /^#CHROM/) {
 	chomp($line);
 	@samples = split(/\t/, $line);
-	(@samples >= 10) || die "no sample ids in CHROM line?\n$line\n";
+	(@samples >= 10) || die "E $0: no sample ids in CHROM line?\n$line\n";
 	# first 9 fields are just copied
 	my $lineToPrint = shift(@samples);
 	foreach my $i (2..9) {
@@ -78,7 +78,7 @@ while(my $line = <STDIN>) {
 	last;
     }
     else {
-	die "E: parsing header, found bad line:\n$line";
+	die "E $0: parsing header, found bad line:\n$line";
     }
 }
 
@@ -87,7 +87,7 @@ while(my $line = <STDIN>) {
     chomp($line);
 
     my @data = split(/\t/, $line);
-    (@data >= 10) || die "no sample data in line?\n$line\n";
+    (@data >= 10) || die "E $0: no sample data in line?\n$line\n";
     # first 5 fields are saved: we may need to modify POS, REF 
     # and ALT when removing unused ALTs and re-normalizing variants
     my ($chr,$pos,$varid,$ref,$alts) = splice(@data,0,5);
@@ -101,7 +101,7 @@ while(my $line = <STDIN>) {
     # from FORMAT we need GT, AF and DP/AD
     my $format = shift(@data);
     # GT and AF should always be first, check it
-    ($format =~ /^GT:AF:/) || die "GT:AF: aren't the first FORMAT keys in:\n$line\n";
+    ($format =~ /^GT:AF:/) || die "E $0: GT:AF: aren't the first FORMAT keys in:\n$line\n";
     # find DP and/or AD indexes
     my ($dpCol,$adCol) = (0,0);
     my @format = split(/:/, $format);
@@ -110,13 +110,13 @@ while(my $line = <STDIN>) {
 	($format[$i] eq "AD") && ($adCol = $i);
     }
     ($dpCol==0) && ($adCol==0) && 
-	die "E in 2_sampleData2genotypes.pl: no DP or AD in format:\n$line\n";
+	die "E $0: no DP or AD in format:\n$line\n";
     # print new FORMAT
     $lineToPrintEnd .= "\tGENOS";
 
     # sanity check
     (@data == @samples) || 
-	die "we don't have same number of samples and data columns in:\n$line\n";
+	die "E $0: we don't have same number of samples and data columns in:\n$line\n";
     # construct comma-separated list of samples for each called genotype
     my %geno2samples = ();
     # remember seen alleles (for multiallelic cleanup):  $seenAlleles[$i]==1 if
@@ -129,7 +129,7 @@ while(my $line = <STDIN>) {
 	# ignore NOCALLs
 	($data[$i] =~ m~^\./\.:~) && next;
 	($data[$i] =~ m~^(\d+)/(\d+):([^:]+):~) || 
-	    die "cannot grab genotype and AF for sample $i in $data[$i] in line:\n$line\n";
+	    die "E $0: cannot grab genotype and AF for sample $i in $data[$i] in line:\n$line\n";
 	my ($geno1,$geno2,$af) = ($1,$2,$3);
 	$seenAlleles[$geno1] = 1;
 	$seenAlleles[$geno2] = 1;
@@ -151,7 +151,7 @@ while(my $line = <STDIN>) {
 		}
 		($dp < $sumOfADs) && ($dp = $sumOfADs);
 	    }
-	    ($dp) || die "E: AF is $af but couldn't find DP or sumOfADs in $data[$i]\n$line\n";
+	    ($dp) || die "E $0: AF is $af but couldn't find DP or sumOfADs in $data[$i]\n$line\n";
 	    # add [DP:AF] after sample ID
 	    $geno2samples{$geno} .= "[$dp:$af]";
 	}
@@ -202,10 +202,10 @@ while(my $line = <STDIN>) {
 	if ($removeLast) {
 	    # OK remove last base from REF and all @alts
 	    ($ref =~ s/$lastRef$//) || 
-		die "WTF can't remove $lastRef from end of ref $ref\n";
+		die "E $0: WTF can't remove $lastRef from end of ref $ref\n";
 	    foreach my $i (0..$#newAlts) {
 		($newAlts[$i] =~ s/$lastRef$//) || 
-		    die "WTF can't remove $lastRef from end of newAlt $i == $newAlts[$i]\n";
+		    die "E $0: WTF can't remove $lastRef from end of newAlt $i == $newAlts[$i]\n";
 	    }
 	}
 	else {
@@ -230,10 +230,10 @@ while(my $line = <STDIN>) {
 	if ($removeFirst) {
 	    # OK remove first base from REF and all @alts
 	    ($ref =~ s/^$firstRef//) || 
-		die "WTF can't remove $firstRef from start of ref $ref\n";
+		die "E $0: WTF can't remove $firstRef from start of ref $ref\n";
 	    foreach my $i (0..$#newAlts) {
 		($newAlts[$i] =~ s/^$firstRef//) || 
-		    die "WTF can't remove $firstRef from start of alt $i == $newAlts[$i]\n";
+		    die "E $0: WTF can't remove $firstRef from start of alt $i == $newAlts[$i]\n";
 	    }
 	    # increment POS
 	    $pos++;
@@ -256,7 +256,7 @@ while(my $line = <STDIN>) {
 	my $newGeno = $geno;
 	if (defined $old2new[$allele]) {
 	    ($old2new[$allele] == -1) &&
-		die "E: allele $allele is present in a geno $geno but it was never seen!\n$line\n";
+		die "E $0: allele $allele is present in a geno $geno but it was never seen!\n$line\n";
 	    $newGeno = $old2new[$allele]."/".$old2new[$allele];
 	}
 	$lineToPrint .= "$newGeno~".$geno2samples{$geno}."|";
@@ -274,7 +274,7 @@ while(my $line = <STDIN>) {
 	my $newGeno = $geno;
 	if (defined $old2new[$allele]) {
 	    ($old2new[$allele] == -1) &&
-		die "E: allele $allele is present in a geno $geno but it was never seen!\n$line\n";
+		die "E $0: allele $allele is present in a geno $geno but it was never seen!\n$line\n";
 	    $newGeno = "0/".$old2new[$allele];
 	}
 	$lineToPrint .= "$newGeno~".$geno2samples{$geno}."|";
@@ -287,19 +287,19 @@ while(my $line = <STDIN>) {
     $lineToPrint .= "\t";
     foreach my $geno (sort keys %geno2samples) {
 	($geno eq '0/0') && next; # skip HR
-	($geno =~ m~^(\d+)/(\d+)$~) || die "E: cannot parse geno $geno in line:\n$line\n";
+	($geno =~ m~^(\d+)/(\d+)$~) || die "E $0: cannot parse geno $geno in line:\n$line\n";
 	my ($allele1,$allele2) = ($1,$2);
 	my $newGeno = $geno;
 	if (defined $old2new[$allele1]) {
 	    ($old2new[$allele1] == -1) &&
-		die "E: allele $allele1 is present in a geno $geno but it was never seen!\n$line\n";
+		die "E $0: allele $allele1 is present in a geno $geno but it was never seen!\n$line\n";
 	    $newGeno = $old2new[$allele1]."/$allele2";
 	}
 	if (defined $old2new[$allele2]) {
 	    ($old2new[$allele2] == -1) &&
-		die "E: allele $allele2 is present in a geno $geno but it was never seen!\n$line\n";
+		die "E $0: allele $allele2 is present in a geno $geno but it was never seen!\n$line\n";
 	    ($newGeno =~ s~/$allele2$~/$old2new[$allele2]~) ||
-		die "cannot subst allele2 $allele2 in geno $geno, newGeno $newGeno, line:\n$line\n";
+		die "E $0: cannot subst allele2 $allele2 in geno $geno, newGeno $newGeno, line:\n$line\n";
 	}
 	$lineToPrint .= "$newGeno~".$geno2samples{$geno}."|";
 	delete($geno2samples{$geno});
@@ -316,7 +316,7 @@ while(my $line = <STDIN>) {
 
     # sanity:
     (%geno2samples) &&
-	die "E: after eating every geno, geno2samples not empty: %geno2samples, line:\n$line\n";
+	die "E $0: after eating every geno, geno2samples not empty: %geno2samples, line:\n$line\n";
 
     print $lineToPrint."\n";
 }

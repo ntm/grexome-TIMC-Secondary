@@ -19,15 +19,15 @@ use strict;
 use warnings;
 
 
-(@ARGV == 2) || die "needs 2 args: an inDir and a non-existant outDir\n";
+(@ARGV == 2) || die "E: $0 - needs 2 args: an inDir and a non-existant outDir\n";
 my ($inDir, $outDir) = @ARGV;
 (-d $inDir) ||
-    die "inDir $inDir doesn't exist or isn't a directory\n";
+    die "E: $0 - inDir $inDir doesn't exist or isn't a directory\n";
 opendir(INDIR, $inDir) ||
-    die "cannot opendir inDir $inDir\n";
+    die "E: $0 - cannot opendir inDir $inDir\n";
 (-e $outDir) && 
-    die "found argument outDir $outDir but it already exists, remove it or choose another name.\n";
-mkdir($outDir) || die "cannot mkdir outDir $outDir\n";
+    die "E: $0 - found argument outDir $outDir but it already exists, remove it or choose another name.\n";
+mkdir($outDir) || die "E: $0 - cannot mkdir outDir $outDir\n";
 
 
 #########################################################
@@ -39,16 +39,16 @@ while (my $inFile = readdir(INDIR)) {
 	$cohort = $1;
     }
     else {
-	warn "W: cannot parse filename of inFile $inFile, skipping it\n";
+	warn "W: $0 - cannot parse filename of inFile $inFile, skipping it\n";
 	next;
     }
 
     open(INFILE, "$inDir/$inFile") ||
-	die "E: cannot open infile $inDir/$inFile\n";
+	die "E: $0 - cannot open infile $inDir/$inFile\n";
 
     my $outFile = "$cohort.final.csv" ;
     open(OUTFILE, "> $outDir/$outFile") ||
-	die "E cannot open outfile $outDir/$outFile: $!\n";
+	die "E: $0 - cannot open outfile $outDir/$outFile: $!\n";
 
 
     ###################################
@@ -70,7 +70,7 @@ while (my $inFile = readdir(INDIR)) {
     }
     # sanity check
     (($hvCol >= 0) && ($hetCol >= 0)) || 
-	die "E: couldn't find one of HV/HET for $cohort\n";
+	die "E: $0 couldn't find one of HV/HET for $cohort\n";
 
     print OUTFILE "$header\n";
 

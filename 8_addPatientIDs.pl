@@ -20,15 +20,15 @@ use warnings;
 use Spreadsheet::XLSX;
 
 
-(@ARGV == 3) || die "needs 3 args: a metadata XLSX, an inDir and a non-existant outDir\n";
+(@ARGV == 3) || die "E $0: needs 3 args: a metadata XLSX, an inDir and a non-existant outDir\n";
 my ($metadata, $inDir, $outDir) = @ARGV;
 (-d $inDir) ||
-    die "inDir $inDir doesn't exist or isn't a directory\n";
+    die "E $0: inDir $inDir doesn't exist or isn't a directory\n";
 opendir(INDIR, $inDir) ||
-    die "cannot opendir inDir $inDir\n";
+    die "E $0: cannot opendir inDir $inDir\n";
 (-e $outDir) && 
-    die "found argument $outDir but it already exists, remove it or choose another name.\n";
-mkdir($outDir) || die "cannot mkdir outDir $outDir\n";
+    die "E $0: found argument $outDir but it already exists, remove it or choose another name.\n";
+mkdir($outDir) || die "E $0: cannot mkdir outDir $outDir\n";
 
 #########################################################
 # parse metadata file
@@ -37,13 +37,13 @@ mkdir($outDir) || die "cannot mkdir outDir $outDir\n";
 my %sample2patient = ();
 
 (-f $metadata) ||
-    die "E: the supplied metadata file doesn't exist\n";
+    die "E $0: the supplied metadata file doesn't exist\n";
 {
     my $workbook = Spreadsheet::XLSX->new("$metadata");
     (defined $workbook) ||
-	die "E when parsing xlsx\n";
+	die "E $0: can't xlsx->open $metadata\n";
     ($workbook->worksheet_count() == 1) ||
-	die "E parsing xlsx: expecting a single worksheet, got ".$workbook->worksheet_count()."\n";
+	die "E $0: parsing xlsx: expecting a single worksheet, got ".$workbook->worksheet_count()."\n";
     my $worksheet = $workbook->worksheet(0);
     my ($colMin, $colMax) = $worksheet->col_range();
     my ($rowMin, $rowMax) = $worksheet->row_range();
@@ -57,11 +57,11 @@ my %sample2patient = ();
 	($cell->value() eq "patientID") && ($patientCol = $col);
     }
     ($sampleCol >= 0) ||
-	die "E parsing xlsx: no column title is sampleID\n";
+	die "E $0: parsing xlsx: no column title is sampleID\n";
     ($specimenCol >= 0) ||
-	die "E parsing xlsx: no column title is specimenID\n";
+	die "E $0: parsing xlsx: no column title is specimenID\n";
       ($patientCol >= 0) ||
-	  die "E parsing xlsx: no column title is patientID\n";
+	  die "E $0: parsing xlsx: no column title is patientID\n";
     
     foreach my $row ($rowMin+1..$rowMax) {
 	my $sample = $worksheet->get_cell($row, $sampleCol)->value;
@@ -92,19 +92,19 @@ while (my $inFile = readdir(INDIR)) {
 	$gz = 1;
     }
     else {
-	warn "W: cannot parse filename of inFile $inDir/$inFile, skipping it\n";
+	warn "W $0: cannot parse filename of inFile $inDir/$inFile, skipping it\n";
     }
 
     my $inFull = "$inDir/$inFile";
     ($gz) && ($inFull = "gunzip -c $inFull | ");
     open(IN, $inFull) ||
-	die "cannot (gunzip-?)open cohort datafile $inDir/$inFile (as $inFull)\n";
+	die "E $0: cannot (gunzip-?)open cohort datafile $inDir/$inFile (as $inFull)\n";
 
     my $outFile = "$outDir/$fileStart.patientIDs.csv";
     my $outFull = " > $outFile";
     ($gz) && ($outFull = " | gzip -c $outFull.gz");
     open (OUT, $outFull) || 
-	die "cannot (gzip-?)open $outFile for writing (as $outFull)\n";
+	die "E $0: cannot (gzip-?)open $outFile for writing (as $outFull)\n";
 
     while (my $line = <IN>) {
 	chomp($line);
@@ -115,7 +115,7 @@ while (my $inFile = readdir(INDIR)) {
 	    $line =~ s/$sample([\[,\s|])/$sample($sample2patient{$sample})$1/g ;
 	}
 	# remove the trailing ,
-	($line =~ s/,$//) || die "E: cannot remove trailing , in:\n$line\n";
+	($line =~ s/,$//) || die "E $0: cannot remove trailing , in:\n$line\n";
 	print OUT "$line\n";
     }
     close(IN);

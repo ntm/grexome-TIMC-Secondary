@@ -40,7 +40,7 @@ GetOptions ("max_ctrl_hv=i" => \$max_ctrl_hv,
 	    "max_af_gnomad=f" => \$max_af_gnomad,
 	    "max_af_1kg=f" => \$max_af_1kg,
 	    "max_af_esp=f" => \$max_af_esp)
-    or die("Error in command line arguments\n");
+    or die("E $0: Error in command line arguments\n");
 
 # build string of all filter values, for logging
 my $filterString = "max_ctrl_hv=$max_ctrl_hv max_ctrl_het=$max_ctrl_het";
@@ -70,7 +70,7 @@ foreach my $i (0..$#titles) {
     }
     # sanity (eg if some column titles change)
     (defined $title2index{$title}) &&
-	die "E in $0: title $title defined twice\n";
+	die "E $0: title $title defined twice\n";
     $title2index{$title} = $i;
 }
 

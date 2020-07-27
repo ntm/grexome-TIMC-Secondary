@@ -100,25 +100,25 @@ GetOptions ("metadata=s" => \$metadata,
 	    "tmpdir=s" => \$tmpDir,
 	    "jobs=i" => \$numJobs,
 	    "help" => \$help)
-    or die("Error in command line arguments\n$USAGE\n");
+    or die("E $0: Error in command line arguments\n$USAGE\n");
 
 # make sure required options were provided and sanity check them
 ($help) && die "$USAGE\n\n";
 
-($metadata) || die "E: you must provide a metadata file\n";
-(-f $metadata) || die "E: the supplied metadata file doesn't exist\n";
-($candidatesFile) || die "E: you must provide a candidateGenes file\n";
-(-f $candidatesFile) || die "E: the supplied candidateGenes file $candidatesFile doesn't exist\n";
+($metadata) || die "E $0: you must provide a metadata file\n";
+(-f $metadata) || die "E $0: the supplied metadata file doesn't exist\n";
+($candidatesFile) || die "E $0: you must provide a candidateGenes file\n";
+(-f $candidatesFile) || die "E $0: the supplied candidateGenes file $candidatesFile doesn't exist\n";
 
-($outDir) || die "E: you must provide an outDir\n";
+($outDir) || die "E $0: you must provide an outDir\n";
 (-e $outDir) && 
-    die "found argument $outDir but it already exists, remove it or choose another name.\n";
-mkdir($outDir) || die "cannot mkdir outDir $outDir\n";
+    die "E $0: found argument $outDir but it already exists, remove it or choose another name.\n";
+mkdir($outDir) || die "E $0: cannot mkdir outDir $outDir\n";
 
-($tmpDir) || die "E: you must provide a tmpDir\n";
+($tmpDir) || die "E $0: you must provide a tmpDir\n";
 (-e $tmpDir) && 
-    die "found argument $tmpDir but it already exists, remove it or choose another name.\n";
-mkdir($tmpDir) || die "cannot mkdir tmpDir $tmpDir\n";
+    die "E $0: found argument $tmpDir but it already exists, remove it or choose another name.\n";
+mkdir($tmpDir) || die "E $0: cannot mkdir tmpDir $tmpDir\n";
 
 my $now = strftime("%F %T", localtime);
 warn "I: $now - starting to run: ".join(" ", $0, @ARGV)."\n";
@@ -137,9 +137,9 @@ my %knownCandidateGenes = ();
 {
     my $workbook = Spreadsheet::XLSX->new("$candidatesFile");
     (defined $workbook) ||
-	die "E when parsing xlsx\n";
+	die "E $0: when parsing xlsx\n";
     ($workbook->worksheet_count() == 1) || ($workbook->worksheet_count() == 2) ||
-	die "E parsing xlsx: expecting one or two worksheets, got ".$workbook->worksheet_count()."\n";
+	die "E $0: parsing xlsx: expecting one or two worksheets, got ".$workbook->worksheet_count()."\n";
     my $worksheet = $workbook->worksheet(0);
     my ($colMin, $colMax) = $worksheet->col_range();
     my ($rowMin, $rowMax) = $worksheet->row_range();
@@ -155,11 +155,11 @@ my %knownCandidateGenes = ();
 	    ($levelCol = $col);
      }
     ($pathoCol >= 0) ||
-	die "E parsing xlsx: no col title is pathology\n";
+	die "E $0: parsing xlsx: no col title is pathology\n";
     ($geneCol >= 0) ||
-	die "E parsing xlsx: no col title is Candidate gene\n";
+	die "E $0: parsing xlsx: no col title is Candidate gene\n";
     ($levelCol >= 0) ||
-	die "E parsing xlsx: no col title is Level\n";
+	die "E $0: parsing xlsx: no col title is Level\n";
     
     foreach my $row ($rowMin+1..$rowMax) {
 	my $cohort = $worksheet->get_cell($row, $pathoCol)->unformatted();
@@ -173,7 +173,7 @@ my %knownCandidateGenes = ();
 	(defined $knownCandidateGenes{$cohort}) ||
 	    ($knownCandidateGenes{$cohort} = {});
 	(defined $knownCandidateGenes{$cohort}->{$gene}) && 
-	    die "E parsing candidatesFile xlsx: have 2 lines with same gene $gene and pathology $cohort\n";
+	    die "E $0: parsing candidatesFile xlsx: have 2 lines with same gene $gene and pathology $cohort\n";
 	$knownCandidateGenes{$cohort}->{$gene} = $level;
     }
 }
@@ -194,9 +194,9 @@ my %sample2causal = ();
     my %cohorts;
     my $workbook = Spreadsheet::XLSX->new("$metadata");
     (defined $workbook) ||
-	die "E when parsing xlsx\n";
+	die "E $0: when parsing xlsx $metadata\n";
     ($workbook->worksheet_count() == 1) ||
-	die "E parsing xlsx: expecting a single worksheet, got ".$workbook->worksheet_count()."\n";
+	die "E $0: parsing xlsx: expecting a single worksheet, got ".$workbook->worksheet_count()."\n";
     my $worksheet = $workbook->worksheet(0);
     my ($colMin, $colMax) = $worksheet->col_range();
     my ($rowMin, $rowMax) = $worksheet->row_range();
@@ -214,18 +214,18 @@ my %sample2causal = ();
 	    ($causalCol = $col);
      }
     ($sampleCol >= 0) ||
-	die "E parsing xlsx: no column title is sampleID\n";
+	die "E $0: parsing xlsx: no column title is sampleID\n";
     ($cohortCol >= 0) ||
-	die "E parsing xlsx: no col title is pathology\n";
+	die "E $0: parsing xlsx: no col title is pathology\n";
     ($causalCol >= 0) ||
-	die "E parsing xlsx: no col title is Causal gene\n";
+	die "E $0: parsing xlsx: no col title is Causal gene\n";
     
     foreach my $row ($rowMin+1..$rowMax) {
 	my $sample = $worksheet->get_cell($row, $sampleCol)->value;
 	# skip "none" lines
 	($sample eq "none") && next;
 	(defined $sample2cohort{$sample}) && 
-	    die "E parsing xlsx: have 2 lines with sample $sample\n";
+	    die "E $0: parsing xlsx: have 2 lines with sample $sample\n";
 	my $cohort = $worksheet->get_cell($row, $cohortCol)->value;
 	$sample2cohort{$sample} = $cohort;
 	$cohorts{$cohort} = 1;
@@ -263,7 +263,7 @@ my %compatible = ();
 foreach my $notConR (@compatible) {
     foreach my $cohort (@$notConR) {
 	(grep($cohort eq $_, @cohorts)) ||
-	    die "E in extractCohorts: cohort $cohort from compatible is not in cohorts @cohorts\n";
+	    die "E $0: cohort $cohort from compatible is not in cohorts @cohorts\n";
 	(defined $compatible{$cohort}) || ($compatible{$cohort} = {});
 	foreach my $notC (@$notConR) {
 	    ($notC eq $cohort) && next;
@@ -278,7 +278,7 @@ foreach my $notConR (@compatible) {
 my @outFHs;
 foreach my $cohorti (0..$#cohorts) {
     my $outFile = "$outDir/$cohorts[$cohorti].csv.gz";
-    open (my $FH, "| gzip -c > $outFile") || die "cannot gzip-open $outFile for writing";
+    open (my $FH, "| gzip -c > $outFile") || die "E $0: cannot gzip-open $outFile for writing";
     $outFHs[$cohorti] = $FH ;
 }
 
@@ -299,9 +299,9 @@ foreach my $i (0..$#headers) {
 	($headers[$i] eq $geno) && ($genoCols{$geno} = $i);
     }
 }
-($symbolCol) || die "could not find SYMBOL in headers\n";
+($symbolCol) || die "E $0: could not find SYMBOL in headers\n";
 foreach my $geno ("HV","HET","OTHER","HR") {
-    ($genoCols{$geno}) || die "cound not find $geno in headers\n";
+    ($genoCols{$geno}) || die "E $0: cound not find $geno in headers\n";
 }
 
 # print new headers
@@ -357,7 +357,7 @@ my $pm = new Parallel::ForkManager($numJobs);
 # need a tmp file for listing the known candidates
 my $tmpFileCandidatesSeen = "$tmpDir/allCandidates.seen";
 open(my $knownCandidatesSeenFH, "> $tmpFileCandidatesSeen") ||
-    die "E: cannot open tmpFileCandidatesSeen $tmpFileCandidatesSeen for writing\n";
+    die "E $0: cannot open tmpFileCandidatesSeen $tmpFileCandidatesSeen for writing\n";
 # spawn a child process that waits for workers to finish producing batches,
 # and prints the tmpfiles to @outFHs in correct order, cleaning up behind 
 # itself. 
@@ -397,12 +397,12 @@ while (!$lastBatch) {
     my @tmpOutFHs = ();
     foreach my $i (0..$#cohorts) {
 	my $tmpOut = "$tmpDir/$batchNum.$cohorts[$i].tsv";
-	open(my $outFH, "> $tmpOut") || die "cannot open $tmpOut for writing\n";
+	open(my $outFH, "> $tmpOut") || die "E $0: cannot open $tmpOut for writing\n";
 	push(@tmpOutFHs, $outFH);
     }
     # create tmp output filehandle for candidatesSeen
     my $tmpSeenFile = "$tmpDir/$batchNum.seen";
-    open(my $tmpSeenFH, "> $tmpSeenFile") || die "cannot open $tmpSeenFile for writing\n";
+    open(my $tmpSeenFH, "> $tmpSeenFile") || die "E $0: cannot open $tmpSeenFile for writing\n";
 
     # process this batch
     &processBatch(\@lines,\%knownCandidateGenes,\%sample2cohort,\@cohorts,
@@ -410,10 +410,10 @@ while (!$lastBatch) {
 
     # done, close tmp FHs and create flag-file
     foreach my $outFH (@tmpOutFHs,$tmpSeenFH) {
-	close($outFH) || die "cannot close tmp outFH $outFH\n";
+	close($outFH) || die "E $0: cannot close tmp outFH $outFH\n";
     }
     my $tmpOutFlag = "$tmpDir/$batchNum.done";
-    open(OUTFLAG, "> $tmpOutFlag") || die "cannot open flagfile $tmpOutFlag for writing\n";
+    open(OUTFLAG, "> $tmpOutFlag") || die "E $0: cannot open flagfile $tmpOutFlag for writing\n";
     print OUTFLAG "$batchNum\n";
     close(OUTFLAG);
     $pm->finish;
@@ -423,7 +423,7 @@ while (!$lastBatch) {
 # batchNum that will ever exist, tell &eatTmpFiles() so it can exit
 # (of course if you change $tmpOutLast you have to edit &eatTmpFiles)
 my $tmpOutLast = "$tmpDir/lastBatch";
-open(OUTLAST, "> $tmpOutLast") || die "cannot open tmp-last-file $tmpOutLast for writing\n";
+open(OUTLAST, "> $tmpOutLast") || die "E $0: cannot open tmp-last-file $tmpOutLast for writing\n";
 print OUTLAST "$batchNum\n";
 close OUTLAST;
 
@@ -435,22 +435,22 @@ foreach my $fh (@outFHs) {
 close($knownCandidatesSeenFH);
 
 open(IN, "$tmpFileCandidatesSeen") ||
-    die "cannot open tmpFileCandidatesSeen $tmpFileCandidatesSeen for reading";
+    die "E $0: cannot open tmpFileCandidatesSeen $tmpFileCandidatesSeen for reading";
 while (my $gene = <IN>) {
     chomp($gene);
     $knownCandidatesSeen{$gene} = 1;
 }
 close(IN);
 (unlink($tmpFileCandidatesSeen) == 1) ||
-    die "E: cannot unlink tmpFileCandidatesSeen $tmpFileCandidatesSeen: $!\n";
+    die "E $0: cannot unlink tmpFileCandidatesSeen $tmpFileCandidatesSeen: $!\n";
 foreach my $gene (keys(%knownCandidatesSeen)) {
     ($knownCandidatesSeen{$gene}) ||
-	warn "W: \"known candidate gene\" $gene was never seen!! typo in metadata or candidates xlsx files?\n";
+	warn "W $0: \"known candidate gene\" $gene was never seen!! typo in metadata or candidates xlsx files?\n";
 }
 
 $now = strftime("%F %T", localtime);
 rmdir($tmpDir) || 
-    die "E: $now - all done but cannot rmdir tmpDir $tmpDir, why? $!\n";
+    die "E $0: $now - all done but cannot rmdir tmpDir $tmpDir, why? $!\n";
 warn "I: $now - DONE running $0\n";
 
 
@@ -473,7 +473,7 @@ warn "I: $now - DONE running $0\n";
 # - $tmpSeen, a filehandle open for writing, we will print one line per different
 #   candidate gene seen in this batch of lines
 sub processBatch {
-    (@_ == 10) || die "E: processBatch needs 10 args\n";
+    (@_ == 10) || die "E $0: processBatch needs 10 args\n";
     my ($linesR,$knownCandidateGenesR,$sample2cohortR,$cohortsR,$sample2causalR,
 	$compatibleR,$symbolCol,$genoColsR,$tmpOutFilesR,$tmpSeen) = @_;
 
@@ -517,9 +517,9 @@ sub processBatch {
 	    ($genoData) || next;
 	    # sanity: at most one genotype (except for OTHER column)
 	    ($genoData =~ /\|/) &&
-		die "E: more than one genotype for geno $genoNames[$gni], impossible. Line:\n$line\n";
+		die "E $0: more than one genotype for geno $genoNames[$gni], impossible. Line:\n$line\n";
 	    ($genoData =~ /^(\d+\/\d+)~([^~\|]+)$/) ||
-		die "E: cannot parse GENOS data $genoData in line:\n$line\n";
+		die "E $0: cannot parse GENOS data $genoData in line:\n$line\n";
 	    # $geno is the genotype (eg 1/1 or 0/2)
 	    my $geno = $1;
 	    my @samples = split(/,/,$2);
@@ -529,7 +529,7 @@ sub processBatch {
 		$sampleID =~ s/\[\d+:\d+\.\d\d\]$//;
 		# sanity check
 		(defined $sample2cohortR->{$sampleID}) ||
-		    die "E sampleID $sampleID doesn't exist, sample was $sample\n";
+		    die "E $0: sampleID $sampleID doesn't exist, sample was $sample\n";
 
 		foreach my $cohorti (0..$#$cohortsR) {
 		    my $cohort = $cohortsR->[$cohorti];
@@ -662,7 +662,7 @@ sub processBatch {
 # we also watch for $tmpOutLast, a file that will tell us
 # the last batch number to wait for
 sub eatTmpFiles {
-    (@_ == 4) || die "eatTmpFiles needs 4 args.\n";
+    (@_ == 4) || die "E $0: eatTmpFiles needs 4 args.\n";
     my ($tmpDir,$cohortsR,$outFHsR,$knownCandidatesSeenFH) = @_;
 
     # NOTE: all tmp filenames (eg $tmpOutLast) are hard-coded here and 
@@ -685,36 +685,37 @@ sub eatTmpFiles {
 	    foreach my $i (0..$#$cohortsR) {
 		my $tmpFile = "$tmpDir/$nextBatch.$cohortsR->[$i].tsv";
 		open (IN, $tmpFile) || 
-		    die "E in eatTmpFiles, flagfile $tmpOutFlag exists but cant read tmpFile $tmpFile: $!\n";
+		    die "E $0: in eatTmpFiles, flagfile $tmpOutFlag exists but cant read tmpFile $tmpFile: $!\n";
 		while(<IN>) {
 		    print {$outFHsR->[$i]} $_;
 		}
 		close(IN);
 		(unlink($tmpFile) == 1) ||
-		    die "E in eatTmpFiles, done with tmpFile $tmpFile but cannot unlink it: $!\n";
+		    die "E $0: in eatTmpFiles, done with tmpFile $tmpFile but cannot unlink it: $!\n";
 	    }
 	    open(IN, $tmpSeenFile) ||
-		die "E in eatTmpFiles, cannot open tmpSeenFile $tmpSeenFile: $!\n";
+		die "E $0: in eatTmpFiles, cannot open tmpSeenFile $tmpSeenFile: $!\n";
 	    while(<IN>) {
 		print $knownCandidatesSeenFH $_;
 	    }
 	    (unlink($tmpSeenFile,$tmpOutFlag) == 2) ||
-		die "E in eatTmpFiles, done with files for batch $nextBatch but cannot unlink (both of) tmpSeen / tmpOutFlag: $!\n";
+		die "E $0: in eatTmpFiles, done with files for batch $nextBatch but cannot unlink (both of) tmpSeen / tmpOutFlag: $!\n";
 
 	    my $now = strftime("%F %T", localtime);
-	    warn("I: $now - done processing batch $nextBatch\n");
+	    # progress log: one INFO message every 10 batches
+	    ($nextBatch % 10) || warn("I $0: $now - done processing batch $nextBatch\n");
 	    $nextBatch++;
 	    next;
 	}
 
 	elsif (-e $tmpOutLast) {
 	    open (IN, $tmpOutLast) || 
-		die "E in eatTmpFiles, cannot open tmpOutLast $tmpOutLast although it exists: $!\n";
+		die "E $0: in eatTmpFiles, cannot open tmpOutLast $tmpOutLast although it exists: $!\n";
 	    $lastBatch = <IN>;
 	    chomp($lastBatch);
 	    close(IN);
 	    unlink($tmpOutLast) || 
-		die "E in eatTmpFiles, cannot unlink tmpOutLast $tmpOutLast: $!\n";
+		die "E $0: in eatTmpFiles, cannot unlink tmpOutLast $tmpOutLast: $!\n";
 	    next;
 	}
 

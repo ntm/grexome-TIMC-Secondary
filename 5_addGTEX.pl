@@ -59,17 +59,17 @@ Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 GetOptions ("gtex=s" => \$gtexFile,
 	    "favoriteTissues=s" => \$favoriteTissues,
 	    "help" => \$help)
-    or die("Error in command line arguments\n$USAGE\n");
+    or die("E: $0 - Error in command line arguments\n$USAGE\n");
 
 # make sure required options were provided and sanity check them
 ($help) && die "$USAGE\n\n";
 
-($gtexFile) || die "E: you must provide a GTEX file\n";
-(-f $gtexFile) || die "E: the supplied GTEX file doesn't exist\n";
+($gtexFile) || die "E $0: you must provide a GTEX file\n";
+(-f $gtexFile) || die "E $0: the supplied GTEX file doesn't exist\n";
 
 my @favoriteTissues = split(/,/,$favoriteTissues);
 (@favoriteTissues) || 
-    die "E: we expect at least one favoriteTissue, just use defaults and ignore them if you don't care\n";
+    die "E $0: we expect at least one favoriteTissue, just use defaults and ignore them if you don't care\n";
 
 my $now = strftime("%F %T", localtime);
 warn "I: $now - starting to run: ".join(" ", $0, @ARGV)."\n";
@@ -81,7 +81,7 @@ warn "I: $now - starting to run: ".join(" ", $0, @ARGV)."\n";
 # key is ENSG, value is a ref to an array holding the TPM values
 my %gtex;
 
-open(GTEX, $gtexFile) || die "E: cannot open gtex file $gtexFile for reading\n";
+open(GTEX, $gtexFile) || die "E $0: cannot open gtex file $gtexFile for reading\n";
 # skip header
 foreach my $i (1..4) {
     my $line = <GTEX>;
@@ -92,14 +92,14 @@ foreach my $i (1..4) {
 my $line = <GTEX>;
 chomp $line;
 ($line =~ s/^Gene ID\tGene Name\t//) || 
-    die "E: line should be GTEX header but can't parse it:\n$line\n" ;
+    die "E $0: line should be GTEX header but can't parse it:\n$line\n" ;
 my @tissues = split(/\t/, $line);
 my @favTissIndex = (-1) x @favoriteTissues;
 # improve tissue name strings, for our header line
 foreach my $i (0..$#tissues) {
     foreach my $fti (0..$#favoriteTissues) {
 	if ($tissues[$i] eq $favoriteTissues[$fti]) {
-	    ($favTissIndex[$fti] != -1) && die "found favorite tissue $tissues[$i] twice, WTF!\n";
+	    ($favTissIndex[$fti] != -1) && die "E $0: found favorite tissue $tissues[$i] twice, WTF!\n";
 	    $favTissIndex[$fti] = $i;
 	    last;
 	}
@@ -109,7 +109,7 @@ foreach my $i (0..$#tissues) {
 }
 
 foreach my $fti (0..$#favoriteTissues) {
-    ($favTissIndex[$fti] == -1) && die "could not find favorite tissue $favoriteTissues[$fti] column in header.\n";
+    ($favTissIndex[$fti] == -1) && die "E $0: could not find favorite tissue $favoriteTissues[$fti] column in header.\n";
 }
 
 # now parse GTEX datalines
@@ -117,7 +117,7 @@ while ($line=<GTEX>) {
     chomp $line;
     # set LIMIT=-1 so we still produce (empty) array elements if we have trailing empty fields
     my @data = split(/\t/, $line, -1);
-    (@data == @tissues+2) || die "E: wrong number of fields in:\n$line\n";
+    (@data == @tissues+2) || die "E $0: wrong number of fields in:\n$line\n";
     # grab ENSG, ignore gene name
     my $ensg = shift(@data);
     shift(@data);
@@ -143,8 +143,8 @@ foreach my $i (0..$#headers) {
 }
 # make sure we found them
 ($insertBeforeIndex) ||
-    die "E: could not find insertBefore==$insertBefore in column headers of infile:\n$header\n";
-($geneIndex) || die "E: could not find Gene field in column headers:\n$header\n";
+    die "E $0: could not find insertBefore==$insertBefore in column headers of infile:\n$header\n";
+($geneIndex) || die "E $0: could not find Gene field in column headers:\n$header\n";
 
 # now make new header
 my @newHeaders = @headers[0..$insertBeforeIndex-1];
@@ -169,7 +169,7 @@ while (my $line = <STDIN>) {
     chomp($line);
     my @fields = split(/\t/, $line, -1) ;
     my $gene = $fields[$geneIndex];
-    ($gene =~ /,/) && die "line in inFile has several Genes, shouldn't happen:\n$line\n";
+    ($gene =~ /,/) && die "E $0: line in inFile has several Genes, shouldn't happen:\n$line\n";
 
     # @thisGtex: array of strings holding expression values, one per tissue
     my @thisGtex =("") x @tissues ;
@@ -192,7 +192,7 @@ while (my $line = <STDIN>) {
 
 	# favExp / averageExp == favExp / (sumExp / numberGtex) == favExp * numberGtex / sumExp
 	# so make sure we can divide by $sumOfGtex
-	($sumOfGtex) || die "Sum of GTEX values is zero for gene $gene, impossible?\n$line\n";
+	($sumOfGtex) || die "E $0: Sum of GTEX values is zero for gene $gene, impossible?\n$line\n";
 	foreach my $ii (0..$#favTissIndex) {
 	    ($thisGtex[$favTissIndex[$ii]]) && 
 		($favTissRatios[$ii] = $thisGtex[$favTissIndex[$ii]] * $numberOfGtex / $sumOfGtex) ;

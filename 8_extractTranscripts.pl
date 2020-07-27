@@ -91,7 +91,7 @@ foreach my $i (0..$#keptColumns) {
 my %keptColsSpecific;
 foreach my $col (@keptColumnsSpecific) {
     ($keptCols{$col}) || 
-	die "E: column $col is in keptColsSpecific but not in keptColumns, add it there\n";
+	die "E $0: column $col is in keptColsSpecific but not in keptColumns, add it there\n";
     $keptColsSpecific{$col} = $keptCols{$col};
     delete($keptCols{$col});
 }
@@ -113,15 +113,15 @@ foreach my $notConR (@compatible) {
 
 #########################################################
 
-(@ARGV == 2) || die "needs 2 args: an inDir and a non-existant outDir\n";
+(@ARGV == 2) || die "E $0: needs 2 args: an inDir and a non-existant outDir\n";
 my ($inDir, $outDir) = @ARGV;
 (-d $inDir) ||
-    die "inDir $inDir doesn't exist or isn't a directory\n";
+    die "E $0: inDir $inDir doesn't exist or isn't a directory\n";
 opendir(INDIR, $inDir) ||
-    die "cannot opendir inDir $inDir\n";
+    die "E $0: cannot opendir inDir $inDir\n";
 (-e $outDir) && 
-    die "found argument outDir $outDir but it already exists, remove it or choose another name.\n";
-mkdir($outDir) || die "cannot mkdir outDir $outDir\n";
+    die "E $0: found argument outDir $outDir but it already exists, remove it or choose another name.\n";
+mkdir($outDir) || die "E $0: cannot mkdir outDir $outDir\n";
 
 
 # Accumulators for all the data we want to print:
@@ -171,15 +171,15 @@ while (my $inFile = readdir(INDIR)) {
 	$cohort = $1;
     }
     else {
-	warn "W: cannot parse filename of inFile $inFile, skipping it\n";
+	warn "W $0: cannot parse filename of inFile $inFile, skipping it\n";
 	next;
     }
 
     my $now = strftime("%F %T", localtime);
-    warn "I: $now - starting $0 on $cohort\n";
+    warn "I $0: $now - starting on $cohort\n";
 
     open(INFILE, "$inDir/$inFile") ||
-	die "E: cannot open infile $inDir/$inFile\n";
+	die "E $0: cannot open infile $inDir/$inFile\n";
 
     ###################################
     # header line
@@ -259,7 +259,7 @@ while (my $inFile = readdir(INDIR)) {
     }
     # sanity check
     (($hvCol >= 0) && ($hvColOC >= 0) && ($hetCol >= 0) && ($hetColOC >= 0)) || 
-	die "E: couldn't find one of HV/HET/OCHV/OCHET for $cohort\n";
+	die "E $0: couldn't find one of HV/HET/OCHV/OCHET for $cohort\n";
 
     # add filter params at the end and store
     $cohort2header{$cohort} = "$newHeaders\t$headers[$#headers]";
@@ -279,7 +279,7 @@ while (my $inFile = readdir(INDIR)) {
 	if (! $transcript2start{$transcript}) {
 	    # first time we see $transcript, fill chr, coord, start and gtex
 	    ($fields[$posCol] =~ /^chr([^:]+):(\d+)$/) ||
-		die "E: cannot grab chrom:pos in line:\n$line\n";
+		die "E $0: cannot grab chrom:pos in line:\n$line\n";
 	    my ($chr,$coord) = ($1,$2);
 	    # for sorting we want just the chrom number, replace X Y M by 23-25
 	    if ($chr eq "X") { $transcript2chr{$transcript} = "23" }
@@ -339,7 +339,7 @@ while (my $inFile = readdir(INDIR)) {
 	elsif ($impact eq "MODHIGH") { $impactStart = 1 }
 	elsif ($impact eq "MODERATE") { $impactStart = 2 }
 	else {
-	    die "E: impact is $impact, should have been skipped earlier. Line:\n$line\n";
+	    die "E $0: impact is $impact, should have been skipped earlier. Line:\n$line\n";
 	}
 
 	foreach my $coli (0..$#cols) {
@@ -356,7 +356,7 @@ while (my $inFile = readdir(INDIR)) {
 	    foreach my $sample (split(/,/,$samples)) {
 		# ignore [DP:AF] and possibly patientIDs
 		($sample =~ /^([^(\[]+)/) ||
-		    die "E: cannot grab sampleID from sample $sample\n";
+		    die "E $0: cannot grab sampleID from sample $sample\n";
 		my $sampleID = $1;
 
 		# always initialize to zero if needed before incrementing
@@ -395,7 +395,7 @@ while (my $inFile = readdir(INDIR)) {
 	}
     }
     $now = strftime("%F %T", localtime);
-    warn "I: $now - Finished parsing $cohort infile\n";
+    warn "I $0: $now - Finished parsing $cohort infile\n";
     close(INFILE);
 }
 closedir(INDIR);
@@ -445,7 +445,7 @@ my %outFHs;
 foreach my $cohort (sort keys(%cohort2header)) {
     my $outFile = "$cohort.Transcripts.csv" ;
     open(my $fh, "> $outDir/$outFile") ||
-	die "E cannot open outfile $outDir/$outFile: $!\n";
+	die "E $0: cannot open outfile $outDir/$outFile: $!\n";
     $outFHs{$cohort} = $fh;
     print $fh $cohort2header{$cohort}."\n";
 }

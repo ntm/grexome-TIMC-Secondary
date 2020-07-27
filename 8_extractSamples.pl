@@ -33,17 +33,17 @@ use Spreadsheet::XLSX;
 
 
 (@ARGV == 4) || 
-    die "needs 4 args: a metadata XLSX, an inDir, a covDir and a non-existant outDir\n";
+    die "E: $0 - needs 4 args: a metadata XLSX, an inDir, a covDir and a non-existant outDir\n";
 my ($metadata, $inDir, $covDir, $outDir) = @ARGV;
 (-d $inDir) ||
-    die "inDir $inDir doesn't exist or isn't a directory\n";
+    die "E: $0 - inDir $inDir doesn't exist or isn't a directory\n";
 opendir(INDIR, $inDir) ||
-    die "cannot opendir inDir $inDir\n";
+    die "E: $0 - cannot opendir inDir $inDir\n";
 (-d $covDir) ||
-    die "covDir $covDir doesn't exist or isn't a directory\n";
+    die "E: $0 - covDir $covDir doesn't exist or isn't a directory\n";
 (-e $outDir) && 
-    die "found argument $outDir but it already exists, remove it or choose another name.\n";
-mkdir($outDir) || die "cannot mkdir outDir $outDir\n";
+    die "E: $0 - found argument $outDir but it already exists, remove it or choose another name.\n";
+mkdir($outDir) || die "E: $0 - cannot mkdir outDir $outDir\n";
 
 #########################################################
 # parse metadata file
@@ -55,13 +55,13 @@ my %cohort2samples = ();
 my %sample2patient = ();
 
 (-f $metadata) ||
-    die "E: the supplied metadata file doesn't exist\n";
+    die "E: $0 - the supplied metadata file doesn't exist\n";
 {
     my $workbook = Spreadsheet::XLSX->new("$metadata");
     (defined $workbook) ||
-	die "E when parsing xlsx\n";
+	die "E: $0 - E when parsing xlsx\n";
     ($workbook->worksheet_count() == 1) ||
-	die "E parsing xlsx: expecting a single worksheet, got ".$workbook->worksheet_count()."\n";
+	die "E: $0 - parsing xlsx: expecting a single worksheet, got ".$workbook->worksheet_count()."\n";
     my $worksheet = $workbook->worksheet(0);
     my ($colMin, $colMax) = $worksheet->col_range();
     my ($rowMin, $rowMax) = $worksheet->row_range();
@@ -76,17 +76,17 @@ my %sample2patient = ();
 	($cell->value() eq "patientID") && ($patientCol = $col);
     }
     ($sampleCol >= 0) ||
-	die "E parsing xlsx: no column title is sampleID\n";
+	die "E: $0 - parsing xlsx: no column title is sampleID\n";
     ($cohortCol >= 0) ||
-	die "E parsing xlsx: no col title is pathology\n";
+	die "E: $0 - parsing xlsx: no col title is pathology\n";
     ($specimenCol >= 0) ||
-	die "E parsing xlsx: no column title is specimenID\n";
+	die "E: $0 - parsing xlsx: no column title is specimenID\n";
     ($patientCol >= 0) ||
-	die "E parsing xlsx: no column title is patientID\n";
+	die "E: $0 - parsing xlsx: no column title is patientID\n";
     
     foreach my $row ($rowMin+1..$rowMax) {
 	(defined $worksheet->get_cell($row, $sampleCol)) ||
-	    die "E: cell undefined for row $row, col $sampleCol\n";
+	    die "E: $0 - cell undefined for row $row, col $sampleCol\n";
 	my $sample = $worksheet->get_cell($row, $sampleCol)->value;
 	# skip "none" lines
 	($sample eq "none") && next;
@@ -119,13 +119,13 @@ while (my $inFile = readdir(INDIR)) {
 	$gz = 1;
     }
     else {
-	warn "W: cannot parse filename of inFile $inDir/$inFile, skipping it\n";
+	warn "W $0: cannot parse filename of inFile $inDir/$inFile, skipping it\n";
     }
 
     my $inFull = "$inDir/$inFile";
     ($gz) && ($inFull = "gunzip -c $inFull | ");
     open(IN, $inFull) ||
-	die "cannot (gunzip-?)open cohort datafile $inDir/$inFile (as $inFull)\n";
+	die "E: $0 - cannot (gunzip-?)open cohort datafile $inDir/$inFile (as $inFull)\n";
     my $header = <IN>;
     chomp($header);
     my @header = split(/\t/,$header);
@@ -165,9 +165,9 @@ while (my $inFile = readdir(INDIR)) {
 	}
     }
     (($hvCol >= 0) && ($hvColOC >= 0)) || 
-	die "E: couldn't find {$cohort}_HV or {$cohort}_OTHERCAUSE_HV in header of infile $inFile\n";
+	die "E: $0 - couldn't find {$cohort}_HV or {$cohort}_OTHERCAUSE_HV in header of infile $inFile\n";
     (($hetCol >= 0) && ($hetColOC >= 0)) || 
-	die "E: couldn't find HET or OC_HET in header of infile $inFile\n";
+	die "E: $0 - couldn't find HET or OC_HET in header of infile $inFile\n";
 
     # KNOWN_CANDIDATE_GENE, Feature and IMPACT column indexes after
     # removing @colsToRemove columns
@@ -188,11 +188,11 @@ while (my $inFile = readdir(INDIR)) {
 	}
     }
     ($knownCandidateCol >= 0) || 
-	die "E: couldn't find KNOWN_CANDIDATE_GENE in header of infile $inFile\n";
+	die "E $0: couldn't find KNOWN_CANDIDATE_GENE in header of infile $inFile\n";
     ($featureCol >= 0) || 
-	die "E: couldn't find Feature in header of infile $inFile\n";
+	die "E $0: couldn't find Feature in header of infile $inFile\n";
     ($impactCol >= 0) || 
-	die "E: couldn't find IMPACT in header of infile $inFile\n";
+	die "E $0: couldn't find IMPACT in header of infile $inFile\n";
 
     $header = join("\t",@header);
 
@@ -202,33 +202,33 @@ while (my $inFile = readdir(INDIR)) {
     my %outFHs;
 
     ($cohort2samples{$cohort}) || 
-	die "cohort $cohort parsed from filename of infile $inFile is not in $metadata\n";
+	die "E: $0 - cohort $cohort parsed from filename of infile $inFile is not in $metadata\n";
     foreach my $sample (@{$cohort2samples{$cohort}}) {
 	my $patient = $sample2patient{$sample};
 	my $outFile = "$outDir/$cohort.$sample.$patient.$fileEnd";
 	($gz) && ($outFile .= ".gz");
 	my $outFull = " > $outFile";
 	($gz) && ($outFull = " | gzip -c $outFull");
-	open (my $FH, $outFull) || die "cannot (gzip-?)open $outFile for writing (as $outFull)\n";
+	open (my $FH, $outFull) || die "E: $0 - cannot (gzip-?)open $outFile for writing (as $outFull)\n";
 
 	# grab global coverage data for $sample
 	my $covFile = "$covDir/coverage_$sample.csv";
 	(-f $covFile) || 
-	    die "E: trying to grab coverage data for $sample but covFile doesn't exist: $covFile\n";
+	    die "E $0: trying to grab coverage data for $sample but covFile doesn't exist: $covFile\n";
 	# global coverage data is in last 2 lines
 	open(COV, "tail -n 2 $covFile |") ||
-	    die "cannot tail-grab cov data from covFile with: tail -n 2 $covFile\n";
+	    die "E: $0 - cannot tail-grab cov data from covFile with: tail -n 2 $covFile\n";
 	# ALL_CANDIDATES
 	my $covLine = <COV>;
 	chomp $covLine;
 	my @covFields = split(/\t/,$covLine);
-	(@covFields == 8) || die "E: expecting 8 fields from candidates coverage line $covLine\n";
+	(@covFields == 8) || die "E $0: expecting 8 fields from candidates coverage line $covLine\n";
 	my $headerCov = "\tCoverage_Candidates_50x=$covFields[5] Coverage_Candidates_20x=$covFields[6] Coverage_Candidates_10x=$covFields[7]";
 	# ALL_GENES
 	$covLine = <COV>;
 	chomp $covLine;
 	@covFields = split(/\t/,$covLine);
-	(@covFields == 8) || die "E: expecting 8 fields from sampled coverage line $covLine\n";
+	(@covFields == 8) || die "E $0: expecting 8 fields from sampled coverage line $covLine\n";
 	$headerCov .= "   Coverage_AllGenes_50x=$covFields[5] Coverage_AllGenes_20x=$covFields[6] Coverage_AllGenes_10x=$covFields[7]";
 	print $FH "$header$headerCov\n";
 	$outFHs{$sample} = $FH ;
@@ -261,7 +261,7 @@ while (my $inFile = readdir(INDIR)) {
 	    my $gd = $fields[$fi];
 	    if ($gd) {
 		($gd =~ s/^[^~]+~//) || 
-		    die "cannot rip out geno from $gd, infile $inFile\n";
+		    die "E: $0 - cannot rip out geno from $gd, infile $inFile\n";
 		($genoData[0]) && ($genoData[0] .= ",");
 		$genoData[0] .= $gd;
 	    }
@@ -270,7 +270,7 @@ while (my $inFile = readdir(INDIR)) {
 	    my $gd = $fields[$fi];
 	    if ($gd) {
 		($gd =~ s/^[^~]+~//) || 
-		    die "cannot rip out geno from $gd, infile $inFile\n";
+		    die "E: $0 - cannot rip out geno from $gd, infile $inFile\n";
 		($genoData[1]) && ($genoData[1] .= ",");
 		$genoData[1] .= $gd;
 	    }
@@ -295,7 +295,7 @@ while (my $inFile = readdir(INDIR)) {
 		    # grab sample and [DP:AF], we know it must be there
 		    # (allowing AF > 1 for Strelka bug)
 		    ($sampleData =~ /^([^\[\s]+)\[(\d+:\d+\.\d\d)\]$/) ||
-			die  "E: inFile $inFile has a sampleData (in a genoData) that I can't parse: $sampleData\n";
+			die  "E $0: inFile $inFile has a sampleData (in a genoData) that I can't parse: $sampleData\n";
 		    my ($sample,$dpaf) = ($1,$2);
 
 		    # initialize everything for this sample if needed
@@ -324,7 +324,7 @@ while (my $inFile = readdir(INDIR)) {
 			$sample2trans2counters{$sample}->{$transcript}->[3] += 2-$i;
 		    }
 		    else {
-			die "E: unknown impact $impact in inFile $inFile, line:\n$line\n";
+			die "E $0: unknown impact $impact in inFile $inFile, line:\n$line\n";
 		    }
 		}
 	    }

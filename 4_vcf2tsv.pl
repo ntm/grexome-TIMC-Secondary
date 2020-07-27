@@ -58,24 +58,24 @@ my $dataHeaders;
 while (my $line = <STDIN>) {
     chomp($line);
     ($line =~ /^#/) ||
-	die "E: parsing header but found non-header line:\n$line\n" ;
+	die "E $0: parsing header but found non-header line:\n$line\n" ;
 
     # VEP CSQ header
     if ($line =~ /^##INFO=<ID=CSQ/) {
 	($line =~ /Format: ([^"]+)">$/) ||
-	    die "E: found CSQ header line but can't find Format:\n$line\n" ;
+	    die "E $0: found CSQ header line but can't find Format:\n$line\n" ;
 	@vepNames = split(/\|/,$1);
     }
     #CHROM == last header line
     elsif ($line =~ /^#CHROM/) {
 	my @headers = split(/\t/,$line);
-	(@headers == 13) || die "E: CHROM header line has wrong number of fields\n";
+	(@headers == 13) || die "E $0: CHROM header line has wrong number of fields\n";
 	$dataHeaders = join("\t",@headers[9..12]);
 	last;
     }
 }
 (@vepNames) || 
-    die "E: done parsing headers but vepNames still empty!\n" ;
+    die "E $0: done parsing headers but vepNames still empty!\n" ;
 
 # sanity: make sure all my @goodVeps fields exist
 {
@@ -85,7 +85,7 @@ while (my $line = <STDIN>) {
     }
     foreach my $v (@goodVeps) {
 	($vepNames{$v} == 1) ||
-	    die "E: the VEP field $v doesn't seem to exist anymore, update goodVeps and maybe other things!\n";
+	    die "E $0: the VEP field $v doesn't seem to exist anymore, update goodVeps and maybe other things!\n";
     }
 }
 
@@ -99,7 +99,7 @@ $headerTsv .= "\t".join("\t",@goodVeps);
 $headerTsv .= "\t$dataHeaders";
 # sanity: below we assume GENOS are HV,HET,OTHER,HR in that order
 ($dataHeaders eq "HV\tHET\tOTHER\tHR") ||
-    die "E: GENOS are not in expected order but the code depends on it, dataHeaders is: $dataHeaders\n";
+    die "E $0: GENOS are not in expected order but the code depends on it, dataHeaders is: $dataHeaders\n";
 # done, print header
 $headerTsv .= "\n" ;
 print $headerTsv ;
@@ -134,7 +134,7 @@ while (my $line =<STDIN>) {
 	# store in hash: key is VEP key, value is value in this CSQ
 	my %thisCsq;
 	(@csqTmp == @vepNames) || 
-	    die "wrong number of fields in CSQ (full line is below): $thisCsq\n$line\n" ;
+	    die "E $0: wrong number of fields in CSQ (full line is below): $thisCsq\n$line\n" ;
 	foreach my $i (0..$#vepNames) {
 	    # replace all slashes by backslashes, for excel :(
 	    $csqTmp[$i] =~ s~/~\\~g ;
@@ -206,7 +206,7 @@ while (my $line =<STDIN>) {
 	    # multi-allelic, have to fix the GENOS
 	    my $allele = $thisCsq{"ALLELE_NUM"};
 	    ($allele =~ /^\d+$/) || 
-		die "E: ALLELE_NUM not a number or undefined? CSQ is $thisCsq\n";
+		die "E $0: ALLELE_NUM not a number or undefined? CSQ is $thisCsq\n";
 	    my ($hvs,$hets,$others,$hrs) = @dataCols;
 	    my @hvs = split(/\|/,$hvs);
 	    my @hets = split(/\|/,$hets);

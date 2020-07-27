@@ -35,37 +35,37 @@ my ($filterBin,$reorderBin) = ("7_filterVariants.pl","7_reorderColumns.pl");
 ## options / params from the command-line
 
 (@ARGV == 3) || (@ARGV == 4) ||
-    die "E: needs 3 or 4 args: an inDir, a non-existant outDir, the path to the secondary analysis scripts, ".
+    die "E $0: needs 3 or 4 args: an inDir, a non-existant outDir, the path to the secondary analysis scripts, ".
     "and optionally PICK (value 0 or 1, default 1)\n";
 my ($inDir, $outDir,$binDir,$pick) = (@ARGV,1);
 
 ($pick == 0) || ($pick == 1) ||
-    die "E: last arg, if present, must be 0 or 1\n";
+    die "E $0: last arg, if present, must be 0 or 1\n";
 
 (-d $binDir) ||
-    die "E: binDir $binDir doesn't exist or isn't a directory\n";
+    die "E $0: binDir $binDir doesn't exist or isn't a directory\n";
 (-f "$binDir/$filterBin") || 
-    die "E: binDir $binDir doesn't contain filterBin $filterBin\n";
+    die "E $0: binDir $binDir doesn't contain filterBin $filterBin\n";
 
 (-f "$binDir/$reorderBin") || 
-    die "E: binDir $binDir doesn't contain reorderBin $reorderBin\n";
+    die "E $0: binDir $binDir doesn't contain reorderBin $reorderBin\n";
 
 (-d $inDir) ||
-    die "E: inDir $inDir doesn't exist or isn't a directory\n";
+    die "E $0: inDir $inDir doesn't exist or isn't a directory\n";
 opendir(INDIR, $inDir) ||
-    die "E: cannot opendir inDir $inDir\n";
+    die "E $0: cannot opendir inDir $inDir\n";
 
 (-e $outDir) && 
-    die "E: found argument $outDir but it already exists, remove it or choose another name.\n";
+    die "E $0: found argument $outDir but it already exists, remove it or choose another name.\n";
 mkdir($outDir) ||
-    die "cannot mkdir outDir $outDir\n";
+    die "E $0: cannot mkdir outDir $outDir\n";
 
 
 #############################################
 
 
 my $now = strftime("%F %T", localtime);
-warn "I: $now - starting to run: ".join(" ", $0, @ARGV)."\n";
+warn "I $0: $now - starting to run: ".join(" ", $0, @ARGV)."\n";
 
 my $pm = new Parallel::ForkManager($numJobs);
 
@@ -81,7 +81,7 @@ while (my $inFile = readdir(INDIR)) {
 	$gz = 1;
     }
     else {
-	warn "W: cannot parse filename of inFile $inFile, skipping it\n";
+	warn "W $0: cannot parse filename of inFile $inFile, skipping it\n";
 	$pm->finish;
     }
 
@@ -104,10 +104,10 @@ while (my $inFile = readdir(INDIR)) {
     $com .= " | perl $binDir/$reorderBin ";
     $com .= " > $outDir/$outFile";
     my $now = strftime("%F %T", localtime);
-    warn "I: $now - starting $com\n";
+    warn "I $0: $now - starting $com\n";
     system($com);
     $now = strftime("%F %T", localtime);
-    warn "I: $now - Finished $com\n";
+    warn "I $0: $now - Finished $com\n";
     $pm->finish;
 }
 closedir(INDIR);

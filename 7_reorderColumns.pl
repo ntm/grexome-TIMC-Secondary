@@ -54,7 +54,7 @@ foreach my $i (0..$#titles) {
 
     if (defined $title2index{$title}) {
 	($title2index{$title} == -1) &&
-	    die "E: title $titles[$i] was converted to $title but this has been seen already, fix the regexps!\n";
+	    die "E $0: title $titles[$i] was converted to $title but this has been seen already, fix the regexps!\n";
 	$old2new[$i] = $title2index{$title};
 	# set to -1 so we can make sure every @newOrder title was seen exactly once
 	$title2index{$title} = -1;
@@ -70,7 +70,7 @@ foreach my $t (keys(%title2index)) {
     ($title2index{$t} == -1) && (delete $title2index{$t});
 }
 if (my @missingTitles = keys(%title2index)) {
-    die "E: some newOrder titles were not found: ".join(" ", keys(%title2index))."\n";
+    die "E $0: some newOrder titles were not found: ".join(" ", keys(%title2index))."\n";
 }
 
 # new header

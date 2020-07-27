@@ -36,18 +36,18 @@ use Bio::DB::HTS::Tabix;
 
 #########################################################
 
-(@ARGV == 4) || die "needs 4 args: a candidatesFile, a tsv.gz, a GVCF and an outDir\n";
+(@ARGV == 4) || die "E $0: needs 4 args: a candidatesFile, a tsv.gz, a GVCF and an outDir\n";
 my ($candidatesFile, $transcriptsFile, $gvcf, $outDir) = @ARGV;
 
 (-f $candidatesFile) ||
-    die "E: the supplied candidates file $candidatesFile doesn't exist\n";
+    die "E $0: the supplied candidates file $candidatesFile doesn't exist\n";
 (-f $transcriptsFile) ||
-    die "transcriptsFile $transcriptsFile doesn't exist or isn't a file\n";
+    die "E $0: transcriptsFile $transcriptsFile doesn't exist or isn't a file\n";
 (-f $gvcf) ||
-    die "GVCF $gvcf doesn't exist or isn't a file\n";
+    die "E $0: GVCF $gvcf doesn't exist or isn't a file\n";
 (-f "$gvcf.tbi") ||
-    die "GVCF $gvcf exists but can't find its index file $gvcf.tbi, did you tabix-index the gvcf?\n";
-(-d $outDir) || mkdir($outDir) || die "cannot mkdir outDir $outDir\n";
+    die "E $0: GVCF $gvcf exists but can't find its index file $gvcf.tbi, did you tabix-index the gvcf?\n";
+(-d $outDir) || mkdir($outDir) || die "E $0: cannot mkdir outDir $outDir\n";
 
 
 #########################################################
@@ -61,9 +61,9 @@ my %candidateGenes = ();
     # code adapted from 6_extractCohorts.pl
     my $workbook = Spreadsheet::XLSX->new("$candidatesFile");
     (defined $workbook) ||
-	die "E when parsing xlsx\n";
+	die "E $0: when parsing xlsx\n";
     ($workbook->worksheet_count() == 1) || ($workbook->worksheet_count() == 2) ||
-	die "E parsing xlsx: expecting one or two worksheets, got ".$workbook->worksheet_count()."\n";
+	die "E $0: parsing xlsx: expecting one or two worksheets, got ".$workbook->worksheet_count()."\n";
     my $worksheet = $workbook->worksheet(0);
     my ($colMin, $colMax) = $worksheet->col_range();
     my ($rowMin, $rowMax) = $worksheet->row_range();
@@ -75,7 +75,7 @@ my %candidateGenes = ();
 	    ($geneCol = $col);
      }
     ($geneCol >= 0) ||
-	die "E parsing xlsx: no col title is Candidate gene\n";
+	die "E $0: parsing xlsx: no col title is Candidate gene\n";
     
     foreach my $row ($rowMin+1..$rowMax) {
 	my $gene = $worksheet->get_cell($row, $geneCol)->unformatted();
@@ -94,7 +94,7 @@ my $tabix = Bio::DB::HTS::Tabix->new( filename => "$gvcf" );
 # ->header gives all headers in a single scalar, we just want the #CHROM line
 my $header = $tabix->header;
 ($header =~ /\n(#CHROM\t.+)$/) ||
-    die "E: cannot extract #CHROM line from header:\n$header\n";
+    die "E $0: cannot extract #CHROM line from header:\n$header\n";
 my @fields = split(/\t/,$1);
 my @samples = @fields[9..$#fields];
 
@@ -111,7 +111,7 @@ foreach my $i (0..$#samples) {
 	$samplesIgnored[$i] = 1;
     }
     else {
-	open(my $FH, "> $outFile") || die "cannot open $outFile for writing\n";
+	open(my $FH, "> $outFile") || die "E $0: cannot open $outFile for writing\n";
 	$outFHs[$i] = $FH;
 	# print header
 	print $FH "Gene\tKNOWN_CANDIDATE_GENE\tTranscript\tExon\tBases examined (+-10 around each exon)\tPercentage covered >= 50x\tPercentage covered >= 20x\tPercentage covered >= 10x\n";
@@ -138,7 +138,7 @@ my ($lengthCandidates,$lengthSampled) = (0,0);
 
 
 open(GENES, "gunzip -c $transcriptsFile |") || 
-    die "cannot gunzip-open transcriptsFile $transcriptsFile\n";
+    die "E $0: cannot gunzip-open transcriptsFile $transcriptsFile\n";
 
 # skip header
 <GENES>;
@@ -147,7 +147,7 @@ while (my $line = <GENES>) {
     chomp($line);
     my @fields = split(/\t/,$line);
     (@fields == 8) || 
-	die "wrong number of fields in line:\n$line\n";
+	die "E $0: wrong number of fields in line:\n$line\n";
     my ($transcript,$gene,$chr,$strand,$cdsStart,$cdsEnd,$starts,$ends) = @fields;
 
     # skip non-coding transcripts
@@ -160,7 +160,7 @@ while (my $line = <GENES>) {
 	$candidateGenes{$gene} = 2;
     }
     elsif ($candidateGenes{$gene}) {
-	warn "W: found several transcripts for candidate gene $gene, is this expected?\n";
+	warn "W $0: found several transcripts for candidate gene $gene, is this expected?\n";
     }
     # else not a candidate gene, nothing to do
 
@@ -168,7 +168,7 @@ while (my $line = <GENES>) {
     my $numExons = @starts;
     my @ends = split(/,/,$ends);
     ($numExons == @ends) || 
-	die "mismatch between numbers of starts and ends in line:\n$line\n";
+	die "E $0: mismatch between numbers of starts and ends in line:\n$line\n";
 
     # we will print one line per exon for candidate genes, but also a final 
     # line for the whole gene/transcript
@@ -234,7 +234,7 @@ while (my $line = <GENES>) {
 	    if ($end > $ends[$i]+10) {
 		#sanity
 		($pos <= $ends[$i]+10) ||
-		    die "tabix gave a line for $range that doesn't overlap it (after):\n$gvcfLine\n";
+		    die "E $0: tabix gave a line for $range that doesn't overlap it (after):\n$gvcfLine\n";
 		$end = $ends[$i]+10;
 	    }
 	    # number of bases overlapping range in this line
@@ -379,7 +379,7 @@ foreach my $fh (@outFHs) {
 
 foreach my $gene (sort keys %candidateGenes) {
     if ($candidateGenes{$gene} == 1) {
-	warn "W: all done but candidate gene $gene was never seen!\n";
+	warn "W $0: all done but candidate gene $gene was never seen!\n";
     }
 }
 

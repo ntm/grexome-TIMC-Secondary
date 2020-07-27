@@ -101,19 +101,18 @@ GetOptions ("metadata=s" => \$metadata,
 	    "verbose=i" => \$verbose,
 	    "tmpdir=s" => \$tmpDir,
 	    "help" => \$help)
-    or die("Error in command line arguments\n$USAGE\n");
+    or die("E $0: Error in command line arguments\n$USAGE\n");
 
 # make sure required options were provided and sanity check them
-($help) &&
-    die "$USAGE\n\n";
+($help) && die "$USAGE\n\n";
 
-($metadata) || die "E: you must provide a metadata file\n";
-(-f $metadata) || die "E: the supplied metadata file doesn't exist\n";
+($metadata) || die "E $0: you must provide a metadata file\n";
+(-f $metadata) || die "E $0: the supplied metadata file doesn't exist\n";
 
 (-e $tmpDir) && 
-    die "E: tmpDir $tmpDir exists, please remove or rename it, or provide a different one with --tmpdir\n";
+    die "E $0: tmpDir $tmpDir exists, please remove or rename it, or provide a different one with --tmpdir\n";
 mkdir($tmpDir) || 
-    die "E: cannot mkdir tmpDir $tmpDir\n";
+    die "E $0: cannot mkdir tmpDir $tmpDir\n";
 
     
 #########################################################
@@ -125,9 +124,9 @@ my %samples = ();
 {
     my $workbook = Spreadsheet::XLSX->new("$metadata");
     (defined $workbook) ||
-	die "E when parsing xlsx\n";
+	die "E $0: when parsing xlsx\n";
     ($workbook->worksheet_count() == 1) ||
-	die "E parsing xlsx: expecting a single worksheet, got ".$workbook->worksheet_count()."\n";
+	die "E $0: parsing xlsx: expecting a single worksheet, got ".$workbook->worksheet_count()."\n";
     my $worksheet = $workbook->worksheet(0);
     my ($colMin, $colMax) = $worksheet->col_range();
     my ($rowMin, $rowMax) = $worksheet->row_range();
@@ -141,14 +140,14 @@ my %samples = ();
 	    ($sampleCol = $col);
     }
     ($sampleCol >= 0) ||
-	die "E parsing xlsx: no column title is sampleID\n";
+	die "E $0: parsing xlsx: no column title is sampleID\n";
 
     foreach my $row ($rowMin+1..$rowMax) {
 	my $sample = $worksheet->get_cell($row, $sampleCol)->value;
 	# skip "none" lines
 	($sample eq "none") && next;
 	(defined $samples{$sample}) && 
-	    die "E parsing xlsx: have 2 lines with sample $sample\n";
+	    die "E $0: parsing xlsx: have 2 lines with sample $sample\n";
 	$samples{$sample} = 1;
     }
 }
@@ -157,9 +156,9 @@ if ($samplesOfInterest) {
     # make sure every listed sample is in %samples and promote it's value to 2
     foreach my $soi (split(/,/, $samplesOfInterest)) {
 	($samples{$soi}) ||
-	    die "E processing samplesOfInterest: a specified sample $soi does not exist in the metadata file\n";
+	    die "E $0: processing samplesOfInterest: a specified sample $soi does not exist in the metadata file\n";
 	($samples{$soi} == 1) ||
-	    warn "W processing samplesOfInterest: sample $soi was specified twice, is that a typo?\n";
+	    warn "W $0: processing samplesOfInterest: sample $soi was specified twice, is that a typo?\n";
 	$samples{$soi} = 2;
     }
     # now demote the SOIs to 1 and ignore all other samples
@@ -177,7 +176,7 @@ if ($samplesOfInterest) {
 # deal with headers
 
 my $now = strftime("%F %T", localtime);
-warn "I: $now - starting to run: ".join(" ", $0, @ARGV)."\n";
+warn "I $0: $now - starting to run: ".join(" ", $0, @ARGV)."\n";
 
 # array, same number of elements as there are columns in the #CHROM line
 # (and hence in each data line), value is true iff column must be skipped
@@ -216,7 +215,7 @@ while(my $line = <STDIN>) {
 	last;
     }
     else {
-	die "E: parsing header, found bad line:\n$line";
+	die "E $0: parsing header, found bad line:\n$line";
     }
 }
 
@@ -264,15 +263,15 @@ while (!$lastBatch) {
 
     # create tmp output filehandle for this batch
     my $tmpOut = "$tmpDir/$batchNum.vcf";
-    open(my $tmpOutFH, "> $tmpOut") || die "cannot open $tmpOut for writing\n";
+    open(my $tmpOutFH, "> $tmpOut") || die "E $0: cannot open $tmpOut for writing\n";
 
     # process this batch
     &processBatch(\@lines,$tmpOutFH,\%filterParams,\@skippedCols,$verbose);
 
     # done, close tmp FH and create flag-file
-    close($tmpOutFH) || die "cannot close tmp outFH $tmpOutFH\n";
+    close($tmpOutFH) || die "E $0: cannot close tmp outFH $tmpOutFH\n";
     my $tmpOutFlag = "$tmpDir/$batchNum.done";
-    open(OUTFLAG, "> $tmpOutFlag") || die "cannot open flagfile $tmpOutFlag for writing\n";
+    open(OUTFLAG, "> $tmpOutFlag") || die "E $0: cannot open flagfile $tmpOutFlag for writing\n";
     print OUTFLAG "$batchNum\n";
     close(OUTFLAG);
     $pm->finish;
@@ -282,7 +281,7 @@ while (!$lastBatch) {
 # batchNum that will ever exist, tell &eatTmpFiles() so it can exit
 # (of course if you change $tmpOutLast you have to edit &eatTmpFiles)
 my $tmpOutLast = "$tmpDir/lastBatch";
-open(OUTLAST, "> $tmpOutLast") || die "cannot open tmp-last-file $tmpOutLast for writing\n";
+open(OUTLAST, "> $tmpOutLast") || die "E $0: cannot open tmp-last-file $tmpOutLast for writing\n";
 print OUTLAST "$batchNum\n";
 close OUTLAST;
 
@@ -290,8 +289,8 @@ $pm->wait_all_children;
 
 $now = strftime("%F %T", localtime);
 rmdir($tmpDir) || 
-    die "E: $now - all done but cannot rmdir tmpDir $tmpDir, why? $!\n";
-warn "I: $now - DONE running: ".join(" ", $0, @ARGV)."\n";
+    die "E $0: $now - all done but cannot rmdir tmpDir $tmpDir, why? $!\n";
+warn "I $0: $now - DONE running: ".join(" ", $0, @ARGV)."\n";
 
 
 
@@ -307,7 +306,7 @@ warn "I: $now - DONE running: ".join(" ", $0, @ARGV)."\n";
 # - ref to array saying which columns to skip
 # - $verbose, 0 is quiet, increase value for more verbosity
 sub processBatch {
-    (@_ == 5) || die "E: processBatch needs 5 args\n";
+    (@_ == 5) || die "E $0: processBatch needs 5 args\n";
     my ($linesR,$outFH,$filterParamsR,$skippedColsR,$verbose) = @_;
 
     # counters for number of blatant errors fixed to HV or HET
@@ -319,7 +318,7 @@ sub processBatch {
 	# least one sample after filtering
 	my $keepLine = 0;
 	my @data = split(/\t/, $line);
-	(@data >= 10) || die "no sample data in line?\n$line\n";
+	(@data >= 10) || die "E $0: no sample data in line?\n$line\n";
 	# if no ALT in line, skip immediately
 	($data[4] eq '.') && next;
 	# grab alleleNum of ALT '*' if it's present
@@ -333,7 +332,7 @@ sub processBatch {
 	my $format = $data[8];
 	my $newFormat = $format;
 	($newFormat =~ s/^GT:/GT:AF:/)  || 
-	    die "E: cannot add AF after GT in format: $format\n";
+	    die "E $0: cannot add AF after GT in format: $format\n";
 	$lineToPrint .= "\t$newFormat";
 	# %format: key is a FORMAT key (eg GQX), value is the index of that key in $format
 	my %format;
@@ -352,10 +351,10 @@ sub processBatch {
 	}elsif (defined $format{"GQ"}){
 		$gq = "GQ";
 	}else{
-		die "no GQ/GQX key in FORMAT string for line:\n$line\n";
+		die "E $0: no GQ/GQX key in FORMAT string for line:\n$line\n";
 	}
-	(defined $format{"GT"}) || die "no GT key in FORMAT string for line:\n$line\n";
-	(defined $format{"AD"}) || die "no AD key in FORMAT string for line:\n$line\n";
+	(defined $format{"GT"}) || die "E $0: no GT key in FORMAT string for line:\n$line\n";
+	(defined $format{"AD"}) || die "E $0: no AD key in FORMAT string for line:\n$line\n";
 
 	# now deal with actual data fields
 	foreach my $i (9..$#data) {
@@ -406,7 +405,7 @@ sub processBatch {
 	    # grab geno
 	    my ($geno1,$geno2) = split(/\//, $thisData[$format{"GT"}]);
 	    ((defined $geno1) && (defined $geno2)) ||
-		die "E: a sample's genotype cannot be split: ".$thisData[$format{"GT"}]."in:\n$line\n";
+		die "E $0: a sample's genotype cannot be split: ".$thisData[$format{"GT"}]."in:\n$line\n";
 	    # make sure alleles are in sorted order
 	    if ($geno2 < $geno1) {
 		my $genot = $geno1;
@@ -419,7 +418,7 @@ sub processBatch {
 	    if (($geno2 != 0) && (($geno1 == 0) || ($geno1 == $geno2))) {
 		# 0/x HET or x/x HV, AD should always be there
 		if ((! $thisData[$format{"AD"}]) || ($thisData[$format{"AD"}] !~ /^[\d,]+$/)) {
-		    die "E: GT is HET or HV but we don't have AD or AD data is blank in:\n$line\nright after:\n$lineToPrint\n";
+		    die "E $0: GT is HET or HV but we don't have AD or AD data is blank in:\n$line\nright after:\n$lineToPrint\n";
 		}
 		my @ads = split(/,/, $thisData[$format{"AD"}]);
 		# $geno2 is always the index of the VAR (thanks to sorting above)
@@ -444,7 +443,7 @@ sub processBatch {
 		$fixedToHV++;
 		if ($verbose >= 2) {
 		    # warn with chrom pos ref > alts sample dp af
-		    warn "I: fix to HV, $data[0]:$data[1] $data[3] > $data[4] sample ".($i-9)." DP=$thisDP AF=$af\n";
+		    warn "I $0: fix to HV, $data[0]:$data[1] $data[3] > $data[4] sample ".($i-9)." DP=$thisDP AF=$af\n";
 		}
 	    }
 	    if (($thisDP >= $filterParamsR->{"minDP_HET"}) && ($geno1 != 0) && ($af ne '.') && 
@@ -454,7 +453,7 @@ sub processBatch {
 		$fixedToHET++;
 		if ($verbose >= 2) {
 		    # warn with chrom pos ref > alts sample dp af
-		    warn "I: fix to HET, $data[0]:$data[1] $data[3] > $data[4] sample ".($i-9)." DP=$thisDP AF=$af\n";
+		    warn "I $0: fix to HET, $data[0]:$data[1] $data[3] > $data[4] sample ".($i-9)." DP=$thisDP AF=$af\n";
 		}
 	    }
 
@@ -463,7 +462,7 @@ sub processBatch {
 	    # OK data passed all filters but $thisData(GT) may have been changed
 	    # -> fix GT in $data and set $keepLine if at least one called allele is not REF or '*'
 	    ($data =~ s/^([^:]+):/$thisData[$format{"GT"}]:$af:/) || 
-		die "cannot fix GT to $thisData[$format{'GT'}] and add AF $af after the geno in: $data\n";
+		die "E $0: cannot fix GT to $thisData[$format{'GT'}] and add AF $af after the geno in: $data\n";
 	    $lineToPrint .= "\t$data";
 	    if (($thisData[$format{"GT"}] ne '0/0') && ($thisData[$format{"GT"}] ne "0/$starNum") &&
 		($thisData[$format{"GT"}] ne "$starNum/0") && ($thisData[$format{"GT"}] ne "$starNum/$starNum")) {
@@ -475,8 +474,8 @@ sub processBatch {
     }
     # INFO with number of fixed calls in this batch, we don't care that this
     # comes out of order to stderr
-    ($verbose) && ($fixedToHV) && (warn "I: fixed $fixedToHV calls from HET to HV\n");
-    ($verbose) && ($fixedToHET) && (warn "I: fixed $fixedToHET calls from HV to HET\n");
+    ($verbose) && (warn "I $0: fixed $fixedToHV calls from HET to HV\n");
+    ($verbose) && (warn "I $0: fixed $fixedToHET calls from HV to HET\n");
 }
 
 
@@ -487,7 +486,7 @@ sub processBatch {
 # we also watch for $tmpOutLast, a file that will tell us
 # the last batch number to wait for
 sub eatTmpFiles {
-    (@_ == 1) || die "eatTmpFiles needs 1 arg.\n";
+    (@_ == 1) || die "E $0: eatTmpFiles needs 1 arg.\n";
     my ($tmpDir) = @_;
 
     # NOTE: all tmp filenames (eg $tmpOut) are hard-coded here and 
@@ -508,27 +507,28 @@ sub eatTmpFiles {
 	    # next batch of tmp files are ready
 	    my $tmpOut = "$tmpDir/$nextBatch.vcf";
 		open (IN, $tmpOut) || 
-		    die "E in eatTmpFiles, flagfile $tmpOutFlag exists but cant read tmpFile $tmpOut: $!\n";
+		    die "E $0: in eatTmpFiles, flagfile $tmpOutFlag exists but cant read tmpFile $tmpOut: $!\n";
 	    while(<IN>) {
 		print $_;
 	    }
 	    close(IN);
 	    (unlink($tmpOut,$tmpOutFlag) == 2) ||
-		die "E in eatTmpFiles, done with tmpFile $tmpOut and flagfile $tmpOutFlag but cannot unlink them: $!\n";
+		die "E $0: in eatTmpFiles, done with tmpFile $tmpOut and flagfile $tmpOutFlag but cannot unlink them: $!\n";
 	    my $now = strftime("%F %T", localtime);
-	    warn("I: $now - done processing batch $nextBatch\n");
+	    # progress log: one INFO message every 10 batches
+	    ($nextBatch % 10) || warn("I $0: $now - done processing batch $nextBatch\n");
 	    $nextBatch++;
 	    next;
 	}
 
 	elsif (-e $tmpOutLast) {
 	    open (IN, $tmpOutLast) || 
-		die "E in eatTmpFiles, cannot open tmpOutLast $tmpOutLast although it exists: $!\n";
+		die "E $0: in eatTmpFiles, cannot open tmpOutLast $tmpOutLast although it exists: $!\n";
 	    $lastBatch = <IN>;
 	    chomp($lastBatch);
 	    close(IN);
 	    unlink($tmpOutLast) || 
-		die "E in eatTmpFiles, cannot unlink tmpOutLast $tmpOutLast: $!\n";
+		die "E $0: in eatTmpFiles, cannot unlink tmpOutLast $tmpOutLast: $!\n";
 	    next;
 	}
 

@@ -72,7 +72,7 @@ GetOptions ("cachePath=s" => \$cachePath,
 	    "dataDir=s" => \$dataDir,
 	    "tmpDir=s" => \$tmpDir,
 	    "help" => \$help)
-    or die("Error in command line arguments\n$USAGE\n");
+    or die("E $0: Error in command line arguments\n$USAGE\n");
 
 # make sure required options were provided and sanity check them
 ($help) && die "$USAGE\n\n";
@@ -80,24 +80,24 @@ GetOptions ("cachePath=s" => \$cachePath,
 # we're OK if the cachefile doesn't exist (first run, it will be created),
 # but we need a subdir to create it in
 ($cachePath) || 
-    die "E in $0: you must provide a cachePath where we will store our cacheFile\n";
+    die "E $0: you must provide a cachePath where we will store our cacheFile\n";
 (-d $cachePath) ||
-    die "E in $0 : the provided cachePath $cachePath doesn't exist or isn't a dir\n";
+    die "E $0 : the provided cachePath $cachePath doesn't exist or isn't a dir\n";
 # prepend path to $cacheFile
 $cacheFile = "$cachePath/$cacheFile";
 
-($genome) || die "E in $0: you must provide a ref genome fasta file\n";
-(-f $genome) || die "E in $0 : provided genome fasta file doesn't exist\n";
+($genome) || die "E $0: you must provide a ref genome fasta file\n";
+(-f $genome) || die "E $0: provided genome fasta file doesn't exist\n";
 
 ($dataDir) || 
-    die "E in $0: you must provide a dataDir containing the data required by the VEP plugins we use\n";
+    die "E $0: you must provide a dataDir containing the data required by the VEP plugins we use\n";
 (-d $dataDir) ||
-    die "E in $0 : the provided dataDir $dataDir doesn't exist or isn't a dir\n";
+    die "E $0: the provided dataDir $dataDir doesn't exist or isn't a dir\n";
 
-($tmpDir) || die "E in $0: you must provide a non-existing tmpDir\n";
+($tmpDir) || die "E $0: you must provide a non-existing tmpDir\n";
 (-e $tmpDir) &&
-    die "E: tmpDir $tmpDir exists, please rm -r $tmpDir or use another tmpDir as arg\n";
-mkdir($tmpDir) || die "E: cannot create tmpDir $tmpDir\n";
+    die "E $0: tmpDir $tmpDir exists, please rm -r $tmpDir or use another tmpDir as arg\n";
+mkdir($tmpDir) || die "E $0: cannot create tmpDir $tmpDir\n";
 
 
 #########################################################################
@@ -112,12 +112,12 @@ my $vepPlugins = "";
     # CADD - might not be needed if dbNSFP is good (it provides CADD 
     # among many other things), commenting out for now
     #my $caddPath = "$dataDir/CADD/";
-    # (-d $caddPath) || die "E: CADD datadir doesn't exist: $caddPath\n";
+    # (-d $caddPath) || die "E $0: CADD datadir doesn't exist: $caddPath\n";
     #$plugins .= " --plugin CADD,$caddPath/whole_genome_SNVs.tsv.gz,$caddPath/InDels.tsv.gz ";
 
     # dbNSFP
     my $dbNsfpPath = "$dataDir/dbNSFP/";
-    (-d $dbNsfpPath) || die "E: dbNSFP datadir doesn't exist: $dbNsfpPath\n";
+    (-d $dbNsfpPath) || die "E $0: dbNSFP datadir doesn't exist: $dbNsfpPath\n";
     # comma-separated list of fields to retrieve from dbNSFP, there are MANY
     # possibilities, check the README in $dbNsfpPath
     my $dbNsfpFields = "MutationTaster_pred,REVEL_rankscore,CADD_raw_rankscore";
@@ -165,23 +165,23 @@ warn "I: $now - starting to run: ".join(" ", $0, @ARGV)."\n";
 #   and printed to $vcfFromCache.
 my $vcf4vep = "$tmpDir/vcf4vep.vcf.gz";
 open(VCF4VEP, "| gzip -c --fast > $vcf4vep") ||
-    die "cannot open gzip pipe to vcf4vep $vcf4vep\n";
+    die "E $0: cannot open gzip pipe to vcf4vep $vcf4vep\n";
 my $vcfFromCache = "$tmpDir/vcfFromCache.vcf.gz";
 open(VCFCACHE, "| gzip -c --fast > $vcfFromCache") ||
-    die "cannot open gzip pipe to vcfFromCache $vcfFromCache\n";
+    die "E $0: cannot open gzip pipe to vcfFromCache $vcfFromCache\n";
 
 # a small VCF containing only the headers is also made, for testing
 # the VEP version etc...
 my $vcf4vepTest = "$tmpDir/vcf4vepVersionTest.vcf";
 open(VEPTEST, "> $vcf4vepTest") ||
-    die "cannot open vcf4vepTest $vcf4vepTest for writing\n";
+    die "E $0: cannot open vcf4vepTest $vcf4vepTest for writing\n";
 
 # $cache is a hashref. key=="chr:pos:ref:alt", value==CSQ
 my $cache = {};
 # grab previously cached data
 if (-f $cacheFile) {
     $cache = &retrieve($cacheFile) ||
-	die "E: cachefile $cacheFile exists but I can't retrieve hash from it.\n";
+	die "E $0: cachefile $cacheFile exists but I can't retrieve hash from it.\n";
 }
 
 # header
@@ -196,7 +196,7 @@ while (my $line = <STDIN>) {
 # run VEP on the small test file
 close(VEPTEST);
 open(VEPTEST_OUT, "$vepCommand < $vcf4vepTest |") ||
-    die "cannot run VEP on testfile with:\n$vepCommand < $vcf4vepTest\n";
+    die "E $0: cannot run VEP on testfile with:\n$vepCommand < $vcf4vepTest\n";
 # check that the cache matches the VEP and cache versions and has the correct VEP columns
 while (my $line = <VEPTEST_OUT>) {
     chomp($line);
@@ -205,7 +205,7 @@ while (my $line = <VEPTEST_OUT>) {
 	# need to remove timestamp
 	my $lineClean = $line;
 	($lineClean =~ s/time="[^"]+" //) ||
-	    die "E in $0: cannot remove timestamp from ##VEP line:\n$line\n";
+	    die "E $0: cannot remove timestamp from ##VEP line:\n$line\n";
 	# also remove any path before /.vep/ in cache= so different users can use the
 	# same $cacheFile if they have their own VEP install with same cache versions
 	$lineClean =~ s~(cache=")[^"]+(/.vep/)~$1$2~; # no "||die", eg if the user changed his VEPDIR
@@ -216,9 +216,9 @@ while (my $line = <VEPTEST_OUT>) {
 		close(VCF4VEP);
 		close(VCFCACHE);
 		unlink($vcf4vep,$vcfFromCache,$vcf4vepTest);
-		rmdir($tmpDir) || warn "W: VEP version mismatch but can't rmdir tmpDir $tmpDir\n";
-		die "cached VEP version and ##VEP line from VCF are different:\n$cacheLine\n$lineClean\n".
-		    "if you updated your VEP cache this script's cachefile is now stale, you need to rm $cacheFile (or change the cacheFile in $0)\n";
+		rmdir($tmpDir) || warn "W $0: VEP version mismatch but can't rmdir tmpDir $tmpDir\n";
+		die "E: $0 - cached VEP version and ##VEP line from VCF are different:\n$cacheLine\n$lineClean\n".
+		    "if you updated your VEP cache this script's cachefile is now stale, you need to rm $cacheFile (or change the cacheFile in $0)\n\n";
 	    }
 	}
 	else {
@@ -233,9 +233,9 @@ while (my $line = <VEPTEST_OUT>) {
 		close(VCF4VEP);
 		close(VCFCACHE);
 		unlink($vcf4vep,$vcfFromCache,$vcf4vepTest);
-		rmdir($tmpDir) || warn "W: INFO-CSQ mismatch but can't rmdir tmpDir $tmpDir\n";
-		die "cacheLine and INFO-CSQ line from VCF are different:\n$cacheLine\n$line\n".
-		    "if you really want to use this vcf from STDIN you need to rm $cacheFile (or change the cacheFile in $0)\n";
+		rmdir($tmpDir) || warn "W $0: INFO-CSQ mismatch but can't rmdir tmpDir $tmpDir\n";
+		die "E: $0 - cacheLine and INFO-CSQ line from VCF are different:\n$cacheLine\n$line\n".
+		    "if you really want to use this vcf from STDIN you need to rm $cacheFile (or change the cacheFile in $0)\n\n";
 	    }
 	}
 	else {
@@ -251,7 +251,7 @@ unlink($vcf4vepTest);
 while (my $line = <STDIN>) {
     chomp($line);
     my @f = split(/\t/,$line,-1);
-    (@f >= 8) || die "VCF line doesn't have >= 8 columns:\n$line\n";
+    (@f >= 8) || die "E $0: VCF line doesn't have >= 8 columns:\n$line\n";
     # key: chrom:pos:ref:alt
     my $key = "$f[0]:$f[1]:$f[3]:$f[4]";
     if (defined $cache->{$key}) {
@@ -271,7 +271,7 @@ close(VCFCACHE);
 
 
 $now = strftime("%F %T", localtime);
-warn "I: $now - $0 finished parsing stdin and splitting it into $tmpDir files\n";
+warn "I $0: $now - finished parsing stdin and splitting it into $tmpDir files\n";
 
 
 ##########################################################################
@@ -281,16 +281,16 @@ my $vcfFromVep = "$tmpDir/vcfFromVep.vcf.gz";
 system("gunzip -c $vcf4vep | $vepCommand | gzip -c --fast > $vcfFromVep") ;
 
 $now = strftime("%F %T", localtime);
-warn "I: $now - $0 finished running VEP on the new variants\n";
+warn "I $0: $now - finished running VEP on the new variants\n";
 
 ##########################################################################
 # merge $vcfFromVep and $vcfFromCache, printing resulting VCF to stdout;
 # also update cache with new CSQs from $vcfFromVep
 
 open(VCFVEP,"gunzip -c $vcfFromVep |") || 
-    die "cannot gunzip-open VCFVEP $vcfFromVep\n";
+    die "E $0: cannot gunzip-open VCFVEP $vcfFromVep\n";
 open (VCFCACHE, "gunzip -c $vcfFromCache |") || 
-    die "cannot gunzip-open VCFCACHE $vcfFromCache\n";
+    die "E $0: cannot gunzip-open VCFCACHE $vcfFromCache\n";
 
 # copy headers from VCFVEP
 while (my $line = <VCFVEP>) {
@@ -312,7 +312,7 @@ if ($nextVep && ($nextVep =~ /^chr(\w+)\t(\d+)\t/)) {
     elsif ($nextVepChr eq "M") {$nextVepChr = 25;}
 }
 elsif ($nextVep) {
-    die"vcfFromVep has a first data line but I can't parse it:\n$nextVep\n";
+    die"E $0: vcfFromVep has a first data line but I can't parse it:\n$nextVep\n";
 }
 
 my ($nextCacheChr,$nextCachePos);
@@ -323,7 +323,7 @@ if ($nextCache && ($nextCache =~ /^chr(\w+)\t(\d+)\t/)) {
     elsif ($nextCacheChr eq "M") {$nextCacheChr = 25;}
 }
 elsif ($nextCache) {
-    die"vcfFromCache has a first data line but I can't parse it:\n$nextCache\n";
+    die"E $0: vcfFromCache has a first data line but I can't parse it:\n$nextCache\n";
 }
 
 
@@ -338,10 +338,10 @@ while ($nextVep || $nextCache) {
 
 	    # also update cache
 	    my @f = split(/\t/,$nextVep);
-	    (@f >= 8) || die "nextVep line doesn't have >=8 columns:\n$nextVep";
+	    (@f >= 8) || die "E $0: nextVep line doesn't have >=8 columns:\n$nextVep";
 	    # key: chrom:pos:ref:alt
 	    my $key = "$f[0]:$f[1]:$f[3]:$f[4]";
-	    ($f[7] =~ /CSQ=([^;]+)/) || die "cannot grab CSQ in nextVep line:\n$nextVep";
+	    ($f[7] =~ /CSQ=([^;]+)/) || die "E $0: cannot grab CSQ in nextVep line:\n$nextVep";
 	    my $csq = $1;
 	    $cache->{$key} = $csq;
 
@@ -354,7 +354,7 @@ while ($nextVep || $nextCache) {
 		elsif ($nextVepChr eq "M") {$nextVepChr = 25;}
 	    }
 	    elsif ($nextVep) {
-		die"vcfFromVep has a data line but I can't parse it:\n$nextVep\n";
+		die"E $0: vcfFromVep has a data line but I can't parse it:\n$nextVep\n";
 	    }
 	    next;
 	}
@@ -371,7 +371,7 @@ while ($nextVep || $nextCache) {
 	elsif ($nextCacheChr eq "M") {$nextCacheChr = 25;}
     }
     elsif ($nextCache) {
-	die"vcfFromCache has a data line but I can't parse it:\n$nextCache\n";
+	die"E $0: vcfFromCache has a data line but I can't parse it:\n$nextCache\n";
     }
 }
 
@@ -380,13 +380,13 @@ close(VCFCACHE);
 
 # save cache
 &store($cache, $cacheFile) || 
-    die "E: produced/updated cache but cannot store to cachefile $cacheFile\n";
+    die "E $0: produced/updated cache but cannot store to cachefile $cacheFile\n";
 
 # clean up
-unlink($vcf4vep) || die "cannot unlink tmpfile vcf4vep $vcf4vep\n";
-unlink($vcfFromCache) || die "cannot unlink tmpfile vcfFromCache $vcfFromCache\n";
-unlink($vcfFromVep) || die "cannot unlink tmpfile vcfFromVep $vcfFromVep\n";
-rmdir($tmpDir) || die "cannot rmdir tmpdir $tmpDir\n";
+unlink($vcf4vep) || die "E $0: cannot unlink tmpfile vcf4vep $vcf4vep\n";
+unlink($vcfFromCache) || die "E $0: cannot unlink tmpfile vcfFromCache $vcfFromCache\n";
+unlink($vcfFromVep) || die "E $0: cannot unlink tmpfile vcfFromVep $vcfFromVep\n";
+rmdir($tmpDir) || die "E $0: cannot rmdir tmpdir $tmpDir\n";
 
 
 $now = strftime("%F %T", localtime);
