@@ -3,14 +3,13 @@
 # 24/03/2018
 # NTM
 
-# Take a single arg: a non-existing tmp dir.
 # Read on stdin a VCF file, write to stdout a similar VCF file
 # with added VEP annotations.
 #
 # 11/08/2019: adding a cache file (VEP is slow).
 # CSQ are taken from the cachefile when the variant is in it,
 # otherwise run VEP and add CSQ to cache.
-# If VEP and/or the VEP cache are updated, script dies and explains that
+# If VEP and/or the VEP-provided cache are updated, script dies and explains that
 # cachefile must be manually removed. It will then be rebuilt from scratch
 # on the next execution.
 
@@ -25,10 +24,6 @@ use Storable;
 ##########################################################################
 ## hard-coded stuff that shouldn't change much
 
-# name of our cache file for VEP annotations (this is not the VEP cache!),
-# the supplied path will be prepended
-my $cacheFile = "VEP_cache";
-
 # vep executable, with path if it's not in PATH
 my $vepBin = "vep";
 
@@ -42,8 +37,8 @@ my $vepJobs = 6;
 #########################################################################
 ## options / params from the command-line
 
-# path to our VEP cachefile
-my $cachePath;
+# our VEP cachefile, with path
+my $cacheFile;
 
 # human genome fasta, filename with path, for VEP --hgvs
 my $genome;
@@ -61,13 +56,13 @@ my $help = '';
 
 my $USAGE = "\nRead on stdin a VCF file, write to stdout a similar VCF file with added VEP annotations.\n
 Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
---cachePath string [no default] : subdir where this script stores its cachefile
+--cacheFile string [no default] : filename with path where this script stores its cachefile
 --genome string [no default] : ref genome fasta, with path
 --dataDir string [no default] : dir containing subdirs with the data required by the VEP plugins we use (eg dbNSFP)
 --tmpDir string [no default] : tmp dir, must not pre-exist, will be removed after running
 --help : print this USAGE";
 
-GetOptions ("cachePath=s" => \$cachePath,
+GetOptions ("cacheFile=s" => \$cacheFile,
 	    "genome=s" => \$genome,
 	    "dataDir=s" => \$dataDir,
 	    "tmpDir=s" => \$tmpDir,
@@ -77,14 +72,18 @@ GetOptions ("cachePath=s" => \$cachePath,
 # make sure required options were provided and sanity check them
 ($help) && die "$USAGE\n\n";
 
-# we're OK if the cachefile doesn't exist (first run, it will be created),
-# but we need a subdir to create it in
-($cachePath) || 
-    die "E $0: you must provide a cachePath where we will store our cacheFile\n";
-(-d $cachePath) ||
-    die "E $0 : the provided cachePath $cachePath doesn't exist or isn't a dir\n";
-# prepend path to $cacheFile
-$cacheFile = "$cachePath/$cacheFile";
+# if cacheFile exists we need write-access to it
+if (-e $cacheFile) {
+    (-w $cacheFile) ||
+	die "E $0: provided cacheFile $cacheFile exists but isn't writable\n";
+}
+# otherwise it's OK we'll create it, but we need write-access to the subdir
+else {
+    open(TEST, ">>$cacheFile") ||
+	die "E $0: provided cacheFile $cacheFile doesn't exist and we can't create it\n";
+    close(TEST);
+    unlink($cacheFile);
+}
 
 ($genome) || die "E $0: you must provide a ref genome fasta file\n";
 (-f $genome) || die "E $0: provided genome fasta file doesn't exist\n";
