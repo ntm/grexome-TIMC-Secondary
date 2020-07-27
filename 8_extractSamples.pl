@@ -3,18 +3,19 @@
 # 25/03/2018
 # NTM
 
-# Take 4 arguments: $metadata $inDir $covDir $outDir
+# Take 3 or 4 arguments: $metadata $inDir $outDir [$covDir]
 # $metadata is the patient_summary xlsx file (with sampleID etc columns);
 # $inDir must contain cohort TSVs as produced by extractCohorts.pl,
 # possibly filtered and reordered with 7_filterAndReorderAll.pl, and 
 # possibly gzipped (but not with PatientIDs);
-# $covDir is a subdir containing per-sample coverage files, as produced
-# by 0_coverage.pl;
 # $outDir doesn't exist, it will be created and filled with one TSV
-# per sample. 
-# Filenames will include patientID/specimenID.
-# The global coverage data (ALL_CANDIDATES and ALL_SAMPLED) for each
-# sample is grabbed from $covDir and added at the end of the header line.
+# per sample;
+# $covDir is optional, if provided it is a subdir containing per-sample 
+# coverage files as produced by 0_coverage.pl.
+#
+# Filenames in $outDirwill include patientID/specimenID.
+# If $covDir is provided, the global coverage data (ALL_CANDIDATES and ALL_SAMPLED)
+# for each sample is grabbed from $covDir and appended at the end of the header line.
 # For a sample, we only print lines from its cohort file and where 
 # it has an HV or HET genotype: this genotype is printed in new columns
 # GENOTYPE and DP:AF, inserted right after KNOWN_CANDIDATE_GENE.
@@ -32,18 +33,25 @@ use warnings;
 use Spreadsheet::XLSX;
 
 
-(@ARGV == 4) || 
-    die "E: $0 - needs 4 args: a metadata XLSX, an inDir, a covDir and a non-existant outDir\n";
-my ($metadata, $inDir, $covDir, $outDir) = @ARGV;
+(@ARGV == 3) || (@ARGV == 4) || 
+    die "E: $0 - needs 3 or 4 args: a metadata XLSX, an inDir, a non-existant outDir and optionally a covDir\n";
+my ($metadata, $inDir, $outDir, $covDir) = @ARGV;
 (-d $inDir) ||
     die "E: $0 - inDir $inDir doesn't exist or isn't a directory\n";
 opendir(INDIR, $inDir) ||
     die "E: $0 - cannot opendir inDir $inDir\n";
-(-d $covDir) ||
-    die "E: $0 - covDir $covDir doesn't exist or isn't a directory\n";
 (-e $outDir) && 
     die "E: $0 - found argument $outDir but it already exists, remove it or choose another name.\n";
 mkdir($outDir) || die "E: $0 - cannot mkdir outDir $outDir\n";
+
+if ($covDir) {
+    (-d $covDir) ||
+	die "E: $0 - covDir $covDir was provided but it doesn't exist or isn't a directory\n";
+}
+else {
+    warn "W: $0 - no covDir provided, coverage statistics won't be appended to the header lines\n";
+}
+
 
 #########################################################
 # parse metadata file
@@ -211,28 +219,32 @@ while (my $inFile = readdir(INDIR)) {
 	($gz) && ($outFull = " | gzip -c $outFull");
 	open (my $FH, $outFull) || die "E: $0 - cannot (gzip-?)open $outFile for writing (as $outFull)\n";
 
-	# grab global coverage data for $sample
-	my $covFile = "$covDir/coverage_$sample.csv";
-	(-f $covFile) || 
-	    die "E $0: trying to grab coverage data for $sample but covFile doesn't exist: $covFile\n";
-	# global coverage data is in last 2 lines
-	open(COV, "tail -n 2 $covFile |") ||
-	    die "E: $0 - cannot tail-grab cov data from covFile with: tail -n 2 $covFile\n";
-	# ALL_CANDIDATES
-	my $covLine = <COV>;
-	chomp $covLine;
-	my @covFields = split(/\t/,$covLine);
-	(@covFields == 8) || die "E $0: expecting 8 fields from candidates coverage line $covLine\n";
-	my $headerCov = "\tCoverage_Candidates_50x=$covFields[5] Coverage_Candidates_20x=$covFields[6] Coverage_Candidates_10x=$covFields[7]";
-	# ALL_GENES
-	$covLine = <COV>;
-	chomp $covLine;
-	@covFields = split(/\t/,$covLine);
-	(@covFields == 8) || die "E $0: expecting 8 fields from sampled coverage line $covLine\n";
-	$headerCov .= "   Coverage_AllGenes_50x=$covFields[5] Coverage_AllGenes_20x=$covFields[6] Coverage_AllGenes_10x=$covFields[7]";
+	# grab global coverage data for $sample if a covDir was provided
+	my $headerCov = "";
+	if ($covDir) {
+	    my $covFile = "$covDir/coverage_$sample.csv";
+	    (-f $covFile) ||
+		die "E $0: covDir provided but cannot find coverage data for $sample: $covFile\n";
+
+	    # global coverage data is in last 2 lines
+	    open(COV, "tail -n 2 $covFile |") ||
+		die "E: $0 - cannot tail-grab cov data from covFile with: tail -n 2 $covFile\n";
+	    # ALL_CANDIDATES
+	    my $covLine = <COV>;
+	    chomp $covLine;
+	    my @covFields = split(/\t/,$covLine);
+	    (@covFields == 8) || die "E $0: expecting 8 fields from candidates coverage line $covLine\n";
+	    $headerCov = "\tCoverage_Candidates_50x=$covFields[5] Coverage_Candidates_20x=$covFields[6] Coverage_Candidates_10x=$covFields[7]";
+	    # ALL_GENES
+	    $covLine = <COV>;
+	    chomp $covLine;
+	    @covFields = split(/\t/,$covLine);
+	    (@covFields == 8) || die "E $0: expecting 8 fields from sampled coverage line $covLine\n";
+	    $headerCov .= "   Coverage_AllGenes_50x=$covFields[5] Coverage_AllGenes_20x=$covFields[6] Coverage_AllGenes_10x=$covFields[7]";
+	    close(COV);
+	}
 	print $FH "$header$headerCov\n";
 	$outFHs{$sample} = $FH ;
-	close(COV);
     }
 
     # now read the data
