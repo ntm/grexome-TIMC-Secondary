@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 
 # NTM
-# 09/07/2019 (but starting from 1_filterBadCalls.pl which is older)
+# 09/07/2019 (as _strelka version, but starting from the older GATK version)
 
 
 # Parses on stdin a Strelka GVCF file with one or more sample data columns;
