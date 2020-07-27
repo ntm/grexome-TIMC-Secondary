@@ -43,13 +43,13 @@ my $batchSize = 500000;
 # heuristics for fixing low-quality or blatantly wrong genotype calls 
 # [$dp below represents max(DP,sumOfADs)]:
 # if $dp < $minDP , any call becomes NOCALL
-# if GQX < $minGQX , any call becomes NOCALL
+# if GQX (or GQ if GQX doesn't exist) < $minGQ , any call becomes NOCALL
 # if AF < $minAF and call was REF/VAR or VAR/VAR, call becomes NOCALL
 # if $dp >= $minDP_HV and AF >= $minAF_HV , call becomes HV
 # if $dp >= $minDP_HET and AF >= $minAF_HET and AF <= $maxAF_HET, call becomes HET
 my %filterParams = (
     "minDP" => 10,
-    "minGQX" => 20,
+    "minGQ" => 20,
     "minAF" => 0.15,
     "minDP_HV" => 20,
     "minAF_HV" => 0.85,
@@ -334,7 +334,7 @@ sub processBatch {
 	($newFormat =~ s/^GT:/GT:AF:/)  || 
 	    die "E $0: cannot add AF after GT in format: $format\n";
 	$lineToPrint .= "\t$newFormat";
-	# %format: key is a FORMAT key (eg GQX), value is the index of that key in $format
+	# %format: key is a FORMAT key (eg DP), value is the index of that key in $format
 	my %format;
 	{
 	    my @format = split(/:/, $format);
@@ -347,11 +347,11 @@ sub processBatch {
 	# $gq is either GQX (Strelka) or GQ (GATK)
 	my $gq = "";
 	if (defined $format{"GQX"}){
-		$gq = "GQX";
+	    $gq = "GQX";
 	}elsif (defined $format{"GQ"}){
-		$gq = "GQ";
+	    $gq = "GQ";
 	}else{
-		die "E $0: no GQ/GQX key in FORMAT string for line:\n$line\n";
+	    die "E $0: no GQ/GQX key in FORMAT string for line:\n$line\n";
 	}
 	(defined $format{"GT"}) || die "E $0: no GT key in FORMAT string for line:\n$line\n";
 	(defined $format{"AD"}) || die "E $0: no AD key in FORMAT string for line:\n$line\n";
@@ -369,8 +369,8 @@ sub processBatch {
 	    my @thisData = split(/:/, $data) ;
 
 	    if ((! $thisData[$format{$gq}]) || ($thisData[$format{$gq}] eq '.') ||
-		($thisData[$format{$gq}] < $filterParamsR->{"minGQX"})) {
-		# GQX undefined or too low, change to NOCALL
+		($thisData[$format{$gq}] < $filterParamsR->{"minGQ"})) {
+		# GQ/GQX undefined or too low, change to NOCALL
 		$lineToPrint .= "\t./.";
 		next;
 	    }
