@@ -4,13 +4,12 @@
 # 26/03/2018
 # NTM
 
-# Takes as args: $inDir $outDir $secAnalPath [$pick]
+# Takes as args: $inDir $outDir [$pick]
 # - $inDir must contain cohort or sample TSVs (possibly gzipped) as 
 #   produced by extractCohorts.pl or extractSamples.pl;
 # - $outDir doesn't exist, it will be created and filled with one TSV
 #   per infile (never gzipped), adding .filtered or .filtered.pick to 
 #   the filename;
-# - $secAnalPath is the path to the secondary analysis scripts
 # - $pick is optional, it's value must be 0 or 1, default is 1, if true
 #   we apply --pick as a filter.
 # Every infile is filtered and columns are reordered.
@@ -18,6 +17,7 @@
 use strict;
 use warnings;
 use POSIX qw(strftime);
+use FindBin qw($RealBin);
 use Parallel::ForkManager;
 
 
@@ -28,27 +28,24 @@ use Parallel::ForkManager;
 my $numJobs = 8;
 
 # names of the scripts that this wrapper actually calls
-my ($filterBin,$reorderBin) = ("7_filterVariants.pl","7_reorderColumns.pl");
+my ($filterBin,$reorderBin) = ("$RealBin/7_filterVariants.pl","$RealBin/7_reorderColumns.pl");
 
 
 #############################################
 ## options / params from the command-line
 
-(@ARGV == 3) || (@ARGV == 4) ||
-    die "E $0: needs 3 or 4 args: an inDir, a non-existant outDir, the path to the secondary analysis scripts, ".
-    "and optionally PICK (value 0 or 1, default 1)\n";
-my ($inDir, $outDir,$binDir,$pick) = (@ARGV,1);
+(@ARGV == 2) || (@ARGV == 3) ||
+    die "E $0: needs 2 or 3 args: an inDir, a non-existant outDir, and optionally PICK (value 0 or 1, default 1)\n";
+my ($inDir, $outDir, $pick) = (@ARGV,1);
 
 ($pick == 0) || ($pick == 1) ||
     die "E $0: last arg, if present, must be 0 or 1\n";
 
-(-d $binDir) ||
-    die "E $0: binDir $binDir doesn't exist or isn't a directory\n";
-(-f "$binDir/$filterBin") || 
-    die "E $0: binDir $binDir doesn't contain filterBin $filterBin\n";
+(-f "$filterBin") || 
+    die "E $0: filterBin $filterBin not found\n";
 
-(-f "$binDir/$reorderBin") || 
-    die "E $0: binDir $binDir doesn't contain reorderBin $reorderBin\n";
+(-f "$reorderBin") || 
+    die "E $0: reorderBin $reorderBin not found\n";
 
 (-d $inDir) ||
     die "E $0: inDir $inDir doesn't exist or isn't a directory\n";
@@ -90,7 +87,7 @@ while (my $inFile = readdir(INDIR)) {
     ($pick) && ($outFile .= ".pick");
     $outFile .= ".csv";
     
-    my $com = "perl $binDir/$filterBin --max_ctrl_hv 3 --max_ctrl_het 10 --no_mod";
+    my $com = "perl $filterBin --max_ctrl_hv 3 --max_ctrl_het 10 --no_mod";
     # using defaults for AFs 
     # $com .= " --max_af_gnomad 0.01 --max_af_1kg 0.03 --max_af_esp 0.05"
     ($pick) && ($com .= " --pick");
@@ -101,7 +98,7 @@ while (my $inFile = readdir(INDIR)) {
 	$com = "cat $inDir/$inFile | $com ";
     }
     
-    $com .= " | perl $binDir/$reorderBin ";
+    $com .= " | perl $reorderBin ";
     $com .= " > $outDir/$outFile";
     my $now = strftime("%F %T", localtime);
     warn "I $0: $now - starting $com\n";
