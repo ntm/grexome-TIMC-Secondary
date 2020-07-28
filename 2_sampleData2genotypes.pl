@@ -37,6 +37,10 @@
 use strict;
 use warnings;
 
+# we use $0 in every stderr message but we really only want
+# the program name, not the path
+$0 = basename($0);
+
 
 # parse header, just copy it except for FORMAT descriptions,
 # which we replace with our FORMAT descriptions, and 

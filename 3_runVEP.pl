@@ -20,6 +20,10 @@ use POSIX qw(strftime);
 # Storable for the cache
 use Storable;
 
+# we use $0 in every stderr message but we really only want
+# the program name, not the path
+$0 = basename($0);
+
 
 ##########################################################################
 ## hard-coded stuff that shouldn't change much

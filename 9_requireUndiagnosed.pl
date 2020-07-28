@@ -18,6 +18,10 @@
 use strict;
 use warnings;
 
+# we use $0 in every stderr message but we really only want
+# the program name, not the path
+$0 = basename($0);
+
 
 (@ARGV == 2) || die "E: $0 - needs 2 args: an inDir and a non-existant outDir\n";
 my ($inDir, $outDir) = @ARGV;

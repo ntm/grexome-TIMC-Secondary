@@ -14,6 +14,9 @@
 use strict;
 use warnings;
 
+# we use $0 in every stderr message but we really only want
+# the program name, not the path
+$0 = basename($0);
 
 
 # columns to be printed first, in that order (replace COHORT

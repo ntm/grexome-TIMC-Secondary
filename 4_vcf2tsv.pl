@@ -23,6 +23,11 @@
 use strict;
 use warnings;
 
+
+# we use $0 in every stderr message but we really only want
+# the program name, not the path
+$0 = basename($0);
+
 # stuff we grab from INFO:
 # CSQ==VEP, but we only want some VEP fields
 

@@ -32,6 +32,10 @@ use strict;
 use warnings;
 use Spreadsheet::XLSX;
 
+# we use $0 in every stderr message but we really only want
+# the program name, not the path
+$0 = basename($0);
+
 
 (@ARGV == 3) || (@ARGV == 4) || 
     die "E: $0 - needs 3 or 4 args: a metadata XLSX, an inDir, a non-existant outDir and optionally a covDir\n";

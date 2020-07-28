@@ -13,6 +13,11 @@ use strict;
 use warnings;
 use Getopt::Long;
 
+# we use $0 in every stderr message but we really only want
+# the program name, not the path
+$0 = basename($0);
+
+
 # default values for args
 my $max_ctrl_hv = 3; # COUNT_NEGCTRL_HV <= $x
 my $max_ctrl_het = 10; # COUNT_NEGCTRL_HET <= $x

@@ -34,6 +34,10 @@ use lib "/home/nthierry/Software/VariantEffectPredictor/ensembl-vep/";
 use Bio::DB::HTS::Tabix;
 
 
+# we use $0 in every stderr message but we really only want
+# the program name, not the path
+$0 = basename($0);
+
 #########################################################
 
 (@ARGV == 4) || die "E $0: needs 4 args: a candidatesFile, a tsv.gz, a GVCF and an outDir\n";

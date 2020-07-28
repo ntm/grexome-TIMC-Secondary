@@ -23,6 +23,11 @@
 use strict;
 use warnings;
 
+# we use $0 in every stderr message but we really only want
+# the program name, not the path
+$0 = basename($0);
+
+
 (@ARGV == 1) || die "E $0, needs 1 arg: a text file with one sampleID per line\n";
 my ($subcohortFile) = @ARGV;
 
