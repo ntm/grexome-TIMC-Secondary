@@ -72,6 +72,7 @@ GetOptions ("cacheFile=s" => \$cacheFile,
 # make sure required options were provided and sanity check them
 ($help) && die "$USAGE\n\n";
 
+($cacheFile) || die "E $0: you must provide a cacheFile\n";
 # if cacheFile exists we need write-access to it
 if (-e $cacheFile) {
     (-w $cacheFile) ||
