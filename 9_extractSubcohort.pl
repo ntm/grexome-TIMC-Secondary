@@ -34,7 +34,7 @@ $0 = basename($0);
 my ($subcohortFile) = @ARGV;
 
 my $now = strftime("%F %T", localtime);
-my $subCpretty = basename($subCohortFile);
+my $subCpretty = basename($subcohortFile);
 warn "I $0: $now - starting to run with $subCpretty, don't yet know if STDIN is cohort or transcripts file\n";
 
 
