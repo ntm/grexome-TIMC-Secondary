@@ -253,7 +253,7 @@ my %subCohorts = ("~/VariantCalling/GrexomeFauve/Grexome_Metadata/4-SubCohorts/s
 		  "~/VariantCalling/GrexomeFauve/Grexome_Metadata/4-SubCohorts/subCohort_AzooZouari.txt" => "Azoo");
 
 mkdir("$outDir/SubCohorts") || die "E $0: cannot mkdir $outDir/SubCohorts\n";
-$com = "";
+$com = "( ";
 foreach my $subC (keys(%subCohorts)) {
     my $patho = $subCohorts{$subC};
     # grab filename from $subC and remove leading "subCohort_" and trailing .txt
@@ -264,6 +264,12 @@ foreach my $subC (keys(%subCohorts)) {
    
     $com .= "perl $RealBin/9_extractSubcohort.pl $subC < $outDir/Cohorts/$patho.final.patientIDs.csv > $outFileRoot.cohort.csv ; ";
     $com .= "perl $RealBin/9_extractSubcohort.pl $subC < $outDir/Transcripts/$patho.Transcripts.patientIDs.csv > $outFileRoot.transcripts.csv ; ";
+}
+if ($debug) {
+    $com .= "2> $outDir/step9-subCohorts.err";
+}
+else {
+    $com .= " ) 2>> $outDir/$logfile";
 }
 system($com) && die "E $0: step9-subCohorts failed: $?";
 

@@ -34,7 +34,8 @@ $0 = basename($0);
 my ($subcohortFile) = @ARGV;
 
 my $now = strftime("%F %T", localtime);
-warn "I $0: $now - starting to run with $subcohortFile, don't yet know if STDIN is cohort or transcripts file\n";
+my $subCpretty = basename($subCohortFile);
+warn "I $0: $now - starting to run with $subCpretty, don't yet know if STDIN is cohort or transcripts file\n";
 
 
 #########################################################
@@ -141,4 +142,4 @@ print "$header\n";
 $now = strftime("%F %T", localtime);
 my $typeString = "Cohort";
 ($type == 2) && ($typeString = "Transcripts");
-warn "I $0: $now - ALL DONE, completed successfully with $subcohortFile on a $typeString file!\n";
+warn "I $0: $now - ALL DONE, completed successfully with $subCpretty on a $typeString file!\n";
