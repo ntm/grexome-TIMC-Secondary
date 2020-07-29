@@ -22,6 +22,7 @@
 
 use strict;
 use warnings;
+use File::Basename qw(basename);
 
 # we use $0 in every stderr message but we really only want
 # the program name, not the path

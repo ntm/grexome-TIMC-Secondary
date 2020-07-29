@@ -15,6 +15,7 @@
 
 use strict;
 use warnings;
+use File::Basename qw(basename);
 use Getopt::Long;
 use POSIX qw(strftime);
 # Storable for the cache

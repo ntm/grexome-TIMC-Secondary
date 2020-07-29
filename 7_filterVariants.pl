@@ -11,6 +11,7 @@
 
 use strict;
 use warnings;
+use File::Basename qw(basename);
 use Getopt::Long;
 
 # we use $0 in every stderr message but we really only want

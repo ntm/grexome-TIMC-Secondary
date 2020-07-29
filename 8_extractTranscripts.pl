@@ -48,6 +48,7 @@
 
 use strict;
 use warnings;
+use File::Basename qw(basename);
 use POSIX qw(strftime);
 
 # we use $0 in every stderr message but we really only want

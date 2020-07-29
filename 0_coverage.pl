@@ -27,6 +27,7 @@
 
 use strict;
 use warnings;
+use File::Basename qw(basename);
 use Spreadsheet::XLSX;
 
 # use tabix module (installed in /usr/local/lib64/), this requires bioperl
