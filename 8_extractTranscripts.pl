@@ -411,8 +411,9 @@ closedir(INDIR);
 # now print all results
 
 # build the sorted list of transcripts once and for all:
-# sort by chrom then by coord
-my @transcripts = sort {($transcript2chr{$a} <=> $transcript2chr{$b}) || ($transcript2coord{$a} <=> $transcript2coord{$b})} keys(%transcript2chr);
+# sort by chrom, then by coord (of the first variant affecting
+# the transcript), then by transcript name...
+my @transcripts = sort {($transcript2chr{$a} <=> $transcript2chr{$b}) || ($transcript2coord{$a} <=> $transcript2coord{$b}) || ($a cmp $b)} keys(%transcript2chr);
 
 
 # for HV counts and lists we want samples with at least one variant (some
