@@ -77,7 +77,7 @@ my @favoriteTissues = split(/,/,$favoriteTissues);
     die "E $0: we expect at least one favoriteTissue, just use defaults and ignore them if you don't care\n";
 
 my $now = strftime("%F %T", localtime);
-warn "I: $now - starting to run: ".join(" ", $0, @ARGV)."\n";
+warn "I $0: $now - starting to run\n";
 
 #############################################
 ## parse GTEX file
@@ -224,4 +224,4 @@ while (my $line = <STDIN>) {
 }
 
 $now = strftime("%F %T", localtime);
-warn "I: $now - DONE running: ".join(" ", $0, @ARGV)."\n";
+warn "I $0: $now - ALL DONE, completed successfully!\n";

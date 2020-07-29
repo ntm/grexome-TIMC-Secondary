@@ -28,6 +28,7 @@
 use strict;
 use warnings;
 use File::Basename qw(basename);
+use POSIX qw(strftime);
 use Spreadsheet::XLSX;
 
 # use tabix module (installed in /usr/local/lib64/), this requires bioperl
@@ -54,6 +55,8 @@ my ($candidatesFile, $transcriptsFile, $gvcf, $outDir) = @ARGV;
     die "E $0: GVCF $gvcf exists but can't find its index file $gvcf.tbi, did you tabix-index the gvcf?\n";
 (-d $outDir) || mkdir($outDir) || die "E $0: cannot mkdir outDir $outDir\n";
 
+my $now = strftime("%F %T", localtime);
+warn "I $0: $now - starting to run\n";
 
 #########################################################
 # parse known candidate genes file
@@ -390,3 +393,6 @@ foreach my $gene (sort keys %candidateGenes) {
 
 close(GENES);
 $tabix->close;
+
+$now = strftime("%F %T", localtime);
+warn "I $0: $now - ALL DONE, completed successfully!\n";

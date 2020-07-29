@@ -23,6 +23,7 @@
 use strict;
 use warnings;
 use File::Basename qw(basename);
+use POSIX qw(strftime);
 
 # we use $0 in every stderr message but we really only want
 # the program name, not the path
@@ -31,6 +32,10 @@ $0 = basename($0);
 
 (@ARGV == 1) || die "E $0, needs 1 arg: a text file with one sampleID per line\n";
 my ($subcohortFile) = @ARGV;
+
+my $now = strftime("%F %T", localtime);
+warn "I $0: $now - starting to run with $subcohortFile, don't yet know if STDIN is cohort or transcripts file\n";
+
 
 #########################################################
 # parse subcohort file
@@ -132,3 +137,8 @@ print "$header\n";
 	 }
      }
 }
+
+$now = strftime("%F %T", localtime);
+my $typeString = "Cohort";
+($type == 2) && ($typeString = "Transcripts");
+warn "I $0: $now - ALL DONE, completed successfully with $subcohortFile on a $typeString file!\n";

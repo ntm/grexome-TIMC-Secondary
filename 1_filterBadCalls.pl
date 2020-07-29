@@ -118,7 +118,10 @@ GetOptions ("metadata=s" => \$metadata,
 mkdir($tmpDir) || 
     die "E $0: cannot mkdir tmpDir $tmpDir\n";
 
-    
+my $now = strftime("%F %T", localtime);
+warn "I $0: $now - starting to run\n";
+
+
 #########################################################
 # parse patient metadata file to grab sampleIDs, limit to samples of interest
 
@@ -178,9 +181,6 @@ if ($samplesOfInterest) {
     
 #############################################
 # deal with headers
-
-my $now = strftime("%F %T", localtime);
-warn "I $0: $now - starting to run: ".join(" ", $0, @ARGV)."\n";
 
 # array, same number of elements as there are columns in the #CHROM line
 # (and hence in each data line), value is true iff column must be skipped
@@ -294,8 +294,7 @@ $pm->wait_all_children;
 $now = strftime("%F %T", localtime);
 rmdir($tmpDir) || 
     die "E $0: $now - all done but cannot rmdir tmpDir $tmpDir, why? $!\n";
-warn "I $0: $now - DONE running: ".join(" ", $0, @ARGV)."\n";
-
+warn "I $0: $now - ALL DONE, completed successfully!\n";
 
 
 #############################################

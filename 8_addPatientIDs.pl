@@ -18,6 +18,7 @@
 use strict;
 use warnings;
 use File::Basename qw(basename);
+use POSIX qw(strftime);
 use Spreadsheet::XLSX;
 
 # we use $0 in every stderr message but we really only want
@@ -34,6 +35,10 @@ opendir(INDIR, $inDir) ||
 (-e $outDir) && 
     die "E $0: found argument $outDir but it already exists, remove it or choose another name.\n";
 mkdir($outDir) || die "E $0: cannot mkdir outDir $outDir\n";
+
+my $now = strftime("%F %T", localtime);
+warn "I $0: $now - starting to run\n";
+
 
 #########################################################
 # parse metadata file
@@ -127,3 +132,7 @@ while (my $inFile = readdir(INDIR)) {
     close(OUT);
 }
 closedir(INDIR);
+
+$now = strftime("%F %T", localtime);
+warn "I $0: $now - ALL DONE, completed successfully!\n";
+

@@ -37,10 +37,14 @@
 use strict;
 use warnings;
 use File::Basename qw(basename);
+use POSIX qw(strftime);
 
 # we use $0 in every stderr message but we really only want
 # the program name, not the path
 $0 = basename($0);
+
+my $now = strftime("%F %T", localtime);
+warn "I $0: $now - starting to run\n";
 
 
 # parse header, just copy it except for FORMAT descriptions,
@@ -325,3 +329,6 @@ while(my $line = <STDIN>) {
 
     print $lineToPrint."\n";
 }
+
+$now = strftime("%F %T", localtime);
+warn "I $0: $now - ALL DONE, completed successfully!\n";

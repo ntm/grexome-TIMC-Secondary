@@ -126,7 +126,7 @@ mkdir($outDir) || die "E $0: cannot mkdir outDir $outDir\n";
 mkdir($tmpDir) || die "E $0: cannot mkdir tmpDir $tmpDir\n";
 
 my $now = strftime("%F %T", localtime);
-warn "I: $now - starting to run: ".join(" ", $0, @ARGV)."\n";
+warn "I $0: $now - starting to run\n";
 
 
 #########################################################
@@ -456,8 +456,7 @@ foreach my $gene (keys(%knownCandidatesSeen)) {
 $now = strftime("%F %T", localtime);
 rmdir($tmpDir) || 
     die "E $0: $now - all done but cannot rmdir tmpDir $tmpDir, why? $!\n";
-warn "I: $now - DONE running $0\n";
-
+warn "I $0: $now - ALL DONE, completed successfully!\n";
 
 
 

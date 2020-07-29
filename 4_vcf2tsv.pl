@@ -23,11 +23,15 @@
 use strict;
 use warnings;
 use File::Basename qw(basename);
+use POSIX qw(strftime);
 
 
 # we use $0 in every stderr message but we really only want
 # the program name, not the path
 $0 = basename($0);
+
+my $now = strftime("%F %T", localtime);
+warn "I $0: $now - starting to run\n";
 
 # stuff we grab from INFO:
 # CSQ==VEP, but we only want some VEP fields
@@ -241,3 +245,6 @@ while (my $line =<STDIN>) {
 	}
     }
 }
+
+$now = strftime("%F %T", localtime);
+warn "I $0: $now - ALL DONE, completed successfully!\n";

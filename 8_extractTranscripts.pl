@@ -128,6 +128,8 @@ opendir(INDIR, $inDir) ||
     die "E $0: found argument outDir $outDir but it already exists, remove it or choose another name.\n";
 mkdir($outDir) || die "E $0: cannot mkdir outDir $outDir\n";
 
+my $now = strftime("%F %T", localtime);
+warn "I $0: $now - starting to run\n";
 
 # Accumulators for all the data we want to print:
 # lines describing each transcript in a given infile can be interspersed,
@@ -180,7 +182,7 @@ while (my $inFile = readdir(INDIR)) {
 	next;
     }
 
-    my $now = strftime("%F %T", localtime);
+    $now = strftime("%F %T", localtime);
     warn "I $0: $now - starting on $cohort\n";
 
     open(INFILE, "$inDir/$inFile") ||
@@ -591,5 +593,5 @@ foreach my $transcript (@transcripts) {
     }
 }
 
-my $now = strftime("%F %T", localtime);
-warn "I: $now - $0 all done!\n";
+$now = strftime("%F %T", localtime);
+warn "I $0: $now - ALL DONE, completed successfully!\n";

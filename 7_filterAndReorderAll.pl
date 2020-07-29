@@ -62,12 +62,12 @@ opendir(INDIR, $inDir) ||
 mkdir($outDir) ||
     die "E $0: cannot mkdir outDir $outDir\n";
 
+my $now = strftime("%F %T", localtime);
+warn "I $0: $now - starting to run\n";
+
 
 #############################################
 
-
-my $now = strftime("%F %T", localtime);
-warn "I $0: $now - starting to run: ".join(" ", $0, @ARGV)."\n";
 
 my $pm = new Parallel::ForkManager($numJobs);
 
@@ -117,4 +117,4 @@ closedir(INDIR);
 $pm->wait_all_children;
 
 $now = strftime("%F %T", localtime);
-warn "I: $now - DONE running: ".join(" ", $0, @ARGV)."\n";
+warn "I $0: $now - ALL DONE, completed successfully!\n";

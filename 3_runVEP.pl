@@ -104,6 +104,8 @@ else {
     die "E $0: tmpDir $tmpDir exists, please rm -r $tmpDir or use another tmpDir as arg\n";
 mkdir($tmpDir) || die "E $0: cannot create tmpDir $tmpDir\n";
 
+my $now = strftime("%F %T", localtime);
+warn "I $0: $now - starting to run\n";
 
 #########################################################################
 # construct the full VEP command-line
@@ -158,9 +160,6 @@ $vepCommand .= $vepPlugins;
 # write output to stdout so we can pipe it to another program
 $vepCommand .= " -o STDOUT" ;
 
-
-my $now = strftime("%F %T", localtime);
-warn "I: $now - starting to run: ".join(" ", $0, @ARGV)."\n";
 
 ##########################################################################
 # parse VCF on stdin.
@@ -395,4 +394,4 @@ rmdir($tmpDir) || die "E $0: cannot rmdir tmpdir $tmpDir\n";
 
 
 $now = strftime("%F %T", localtime);
-warn "I: $now - DONE running: ".join(" ", $0, @ARGV)."\n";
+warn "I $0: $now - ALL DONE, completed successfully!\n";

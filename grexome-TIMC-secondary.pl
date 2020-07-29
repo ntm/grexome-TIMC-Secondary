@@ -125,7 +125,7 @@ $candidateGenes = "$outDir/".basename($candidateGenes);
 #############################################
 
 my $now = strftime("%F %T", localtime);
-warn "I $0: $now - starting to run: ".join(" ", $0, @ARGV)."\n";
+warn "I $0: $now - starting to run\n";
 
 # all intermediate results / tmp working files are created in $tmpdir,
 # a randomly-named subdir of &fastTmpPath() to avoid clashes

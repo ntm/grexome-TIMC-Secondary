@@ -31,6 +31,7 @@
 use strict;
 use warnings;
 use File::Basename qw(basename);
+use POSIX qw(strftime);
 use Spreadsheet::XLSX;
 
 # we use $0 in every stderr message but we really only want
@@ -56,6 +57,9 @@ if ($covDir) {
 else {
     warn "W: $0 - no covDir provided, coverage statistics won't be appended to the header lines\n";
 }
+
+my $now = strftime("%F %T", localtime);
+warn "I $0: $now - starting to run\n";
 
 
 #########################################################
@@ -393,3 +397,6 @@ while (my $inFile = readdir(INDIR)) {
     }
 }
 closedir(INDIR);
+
+$now = strftime("%F %T", localtime);
+warn "I $0: $now - ALL DONE, completed successfully!\n";
