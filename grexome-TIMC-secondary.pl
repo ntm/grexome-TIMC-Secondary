@@ -34,9 +34,6 @@ my $numJobsGunzip = 6;
 my $numJobs1 = 20;
 my $numJobs6 = 16;
 
-# name of the single logfile that will be produced in $outDir
-# (in debug mode this is replaced by one stepX.err logfile per step)
-my $logfile = "grexomeTIMCsec.err";
 
 #############################################
 ## options / params from the command-line
@@ -51,8 +48,8 @@ my $candidateGenes;
 my $inFile;
 
 # outDir must not exist, it will be created and populated with
-# subdirs (containing the pipeline results), logfiles, and copies
-# of the provided metadata and candidateGenes.
+# subdirs (containing the pipeline results), logfiles (in debug mode),
+# and copies of the provided metadata and candidateGenes.
 my $outDir;
 
 # path+file of the config file holding all install-specific params,
@@ -186,8 +183,7 @@ if ($debug) {
 }
 else {
     # after step6 we have several files (one per cohort) so no more piping,
-    # run steps 1-6 with a single logfile
-    $com = "( $com ) 2> $outDir/$logfile";
+    # run steps 1-6, all logs go to stderr
     system($com) && die "E $0: steps 1 to 6 seem to have failed? $?";
 }
 
@@ -199,7 +195,6 @@ if ($debug) {
     $com .= "2> $outDir/step7.err";
 }
 else {
-    $com .= "2>> $outDir/$logfile";
     # remove unfiltered results in non-debug mode
     $com .= " ; rm -r $tmpdir/Cohorts/";
 }
@@ -210,9 +205,6 @@ $com = "perl $RealBin/8_extractSamples.pl $metadata $tmpdir/Cohorts_Filtered/ $o
 if ($debug) {
     $com .= "2> $outDir/step8s.err";
 }
-else {
-    $com .= "2>> $outDir/$logfile";
-}
 system($com) && die "E $0: step8-samples failed: $?";
 
 # STEP 8 - TRANSCRIPTS , adding patientIDs
@@ -222,7 +214,6 @@ if ($debug) {
     $com .= "2> $outDir/step8t.err";
 }
 else {
-    $com .= "2>> $outDir/$logfile";
     $com .= " ; rm -r $tmpdir/Transcripts_noIDs/ ";
 }
 system($com) && die "E $0: step8-transcripts failed: $?";
@@ -234,7 +225,6 @@ if ($debug) {
     $com .= "2> $outDir/step9-finalCohorts.err";
 }
 else {
-    $com .= "2>> $outDir/$logfile";
     $com .= " ; rm -r $tmpdir/Cohorts_Filtered/ $tmpdir/Cohorts_FINAL/ ";
 }
 system($com) && die "E $0: step9-finalCohorts failed: $?";
@@ -270,7 +260,7 @@ if ($debug) {
     $com .= "2> $outDir/step9-subCohorts.err";
 }
 else {
-    $com .= " ) 2>> $outDir/$logfile";
+    $com .= " )";
 }
 system($com) && die "E $0: step9-subCohorts failed: $?";
 
