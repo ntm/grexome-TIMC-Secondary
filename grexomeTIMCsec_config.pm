@@ -83,10 +83,13 @@ sub vepPluginDataPath {
 # Return a tmp dir with fast RW access, ideally a ramdisk, otherwise
 # hopefully at least an SSD.
 # Example: on linux you can make a 96GB ramdisk (assuming you have enough RAM)
-# accessible in RamDisk/ with:
-# mount -t tmpfs -o size=96g myramdisk RamDisk/
+# accessible in /mnt/RamDisk/ with:
+### sudo mkdir /mnt/RamDisk
+### sudo mount -t tmpfs -o size=96g myramdisk /mnt/RamDisk/
+# You can make the mount automatic on boot by adding to /etc/fstab:
+### tmpfs /mnt/RamDisk tmpfs size=192g 0 0
 sub fastTmpPath {
-    my $ramdisk = "/data/nthierry/PierreRay/RunSecondaryAnalyses/RamDisk/";
+    my $ramdisk = "/mnt/RamDisk/";
     (-d $ramdisk) && return($ramdisk);
     die "E: no fastTmpPath found, you need to edit *config.pm";
 }
