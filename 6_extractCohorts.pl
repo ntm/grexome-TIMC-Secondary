@@ -274,7 +274,7 @@ my %compatible = ();
     foreach my $notConR (@$compatibleAR) {
 	foreach my $cohort (@$notConR) {
 	    (grep($cohort eq $_, @cohorts)) ||
-		die "E $0: cohort $cohort from compatible is not in cohorts @cohorts\n";
+		die "E $0: cohort $cohort from compatible is not in cohorts: @cohorts\n";
 	    (defined $compatible{$cohort}) || ($compatible{$cohort} = {});
 	    foreach my $notC (@$notConR) {
 		($notC eq $cohort) && next;
