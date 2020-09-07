@@ -3,11 +3,13 @@
 # 19/08/2019, but starting from 6_extractCohorts.pl
 # NTM
 
-# Takes 2 arguments: $inDir $outDir
+# Takes as arguments: $inDir $outDir $config
 # - $inDir must contain cohort TSVs as produced by extractCohorts.pl,
 #   filtered and reordered by filterVariants.pl and reorderColumns.pl;
 # - $outDir doesn't exist, it will be created and filled with one TSV
-#   per infile, adding .Transcripts to the name.
+#   per infile, adding .Transcripts to the name;
+# - $config is a customized copy of grexomeTIMCsec_config.pm and
+#    provides 'compatible'
 #
 # We expect that cohort files were filtered to consider only rare variants 
 # (max_af_*) in picked transcripts, that aren't seen in too many CTRLs 
@@ -31,7 +33,7 @@
 #   the samples with a "known causal variant" in another gene, all concatenated
 #   into a single :-separated string (with :: between HVs and HETs)
 # - another column COUNTSAMPLES_COMPAT same as OTHERCAUSE but counting
-#   the samples belonging to compatible cohorts (as defined in extractCohorts)
+#   the samples belonging to compatible cohorts (as defined in $config)
 # - 6 final columns COUNTSAMPLES_NEGCTRL_* similar to $cohort counts but counting
 #   the control samples (as in extractCohorts again).
 # - HV_HIGH, HV_MODHIGH, HV_MODER, COMPHET_HIGH, COMPHET_MODHIGH, COMPHET_MODER:
@@ -49,6 +51,8 @@
 use strict;
 use warnings;
 use File::Basename qw(basename);
+use FindBin qw($RealBin);
+use Getopt::Long;
 use POSIX qw(strftime);
 
 # we use $0 in every stderr message but we really only want
@@ -58,17 +62,6 @@ $0 = basename($0);
 
 #############################################
 ## hard-coded stuff that shouldn't change much
-
-# @compatible: array of arrayrefs, each arrayref holds cohorts that
-# should NOT be used as neg controls for each other.
-# The cohort names must match the "pathology" column of the $metadata xlsx
-# (this is checked).
-# NOTE: @compatible IS DUPLICATED IN 6_extractCohorts.pl, IF IT IS CHANGED HERE IT 
-# MUST ALSO BE CHANGED THERE 
-my @compatible = (["Flag","Astheno","Headless"],
-		  ["Azoo","Ovo","Macro","IOP"],
-		  ["Globo","Macro","Terato"]);
-
 
 # columns we want to keep, in this order:
 my @keptColumns = qw(SYMBOL KNOWN_CANDIDATE_GENE Feature Gene RefSeq BIOTYPE);
@@ -82,6 +75,56 @@ my @keptColumnsSpecific = qw(KNOWN_CANDIDATE_GENE);
 
 # also for convenience: the types of samples to count
 my @countTypes = ("HV_HIGH","HV_MODHIGH","HV_MODER","COMPHET_HIGH","COMPHET_MODHIGH","COMPHET_MODER");
+
+
+#############################################
+## options / params from the command-line
+
+# inDir contains cohort TSVs, $outDir must not pre-exist, no defaults
+my ($inDir, $outDir);
+
+# path+file of the config file providing "compatible", no default
+my $config = "";
+
+# help: if true just print $USAGE and exit
+my $help = '';
+
+my $USAGE = "\nParse cohort TSVs from inDir, create transcript TSVs in outDir.
+Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
+--indir string [no default] : subdir containing cohort TSVs as produced by extractCohorts.pl, 
+                              filtered and reordered by filterVariants.pl and reorderColumns.pl;
+--outdir string [no default] : subdir where resulting Transcripts TSV files will be created, must not pre-exist
+--config string [no default] : your customized copy (with path) of the distributed *config.pm
+--help : print this USAGE";
+
+GetOptions ("indir=s" => \$inDir,
+	    "outdir=s" => \$outDir,
+	    "config=s" => \$config,
+	    "help" => \$help)
+    or die("E $0: Error in command line arguments\n$USAGE\n");
+
+# make sure required options were provided and sanity check them
+($help) && die "$USAGE\n\n";
+
+# immediately import $config, so we die if file is broken
+(-f $config) ||  die "E $0: the supplied config.pm doesn't exist: $config\n";
+require($config);
+grexomeTIMCsec_config->import('compatible');
+
+(-d $inDir) ||
+    die "E $0: inDir $inDir doesn't exist or isn't a directory\n";
+opendir(INDIR, $inDir) ||
+    die "E $0: cannot opendir inDir $inDir\n";
+
+(-e $outDir) && 
+    die "E $0: found argument outDir $outDir but it already exists, remove it or choose another name.\n";
+mkdir($outDir) || die "E $0: cannot mkdir outDir $outDir\n";
+
+
+my $now = strftime("%F %T", localtime);
+warn "I $0: $now - starting to run\n";
+
+
 
 #########################################################
 # pre-process some of the hard-coded stuff
@@ -101,35 +144,33 @@ foreach my $col (@keptColumnsSpecific) {
     delete($keptCols{$col});
 }
 
+
+# store @compatible cohorts in %compatible hash
+
 # %compatible: key is a cohort name, value is a hashref
 # with keys == cohorts that shouldn't be used as negative 
 # controls for this cohort, value==1
 my %compatible = ();
 
-foreach my $notConR (@compatible) {
-    foreach my $cohort (@$notConR) {
-	(defined $compatible{$cohort}) || ($compatible{$cohort} = {});
-	foreach my $notC (@$notConR) {
-	    ($notC eq $cohort) && next;
-	    $compatible{$cohort}->{$notC} = 1;
+{
+    # @$compatibleAR: array of arrayrefs, each arrayref holds cohorts that
+    # should NOT be used as neg controls for each other.
+    # The cohort names must match the "pathology" column of the $metadata xlsx
+    # (not checked here, but already checked in 6_extractCohorts.pl).
+    my $compatibleAR = &compatible();
+
+    foreach my $notConR (@$compatibleAR) {
+	foreach my $cohort (@$notConR) {
+	    (defined $compatible{$cohort}) || ($compatible{$cohort} = {});
+	    foreach my $notC (@$notConR) {
+		($notC eq $cohort) && next;
+		$compatible{$cohort}->{$notC} = 1;
+	    }
 	}
     }
 }
 
 #########################################################
-
-(@ARGV == 2) || die "E $0: needs 2 args: an inDir and a non-existant outDir\n";
-my ($inDir, $outDir) = @ARGV;
-(-d $inDir) ||
-    die "E $0: inDir $inDir doesn't exist or isn't a directory\n";
-opendir(INDIR, $inDir) ||
-    die "E $0: cannot opendir inDir $inDir\n";
-(-e $outDir) && 
-    die "E $0: found argument outDir $outDir but it already exists, remove it or choose another name.\n";
-mkdir($outDir) || die "E $0: cannot mkdir outDir $outDir\n";
-
-my $now = strftime("%F %T", localtime);
-warn "I $0: $now - starting to run\n";
 
 # Accumulators for all the data we want to print:
 # lines describing each transcript in a given infile can be interspersed,

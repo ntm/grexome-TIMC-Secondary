@@ -4,6 +4,7 @@
 # Define the paths and filenames that should be install-specific and
 # are needed by grexome-TIMC-secondary.pl .
 # Every hard-coded path/filename in the pipeline should be here.
+# Also define some data-specific or behavioral config (eg "compatible").
 # Other hard-coded stuff you may want to tweak to adjust the pipeline's
 # behavior include:
 # - some stuff in 3_runVEP.pl (eg VEP plugins and params to use)
@@ -19,9 +20,12 @@ use strict;
 use warnings;
 use Exporter;
 our @ISA = ('Exporter');
-# not using EXPORT_OK because grexome-TIMC-secondary.pl is our only user,
-# and it uses everything we define
-our @EXPORT = qw(refGenome vepCacheFile vepPluginDataPath fastTmpPath coveragePath gtexDatafile gtexFavoriteTissues);
+# NOTE: this file can and should be copied somewhere and customized, 
+# therefore we should never "use grexomeTIMCsec_config" but instead
+# provide the customized *config.pm as an argument, see --config in
+# grexome-TIMC-secondary.pl for an example.
+our @EXPORT_OK = qw(refGenome vepCacheFile vepPluginDataPath fastTmpPath 
+                    coveragePath gtexDatafile gtexFavoriteTissues compatible);
 
 
 #################################################################
@@ -135,6 +139,17 @@ sub gtexFavoriteTissues {
     # default: working on infertility here...
     my $favoriteTissues = "testis,ovary";
     return($favoriteTissues);
+}
+
+
+# Return a ref to an array of arrayrefs, each arrayref holds cohorts that
+# should NOT be used as neg controls for each other.
+# The cohort names must match the "pathology" column of the $metadata xlsx.
+sub compatible {
+    my @compatible = (["Flag","Astheno","Headless"],
+		      ["Azoo","Ovo","Macro","IOP"],
+		      ["Globo","Macro","Terato"]);
+    return(\@compatible);
 }
 
 

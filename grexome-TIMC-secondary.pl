@@ -106,7 +106,8 @@ GetOptions ("metadata=s" => \$metadata,
 # immediately import $config, so we die if file is broken
 (-f $config) ||  die "E $0: the supplied config.pm doesn't exist: $config\n";
 require($config);
-grexomeTIMCsec_config->import();
+grexomeTIMCsec_config->import(qw(refGenome vepCacheFile vepPluginDataPath fastTmpPath), 
+			      qw(coveragePath gtexDatafile gtexFavoriteTissues));
 
 ($outDir) || die "E $0: you must provide an outDir\n";
 (-e $outDir) && 
@@ -178,7 +179,7 @@ if ($debug) {
 }
 
 # step 6
-$com .= " | perl $RealBin/6_extractCohorts.pl --metadata=$metadata --candidateGenes=$candidateGenes --outDir=$tmpdir/Cohorts/ --tmpDir=$tmpdir/TmpExtract/ --jobs=$numJobs6 ";
+$com .= " | perl $RealBin/6_extractCohorts.pl --metadata=$metadata --candidateGenes=$candidateGenes --outDir=$tmpdir/Cohorts/ --tmpDir=$tmpdir/TmpExtract/ --config $config --jobs=$numJobs6 ";
 if ($debug) {
     $com .= "2> $outDir/step6.err";
     system($com) && die "E $0: debug mode on, step6 failed: $?";
@@ -215,7 +216,7 @@ else {
 system($com) && die "E $0: step8-samples failed: $?";
 
 # STEP 8 - TRANSCRIPTS , adding patientIDs
-$com = "( perl $RealBin/8_extractTranscripts.pl $tmpdir/Cohorts_Filtered/ $tmpdir/Transcripts_noIDs/ ; ";
+$com = "( perl $RealBin/8_extractTranscripts.pl --indir $tmpdir/Cohorts_Filtered/ --outdir $tmpdir/Transcripts_noIDs/ --config $config ; ";
 $com .= " perl $RealBin/8_addPatientIDs.pl $metadata $tmpdir/Transcripts_noIDs/ $outDir/Transcripts/ )";
 if ($debug) {
     $com .= "2> $outDir/step8t.err";

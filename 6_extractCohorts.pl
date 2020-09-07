@@ -3,15 +3,15 @@
 # 25/03/2018
 # NTM
 
-# Takes as arguments a $metadata xlsx file, a $candidatesFile
-# xlsx file, an $outDir and a $tmpDir that don't exist; 
+# Takes as arguments a $metadata xlsx file, a $candidatesFile xlsx
+# file, a $config pm file, an $outDir and a $tmpDir that don't exist; 
 # reads on stdin a fully annotated TSV file;
 # makes $outDir and creates in it one gzipped TSV file per cohort.
 # The cohorts are defined in $metadata.
 # For each sample, any identified causal (mutation in a) gene 
 # is grabbed from $metadata.
-# @compatible defined at the top of this script says which cohorts
-# should NOT be used as negative controls for each other.
+# @compatible provided by $config says which cohorts should
+# NOT be used as negative controls for each other.
 # For optimal performance $tmpDir should be on a RAMDISK (eg tmpfs).
 #
 # A new KNOWN_CANDIDATE_GENE column is inserted right after SYMBOL:
@@ -26,8 +26,7 @@
 #   a causal variant in another gene)
 # - $cohort_OTHERCAUSE_HV, $cohort_OTHERCAUSE_HET -> samples from $cohort
 #   that have a causal variant in another gene
-# - COMPAT_HV, COMPAT_HET -> samples from compatible cohorts as defined
-#   in @compatible
+# - COMPAT_HV, COMPAT_HET -> samples from compatible cohorts
 # - NEGCTRL_HV, NEGCTRL_HET -> samples from all other cohorts
 # - OTHERGENO -> samples with OTHER genotypes (from any cohort)
 #
@@ -44,6 +43,7 @@
 use strict;
 use warnings;
 use File::Basename qw(basename);
+use FindBin qw($RealBin);
 use Getopt::Long;
 use Spreadsheet::XLSX;
 use POSIX qw(strftime);
@@ -56,17 +56,6 @@ $0 = basename($0);
 
 #############################################
 ## hard-coded stuff that shouldn't change much
-
-# @compatible: array of arrayrefs, each arrayref holds cohorts that
-# should NOT be used as neg controls for each other.
-# The cohort names must match the "pathology" column of the $metadata xlsx
-# (this is checked).
-# NOTE: @compatible IS DUPLICATED IN extractTranscripts.pl, IF IT IS CHANGED HERE IT 
-# MUST ALSO BE CHANGED THERE 
-my @compatible = (["Flag","Astheno","Headless"],
-		  ["Azoo","Ovo","Macro","IOP"],
-		  ["Globo","Macro","Terato"]);
-
 
 # max number of lines to read in a single batch. Each batch is then
 # processed by a worker thread. This is a performance tuning param,
@@ -86,6 +75,9 @@ my ($metadata, $candidatesFile);
 # outDir and tmpDir, also no defaults
 my ($outDir, $tmpDir);
 
+# path+file of the config file providing "compatible", no default
+my $config = "";
+
 # help: if true just print $USAGE and exit
 my $help = '';
 
@@ -96,6 +88,7 @@ Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --candidateGenes string [no default] : known candidate genes in xlsx file, with path
 --outdir string [no default] : subdir where resulting cohort files will be created, must not pre-exist
 --tmpdir string [no default] : subdir where tmp files will be created (on a RAMDISK if possible), must not pre-exist and will be removed after execution
+--config string [no default] : your customized copy (with path) of the distributed *config.pm
 --jobs N [default = $numJobs] : number of parallel jobs=threads to run
 --help : print this USAGE";
 
@@ -103,6 +96,7 @@ GetOptions ("metadata=s" => \$metadata,
 	    "candidateGenes=s" => \$candidatesFile,
 	    "outdir=s" => \$outDir,
 	    "tmpdir=s" => \$tmpDir,
+	    "config=s" => \$config,
 	    "jobs=i" => \$numJobs,
 	    "help" => \$help)
     or die("E $0: Error in command line arguments\n$USAGE\n");
@@ -114,6 +108,11 @@ GetOptions ("metadata=s" => \$metadata,
 (-f $metadata) || die "E $0: the supplied metadata file doesn't exist\n";
 ($candidatesFile) || die "E $0: you must provide a candidateGenes file\n";
 (-f $candidatesFile) || die "E $0: the supplied candidateGenes file $candidatesFile doesn't exist\n";
+
+# immediately import $config, so we die if file is broken
+(-f $config) ||  die "E $0: the supplied config.pm doesn't exist: $config\n";
+require($config);
+grexomeTIMCsec_config->import('compatible');
 
 ($outDir) || die "E $0: you must provide an outDir\n";
 (-e $outDir) && 
@@ -265,14 +264,22 @@ foreach my $c (keys(%knownCandidateGenes)) {
 # controls for this cohort, value==1
 my %compatible = ();
 
-foreach my $notConR (@compatible) {
-    foreach my $cohort (@$notConR) {
-	(grep($cohort eq $_, @cohorts)) ||
-	    die "E $0: cohort $cohort from compatible is not in cohorts @cohorts\n";
-	(defined $compatible{$cohort}) || ($compatible{$cohort} = {});
-	foreach my $notC (@$notConR) {
-	    ($notC eq $cohort) && next;
-	    $compatible{$cohort}->{$notC} = 1;
+{
+    # @$compatibleAR: array of arrayrefs, each arrayref holds cohorts that
+    # should NOT be used as neg controls for each other.
+    # The cohort names must match the "pathology" column of the $metadata xlsx
+    # (this is checked).
+    my $compatibleAR = &compatible();
+
+    foreach my $notConR (@$compatibleAR) {
+	foreach my $cohort (@$notConR) {
+	    (grep($cohort eq $_, @cohorts)) ||
+		die "E $0: cohort $cohort from compatible is not in cohorts @cohorts\n";
+	    (defined $compatible{$cohort}) || ($compatible{$cohort} = {});
+	    foreach my $notC (@$notConR) {
+		($notC eq $cohort) && next;
+		$compatible{$cohort}->{$notC} = 1;
+	    }
 	}
     }
 }
