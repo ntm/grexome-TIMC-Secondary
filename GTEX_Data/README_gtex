@@ -1,3 +1,21 @@
+#################################
+24/09/2020
+NTM
+
+Updating to latest GTEX file from Expression Atlas:
+they haven't updated the actual GTEX dataset, but the gene names
+should be more recent (the webpage says they are using Ensembl 99,
+current Ensembl is 101... not up-to-date but still better than 04/2018).
+
+mv E-MTAB-5214-query-results.tpms.tsv Old/
+
+Then get latest from:
+https://www.ebi.ac.uk/gxa/experiments-content/E-MTAB-5214/resources/ExperimentDownloadSupplier.RnaSeqBaseline/tpms.tsv
+
+DONE.
+
+
+#################################
 06/04/2018
 
 I'll use the expression atlas file, so easy: just change
