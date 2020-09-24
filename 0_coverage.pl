@@ -4,7 +4,7 @@
 # NTM
 
 # Takes 4 args: a $candidatesFile xlsx, a gzipped tsv $transciptsFile
-# as produced in Coverage_Data/, a merged bgzipped $gvcf (must be 
+# as produced in Transcripts_Data/, a merged bgzipped $gvcf (must be 
 # tabix-indexed), and an $outDir.
 # If $outDir doesn't exist it is created; if it exists any pre-existing
 # coverage*tsv file in it is not remade (considered good).
