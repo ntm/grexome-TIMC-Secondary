@@ -4,8 +4,9 @@ NTM
 
 Updating to latest GTEX file from Expression Atlas:
 they haven't updated the actual GTEX dataset, but the gene names
-should be more recent (the webpage says they are using Ensembl 99,
-current Ensembl is 101... not up-to-date but still better than 04/2018).
+and identifiers will be more up-to-date.
+[The GXA webpage says they are using Ensembl 99, latest Ensembl is 101... 
+GXA isn't current but it's better than the 04/2018 version I use now		).
 
 mv E-MTAB-5214-query-results.tpms.tsv Old/
 
