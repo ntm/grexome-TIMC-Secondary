@@ -1,4 +1,25 @@
 ###############################################
+23/09/2020
+
+Updating to Ensembl release 101:
+
+- grab the latest ensembl Human GTF in /data/Ensembl/ with:
+wget ftp://ftp.ensembl.org/pub/release-101/gtf/homo_sapiens/Homo_sapiens.GRCh38.101.chr.gtf.gz
+
+- generate updated list of canonical transcripts [from home, tcp/3306 is still blocked at TIMC]
+/bin/sh < listCanonicalTranscripts_MYSQL.sh | gzip -c >  listCanonicalTranscripts_200923.tsv.gz
+
+- then on fauve:
+gunzip -c /data/Ensembl/Homo_sapiens.GRCh38.101.chr.gtf.gz | makeCanonicalTranscriptTable.pl listCanonicalTranscripts_200923.tsv.gz | gzip -c > canonicalTranscripts_200923.tsv.gz
+
+- also want it in BED format for samtools bedconv:
+gunzip -c canonicalTranscripts_200923.tsv.gz | canonicalTranscripts_table2bed.pl | gzip -c > canonicalTranscripts_200923.bed.gz
+
+AOK, move previous versions to Old/ .
+
+
+
+###############################################
 07/11/2019
 
 I want the canonical transcripts in BED format (for samtools bedconv),
