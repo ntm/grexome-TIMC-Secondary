@@ -257,7 +257,7 @@ foreach my $subC (keys(%subCohorts)) {
     $com .= "perl $RealBin/9_extractSubcohort.pl $subC < $outDir/Transcripts/$patho.Transcripts.patientIDs.csv > $outFileRoot.transcripts.csv ; ";
 }
 if ($debug) {
-    $com .= "2> $outDir/step9-subCohorts.err";
+    $com .= "2> $outDir/step9-subCohorts.err )";
 }
 else {
     $com .= " )";
