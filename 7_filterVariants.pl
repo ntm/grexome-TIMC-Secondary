@@ -12,7 +12,6 @@
 use strict;
 use warnings;
 use File::Basename qw(basename);
-use POSIX qw(strftime);
 use Getopt::Long;
 
 # we use $0 in every stderr message but we really only want
@@ -48,10 +47,6 @@ GetOptions ("max_ctrl_hv=i" => \$max_ctrl_hv,
 	    "max_af_1kg=f" => \$max_af_1kg,
 	    "max_af_esp=f" => \$max_af_esp)
     or die("E $0: Error in command line arguments\n");
-
-my $now = strftime("%F %T", localtime);
-warn "I $0: $now - starting to run\n";
-
 
 # build string of all filter values, for logging
 my $filterString = "max_ctrl_hv=$max_ctrl_hv max_ctrl_het=$max_ctrl_het";
@@ -149,6 +144,3 @@ while(my $line = <STDIN>) {
     # passed all filters
     print "$line\n";
 }
-
-$now = strftime("%F %T", localtime);
-warn "I $0: $now - ALL DONE, completed successfully!\n";

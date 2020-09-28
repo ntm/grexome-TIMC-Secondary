@@ -14,7 +14,6 @@
 use strict;
 use warnings;
 use File::Basename qw(basename);
-use POSIX qw(strftime);
 
 # we use $0 in every stderr message but we really only want
 # the program name, not the path
@@ -25,9 +24,6 @@ $0 = basename($0);
 # with the current cohort)
 my @newOrder = qw(POSITION REF ALT SYMBOL KNOWN_CANDIDATE_GENE COUNT_HR COUNT_COHORT_HV COUNT_COHORT_HET COUNT_COHORT_OTHERCAUSE_HV COUNT_COHORT_OTHERCAUSE_HET COUNT_COMPAT_HV COUNT_COMPAT_HET COUNT_NEGCTRL_HV COUNT_NEGCTRL_HET COUNT_OTHERGENO IMPACT Consequence HGVSc HGVSp Protein_position gnomAD_AF COHORT_HV COHORT_HET COHORT_OTHERCAUSE_HV COHORT_OTHERCAUSE_HET COMPAT_HV COMPAT_HET GTEX_testis_RATIO GTEX_ovary_RATIO GTEX_testis GTEX_ovary GTEX_blood GTEX_cerebellar_hemisphere GTEX_liver GTEX_lung);
 
-
-my $now = strftime("%F %T", localtime);
-warn "I $0: $now - starting to run\n";
 
 # build hash of @newOrder headers, value is the new column index
 # for that header
@@ -99,6 +95,3 @@ while(my $line = <STDIN>) {
     }
     print join("\t", @newLine)."\n";
 }
-
-$now = strftime("%F %T", localtime);
-warn "I $0: $now - ALL DONE, completed successfully!\n";
