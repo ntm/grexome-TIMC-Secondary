@@ -187,8 +187,8 @@ my %compatible = ();
 my %transcript2start;
 # %transcript2gtex: key==$transcript, value==GTEX data to print (starting with \t)
 my %transcript2gtex;
-# also remember CHR and POS (the first POS we see for a variant affecting the
-# transcript), replacing X Y M with 23-25 for easy sorting
+# also remember CHR and POS (the smallest POS we see in any cohort for a variant
+#  affecting the transcript), replacing X Y M with 23-25 for easy sorting
 my %transcript2chr;
 my %transcript2coord;
 
@@ -323,12 +323,14 @@ while (my $inFile = readdir(INDIR)) {
 	($impact eq "LOW") && next;
 	($impact eq "MODIFIER") && next;
 
+	# grab chrom and coord
+	($fields[$posCol] =~ /^chr([^:]+):(\d+)$/) ||
+	    die "E $0: cannot grab chrom:pos in line:\n$line\n";
+	my ($chr,$coord) = ($1,$2);
+
 	my $transcript = $fields[$transCol];
 	if (! $transcript2start{$transcript}) {
 	    # first time we see $transcript, fill chr, coord, start and gtex
-	    ($fields[$posCol] =~ /^chr([^:]+):(\d+)$/) ||
-		die "E $0: cannot grab chrom:pos in line:\n$line\n";
-	    my ($chr,$coord) = ($1,$2);
 	    # for sorting we want just the chrom number, replace X Y M by 23-25
 	    if ($chr eq "X") { $transcript2chr{$transcript} = "23" }
 	    elsif ($chr eq "Y") { $transcript2chr{$transcript} = "24" }
@@ -374,6 +376,8 @@ while (my $inFile = readdir(INDIR)) {
 	    $transcript2cohort2samplesOC{$transcript}->{$cohort} = [{},{},{},{},{},{}];
 	}
 
+	# update transcript2coord if new coord is smaller
+	($coord < $transcript2coord{$transcript}) && ($transcript2coord{$transcript} = $coord);
 	# in any case, update %transcript2cohort2samples and transcript2cohort2samplesOC
 	# we will read the sample columns in this order:
 	my @cols = ($hetCol,$hvCol,$hetColOC,$hvColOC);
