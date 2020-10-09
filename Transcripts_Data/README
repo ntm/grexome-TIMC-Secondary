@@ -12,7 +12,7 @@ wget ftp://ftp.ensembl.org/pub/release-101/gtf/homo_sapiens/Homo_sapiens.GRCh38.
 - then on fauve:
 gunzip -c /data/Ensembl/Homo_sapiens.GRCh38.101.chr.gtf.gz | makeCanonicalTranscriptTable.pl listCanonicalTranscripts_200923.tsv.gz | gzip -c > canonicalTranscripts_200923.tsv.gz
 
-- also want it in BED format for samtools bedconv:
+- also want it in BED format for samtools bedcov:
 gunzip -c canonicalTranscripts_200923.tsv.gz | canonicalTranscripts_table2bed.pl | gzip -c > canonicalTranscripts_200923.bed.gz
 
 AOK, move previous versions to Old/ .
@@ -22,7 +22,7 @@ AOK, move previous versions to Old/ .
 ###############################################
 07/11/2019
 
-I want the canonical transcripts in BED format (for samtools bedconv),
+I want the canonical transcripts in BED format (for samtools bedcov),
 producing this:
 gunzip -c canonicalTranscripts_190918.tsv.gz | canonicalTranscripts_table2bed.pl | gzip -c > canonicalTranscripts_190918.bed.gz
 
