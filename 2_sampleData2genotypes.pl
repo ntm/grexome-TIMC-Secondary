@@ -189,6 +189,14 @@ while(my $line = <STDIN>) {
     my @newAlts = ();
     foreach my $i (0..$#alts) {
 	if ((!defined $old2new[$i+1]) || ($old2new[$i+1] != -1)) {
+	    # the normalization algo below assumes @newAlts don't include <NON_REF> or *,
+	    # this should always be true since <NON_REF> should never be a call, and hemizygous
+	    # calls with * have been fixed to HOMO calls by 1_filterBadCalls.pl.
+	    # Check it anyways.
+	    ($alts[$i] eq '*') &&
+		die "E $0: we have a call for *, should have been fixed to HOMO upstream:\n$line\n";
+	    ($alts[$i] eq '<NON_REF>') &&
+		die "E $0: we have a call for NON_REF, it's meaningless!\n$line\n";
 	    push(@newAlts,$alts[$i]);
 	}
     }
