@@ -269,9 +269,12 @@ while (my $line = <GENES>) {
 		    $coverage = $data[$format{"MIN_DP"}];
 		}
 		else {
-		    # grab the depth (DP or sumOfADs, whichever is defined and higher)
+		    # grab the depth (DP or DPI or sumOfADs, whichever is defined and higher)
 		    if ((defined $format{"DP"}) && ($data[$format{"DP"}]) && ($data[$format{"DP"}] ne '.')) {
 			$coverage = $data[$format{"DP"}];
+		    }
+		    if ((defined $format{"DPI"}) && ($data[$format{"DPI"}]) && ($data[$format{"DPI"}] ne '.')) {
+			($coverage < $data[$format{"DPI"}]) && ($coverage = $data[$format{"DPI"}]);
 		    }
 		    if ((defined $format{"AD"}) && ($data[$format{"AD"}]) && ($data[$format{"AD"}] =~ /^[\d,]+$/)) {
 			my $sumOfADs = 0;
