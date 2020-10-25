@@ -14,6 +14,7 @@
 # - non-variant lines are removed;
 # - phased genotypes x|y are replaced by unphased x/y;
 # - hemizygous calls x (strelka) or x/* or */x (gatk) are replaced by HV x/x;
+# - the new and useless GATK "weAreInAHomoDel" calls */* are replaced by ./.;
 # - the variant calls in data columns are replaced by ./. if a call-condition
 #   is not met (see "heuristics"), or if previous call was '.' (the Strelka NOCALL);
 # - lines where every sample is now ./. or 0/0 are skipped;
@@ -229,7 +230,7 @@ STDOUT->flush();
 
 
 #############################################
-# parse data lines
+# read data lines
 
 # create fork manager
 my $pm = new Parallel::ForkManager($numJobs);
@@ -372,6 +373,12 @@ sub processBatch {
 		$lineToPrint .= "\t./." ;
 		next;
 	    }
+	    # also if call is */* , just replace with ./.
+	    if ($data =~ m~^$starNum/$starNum:~) {
+		$lineToPrint .= "\t./." ;
+		next;
+	    }
+
 	    # otherwise examine content and apply filters
 	    my @thisData = split(/:/, $data) ;
 
@@ -419,9 +426,9 @@ sub processBatch {
 	    # GATK hemizygous calls (eg under a HET DEL) appear as x/* or */x, fix to x/x
 	    if ($starNum != -1) {
 		if ($geno2 == $starNum) {
-		    # */* shouldn't exist, check it
+		    # */* shouldn't exist (replaced by ./. earlier)
 		    ($geno1 == $starNum) &&
-			die "E $0: genotpye */* was called for a sample, no idea what it means, dying:\n$line\n"; 
+			die "E $0: WTF genotype */* shouln't exist anymore!\n$line\n$lineToPrint\n"; 
 		    $geno2 = $geno1;
 		    $thisData[$format{"GT"}] = "$geno1/$geno2";
 		}
