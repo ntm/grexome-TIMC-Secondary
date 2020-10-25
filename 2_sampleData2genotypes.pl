@@ -16,10 +16,6 @@
 # NOTE that FORMAT becomes "GENOS", so produced file is no longer
 # a VCF stricto sensu (spec requires first FORMAT key is GT).
 #
-# UPDATE 25/06/2019: allow phased GTs (as produced eg by Strelka),
-# just transform them to unphased for now;
-# and allow hemizygous GTs (eg "1"), replace by HOMO (eg "1/1")
-#
 # UPDATE 09/08/2019: remove ALTs that don't appear in a genotype
 # (and renumber remaining ALTs in the called genotypes). 
 # UPDATE 14/08/2019: also re-normalize the variants. I don't check for

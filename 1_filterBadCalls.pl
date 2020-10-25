@@ -12,10 +12,11 @@
 #   obsoleted as dupes);
 # - ignore all samples except the $samplesOfInterest, if specified;
 # - non-variant lines are removed;
+# - phased genotypes x|y are replaced by unphased x/y;
+# - hemizygous calls x (strelka) or x/* or */x (gatk) are replaced by HV x/x;
 # - the variant calls in data columns are replaced by ./. if a call-condition
 #   is not met (see "heuristics"), or if previous call was '.' (the Strelka NOCALL);
 # - lines where every sample is now ./. or 0/0 are skipped;
-# - lines where the only called ALT is '*' (new in VCF 4.2) are skipped;
 # - AF is added to FORMAT right after GT, and every 0/x or x/x call gets
 #   for AF the fraction of variant reads (rounded to 2 decimals), HR
 #   and x/y calls get '.';
@@ -324,6 +325,10 @@ sub processBatch {
 	(@data >= 10) || die "E $0: no sample data in line?\n$line\n";
 	# if no ALT in line, skip immediately
 	($data[4] eq '.') && next;
+	# GATK4 produces useless lines where there are NO sequencing reads
+	# (where FORMAT is eg GT or GT:GQ:PL), skip them immediately:
+	# any line with supporting reads must have an AD field
+	($data[8] =~ /:AD:/) || next;
 	# grab alleleNum of ALT '*' if it's present
 	my $starNum = -1;
 	my @alts = split(/,/,$data[4]);
@@ -346,7 +351,6 @@ sub processBatch {
 	    }
 	}
 	# sanity: make sure the fields we need are there
-	# don't check DP since AD is checked
 	# $gq is either GQX (Strelka) or GQ (GATK)
 	my $gq = "";
 	if (defined $format{"GQX"}){
@@ -357,7 +361,7 @@ sub processBatch {
 	    die "E $0: no GQ/GQX key in FORMAT string for line:\n$line\n";
 	}
 	(defined $format{"GT"}) || die "E $0: no GT key in FORMAT string for line:\n$line\n";
-	(defined $format{"AD"}) || die "E $0: no AD key in FORMAT string for line:\n$line\n";
+	(defined $format{"AD"}) || (defined $format{"DP"}) || die "E $0: no AD or DP key in FORMAT string for line:\n$line\n";
 
 	# now deal with actual data fields
 	foreach my $i (9..$#data) {
@@ -378,10 +382,13 @@ sub processBatch {
 		next;
 	    }
 
-	    # grab the depth (DP or sumOfADs, whichever is defined and higher)
+	    # grab the depth (DP or DPI or sumOfADs, whichever is defined and higher)
 	    my $thisDP = -1;
 	    if ((defined $format{"DP"}) && ($thisData[$format{"DP"}]) && ($thisData[$format{"DP"}] ne '.')) {
 		$thisDP = $thisData[$format{"DP"}];
+	    }
+	    if ((defined $format{"DPI"}) && ($thisData[$format{"DPI"}]) && ($thisData[$format{"DPI"}] ne '.')) {
+		($thisDP < $thisData[$format{"DPI"}]) && ($thisDP = $thisData[$format{"DPI"}]);
 	    }
 	    if ((defined $format{"AD"}) && ($thisData[$format{"AD"}]) && ($thisData[$format{"AD"}] =~ /^[\d,]+$/)) {
 		my $sumOfADs = 0;
@@ -399,8 +406,8 @@ sub processBatch {
 	    # with GATK I had some issues with DP=0 calls, causing illegal divisions
 	    # by zero when calculating AF, but that is now skipped above
 
-	    # clean up Strelka GTs and calculate AF, for fracVarReads filter:
-	    # Strelka makes some phased calls sometimes, homogenize as unphased
+	    # clean up GTs and calculate AF, for fracVarReads filter:
+	    # Strelka and GATK make some phased calls sometimes, homogenize as unphased
 	    $thisData[$format{"GT"}] =~ s~\|~/~ ;
 	    # Strelka also makes some hemizygous calls (eg when the position
 	    # is in a HET deletion), makes sense but still, homogenize as HOMO
@@ -409,6 +416,20 @@ sub processBatch {
 	    my ($geno1,$geno2) = split(/\//, $thisData[$format{"GT"}]);
 	    ((defined $geno1) && (defined $geno2)) ||
 		die "E $0: a sample's genotype cannot be split: ".$thisData[$format{"GT"}]."in:\n$line\n";
+	    # GATK hemizygous calls (eg under a HET DEL) appear as x/* or */x, fix to x/x
+	    if ($starNum != -1) {
+		if ($geno2 == $starNum) {
+		    # */* shouldn't exist, check it
+		    ($geno1 == $starNum) &&
+			die "E $0: genotpye */* was called for a sample, no idea what it means, dying:\n$line\n"; 
+		    $geno2 = $geno1;
+		    $thisData[$format{"GT"}] = "$geno1/$geno2";
+		}
+		elsif ($geno1 == $starNum) {
+		    $geno1 = $geno2;
+		    $thisData[$format{"GT"}] = "$geno1/$geno2";
+		}
+	    }
 	    # make sure alleles are in sorted order
 	    if ($geno2 < $geno1) {
 		my $genot = $geno1;
@@ -463,12 +484,11 @@ sub processBatch {
 	    # other filters (eg strandDisc) would go here
 
 	    # OK data passed all filters but $thisData(GT) may have been changed
-	    # -> fix GT in $data and set $keepLine if at least one called allele is not REF or '*'
+	    # -> fix GT in $data and set $keepLine if at least one called allele is not REF
 	    ($data =~ s/^([^:]+):/$thisData[$format{"GT"}]:$af:/) || 
 		die "E $0: cannot fix GT to $thisData[$format{'GT'}] and add AF $af after the geno in: $data\n";
 	    $lineToPrint .= "\t$data";
-	    if (($thisData[$format{"GT"}] ne '0/0') && ($thisData[$format{"GT"}] ne "0/$starNum") &&
-		($thisData[$format{"GT"}] ne "$starNum/0") && ($thisData[$format{"GT"}] ne "$starNum/$starNum")) {
+	    if ($thisData[$format{"GT"}] ne '0/0') {
 		$keepLine = 1;
 	    }
 	}
