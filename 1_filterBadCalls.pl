@@ -373,8 +373,8 @@ sub processBatch {
 		$lineToPrint .= "\t./." ;
 		next;
 	    }
-	    # also if call is */* , just replace with ./.
-	    if ($data =~ m~^$starNum/$starNum:~) {
+	    # also if call is */* or *|* , just replace with ./.
+	    if ($data =~ m~^$starNum[/|]$starNum:~) {
 		$lineToPrint .= "\t./." ;
 		next;
 	    }
