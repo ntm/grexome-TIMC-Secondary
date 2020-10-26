@@ -98,7 +98,7 @@ GetOptions ("metadata=s" => \$metadata,
 
 ($inFile) || die "E $0: you must provide an input bgzipped (G)VCF file\n";
 (-f $inFile) || die "E $0: the supplied infile doesn't exist\n";
-($inFile =~ /\.gz$/) || die "E $0: the supplied infiledoesn't seem bgzipped\n";
+($inFile =~ /\.gz$/) || die "E $0: the supplied infile doesn't seem bgzipped\n";
 
 # immediately import $config, so we die if file is broken
 (-f $config) ||  die "E $0: the supplied config.pm doesn't exist: $config\n";
@@ -119,6 +119,10 @@ copy($candidateGenes, $outDir) ||
 # use the copied versions in scripts (eg if original gets edited while analysis is running...)
 $metadata = "$outDir/".basename($metadata);
 $candidateGenes = "$outDir/".basename($candidateGenes);
+
+# number of samples in $inFile, needed to set $min_hr (for filtering)
+my $numSamples = scalar(split(/\s+/, `zgrep --max-count=1 '#CHROM' $inFile`)) - 9;
+
 
 #############################################
 
@@ -190,7 +194,9 @@ else {
 ######################
   
 # STEP 7: filter variants and reorder columns, clean up unfiltered CohortFiles
-$com = "perl $RealBin/7_filterAndReorderAll.pl $tmpdir/Cohorts/ $tmpdir/Cohorts_Filtered/ ";
+# set min_hr to 20% of $numSamples
+my $min_hr = int($numSamples * 0.2);
+$com = "perl $RealBin/7_filterAndReorderAll.pl --indir $tmpdir/Cohorts/ --outdir $tmpdir/Cohorts_Filtered/ --pick --min_hr=$min_hr ";
 if ($debug) {
     $com .= "2> $outDir/step7.err";
 }
