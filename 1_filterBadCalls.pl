@@ -49,7 +49,7 @@ my $batchSize = 500000;
 # heuristics for fixing low-quality or blatantly wrong genotype calls 
 # [$dp below represents max(DP,sumOfADs)]:
 # if $dp < $minDP , any call becomes NOCALL
-# if GQ < $minGQ , any call becomes NOCALL
+# if max(GQ,GQX) < $minGQ , any call becomes NOCALL
 # if AF < $minAF and call was REF/VAR or VAR/VAR, call becomes NOCALL
 # if $dp >= $minDP_HV and AF >= $minAF_HV , call becomes HV
 # if $dp >= $minDP_HET and AF >= $minAF_HET and AF <= $maxAF_HET, call becomes HET
@@ -375,9 +375,18 @@ sub processBatch {
 	    # otherwise examine content and apply filters
 	    my @thisData = split(/:/, $data) ;
 
-	    if ((! $thisData[$format{"GQ"}]) || ($thisData[$format{"GQ"}] eq '.') ||
-		($thisData[$format{"GQ"}] < $filterParamsR->{"minGQ"})) {
-		# GQ undefined or too low, change to NOCALL
+	    # calculate $gq = max(GQ,GQX) making sure things are defined.
+	    # $gq stays at -1 if GQ and GQX are both undef or '.'
+	    my $gq = -1;
+	    if ((defined $thisData[$format{"GQ"}]) && ($thisData[$format{"GQ"}] ne '.')) {
+		$gq = $thisData[$format{"GQ"}];
+	    }
+	    if ((defined $format{"GQX"}) && (defined $thisData[$format{"GQX"}]) &&
+		($thisData[$format{"GQX"}] ne '.') && ($thisData[$format{"GQX"}] > $gq)) {
+		$gq = $thisData[$format{"GQX"}];
+	    }
+	    if ($gq < $filterParamsR->{"minGQ"}) {
+		# GQ and GQX (if it exists) are both undef or too low, change to NOCALL
 		$lineToPrint .= "\t./.";
 		next;
 	    }
