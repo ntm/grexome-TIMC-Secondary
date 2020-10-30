@@ -337,8 +337,10 @@ sub processBatch {
 	foreach my $alti (0..$#alts) {
 	    ($alts[$alti] eq '*') && ($starNum = $alti + 1);
 	}
-	# first 9 fields are copied except AF is added to FORMAT after GT
-	my $lineToPrint = join("\t",@data[0..7]);
+	# first 9 fields are copied except INFO is cleared, and AF is added to FORMAT after GT
+	my $lineToPrint = join("\t",@data[0..6]);
+	# clear INFO to '.'
+	$lineToPrint .= "\t.";
 	my $format = $data[8];
 	my $newFormat = $format;
 	($newFormat =~ s/^GT:/GT:AF:/)  || 
