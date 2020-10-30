@@ -69,7 +69,7 @@ while(my $line = <STDIN>) {
 	# Now print the command line, the new FORMAT descriptions, and 
 	# then the new CHROM line
 	# add info with full command line run
-	my $com = qx/ps -o args= $$/;
+	my $com = "$0 ".join(" ",@ARGV);
 	chomp($com);
 	$com .= " < ".`readlink -f /proc/$$/fd/0` ;
 	chomp($com);

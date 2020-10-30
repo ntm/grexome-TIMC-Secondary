@@ -4,7 +4,7 @@
 # 09/07/2019 (as _strelka version, but starting from the older GATK version)
 
 
-# Parses on stdin a Strelka GVCF file with one or more sample data columns;
+# Parses on stdin a Strelka or GATK GVCF file with one or more sample data columns;
 # Args: see $USAGE.
 # Prints to stdout a VCF file where:
 # - samples that don't appear in $metadata "sampleID" column are removed
@@ -100,6 +100,16 @@ Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --jobs N [default = $numJobs] : number of parallel jobs=threads to run
 --verbose N [default 0] : if > 0 increase verbosity on stderr
 --help : print this USAGE";
+
+# construct string with full command-line for adding to headers, must be
+# done before GetOptions
+my $addToHeader = "$0 ".join(" ",@ARGV);
+chomp($addToHeader);
+$addToHeader .= " > ".`readlink -f /proc/$$/fd/1` ;
+chomp($addToHeader);
+$addToHeader .= " 2> ".`readlink -f /proc/$$/fd/2` ;
+chomp($addToHeader);
+$addToHeader = "##filterBadCalls=<commandLine=\"$addToHeader\">\n";
 
 GetOptions ("metadata=s" => \$metadata,
 	    "samplesOfInterest=s" => \$samplesOfInterest,
@@ -197,16 +207,7 @@ while(my $line = <STDIN>) {
     }
     elsif ($line =~ /^#CHROM/) {
 	# add ##comment with full command line run
-	my $com = qx/ps -o args= $$/;
-	chomp($com);
-	$com .= " < ".`readlink -f /proc/$$/fd/0` ;
-	chomp($com);
-	$com .= " > ".`readlink -f /proc/$$/fd/1` ;
-	chomp($com);
-	$com .= " 2> ".`readlink -f /proc/$$/fd/2` ;
-	chomp($com);
-	print "##filterBadCalls=<commandLine=\"$com\">\n";
-
+	print $addToHeader;
 	# remove samples that don't exist in $metadata (anymore) or are not of interest
 	chomp($line);
 	my @fields = split(/\t/,$line);
