@@ -49,7 +49,7 @@ my $batchSize = 500000;
 # heuristics for fixing low-quality or blatantly wrong genotype calls 
 # [$dp below represents max(DP,sumOfADs)]:
 # if $dp < $minDP , any call becomes NOCALL
-# if GQX (or GQ if GQX doesn't exist) < $minGQ , any call becomes NOCALL
+# if GQ < $minGQ , any call becomes NOCALL
 # if AF < $minAF and call was REF/VAR or VAR/VAR, call becomes NOCALL
 # if $dp >= $minDP_HV and AF >= $minAF_HV , call becomes HV
 # if $dp >= $minDP_HET and AF >= $minAF_HET and AF <= $maxAF_HET, call becomes HET
@@ -353,15 +353,7 @@ sub processBatch {
 	    }
 	}
 	# sanity: make sure the fields we need are there
-	# $gq is either GQX (Strelka) or GQ (GATK)
-	my $gq = "";
-	if (defined $format{"GQX"}){
-	    $gq = "GQX";
-	}elsif (defined $format{"GQ"}){
-	    $gq = "GQ";
-	}else{
-	    die "E $0: no GQ/GQX key in FORMAT string for line:\n$line\n";
-	}
+	(defined $format{"GQ"}) || die "E $0: no GQ key in FORMAT string for line:\n$line\n";
 	(defined $format{"GT"}) || die "E $0: no GT key in FORMAT string for line:\n$line\n";
 	(defined $format{"AD"}) || (defined $format{"DP"}) || die "E $0: no AD or DP key in FORMAT string for line:\n$line\n";
 
@@ -383,9 +375,9 @@ sub processBatch {
 	    # otherwise examine content and apply filters
 	    my @thisData = split(/:/, $data) ;
 
-	    if ((! $thisData[$format{$gq}]) || ($thisData[$format{$gq}] eq '.') ||
-		($thisData[$format{$gq}] < $filterParamsR->{"minGQ"})) {
-		# GQ/GQX undefined or too low, change to NOCALL
+	    if ((! $thisData[$format{"GQ"}]) || ($thisData[$format{"GQ"}] eq '.') ||
+		($thisData[$format{"GQ"}] < $filterParamsR->{"minGQ"})) {
+		# GQ undefined or too low, change to NOCALL
 		$lineToPrint .= "\t./.";
 		next;
 	    }
