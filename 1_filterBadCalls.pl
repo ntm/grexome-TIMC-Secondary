@@ -12,6 +12,7 @@
 #   obsoleted as dupes);
 # - ignore all samples except the $samplesOfInterest, if specified;
 # - non-variant lines are removed;
+# - QUAL and INFO are cleared to '.'
 # - phased genotypes x|y are replaced by unphased x/y;
 # - hemizygous calls x (strelka) or x/* or */x (gatk) are replaced by HV x/x;
 # - the new and useless GATK "weAreInAHomoDel" calls */* are replaced by ./.;
@@ -337,10 +338,10 @@ sub processBatch {
 	foreach my $alti (0..$#alts) {
 	    ($alts[$alti] eq '*') && ($starNum = $alti + 1);
 	}
-	# first 9 fields are copied except INFO is cleared, and AF is added to FORMAT after GT
-	my $lineToPrint = join("\t",@data[0..6]);
-	# clear INFO to '.'
-	$lineToPrint .= "\t.";
+	# first 6 fields are copied, QUAL and INFO are cleared, and AF is added to FORMAT after GT
+	my $lineToPrint = join("\t",@data[0..5]);
+	# clear QUAL and INFO to '.'
+	$lineToPrint .= "\t.\t.";
 	my $format = $data[8];
 	my $newFormat = $format;
 	($newFormat =~ s/^GT:/GT:AF:/)  || 
