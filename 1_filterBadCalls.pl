@@ -326,7 +326,7 @@ sub processBatch {
 	my @data = split(/\t/, $line);
 	(@data >= 10) || die "E $0: no sample data in line?\n$line\n";
 	# if no ALT in line, skip immediately
-	($data[4] eq '.') && next;
+	(($data[4] eq '.') || ($data[4] eq '<NON_REF>')) && next;
 	# GATK4 produces useless lines where there are NO sequencing reads
 	# (where FORMAT is eg GT or GT:GQ:PL), skip them immediately:
 	# any line with supporting reads must have an AD field
