@@ -6,19 +6,21 @@
 
 # Parses on stdin a Strelka or GATK GVCF file with one or more sample data columns;
 # Args: see $USAGE.
-# Prints to stdout a VCF file where:
+# Prints to stdout a VCF (default) or GVCF (with --keepHR) file where:
 # - samples that don't appear in $metadata "sampleID" column are removed
 #   (allows to discard data for samples that are in the GVCF but were
 #   obsoleted as dupes);
 # - ignore all samples except the $samplesOfInterest, if specified;
-# - non-variant lines are removed;
-# - QUAL and INFO are cleared to '.'
+# - QUAL is cleared to '.';
+# - INFO is cleared to '.' (except for non-variant blocks with --keepHR, where 
+#      INFO is kept as-is since END= is required)
 # - phased genotypes x|y are replaced by unphased x/y;
 # - hemizygous calls x (strelka) or x/* or */x (gatk) are replaced by HV x/x;
 # - the new and useless GATK "weAreInAHomoDel" calls */* are replaced by ./.;
 # - the variant calls in data columns are replaced by ./. if a call-condition
 #   is not met (see "heuristics"), or if previous call was '.' (the Strelka NOCALL);
-# - lines where every sample is now ./. or 0/0 are skipped;
+# - without --keepHR, lines where every sample is now ./. or 0/0 are skipped;
+# - with --keepHR, lines where every sample is now ./. are skipped;
 # - AF is added to FORMAT right after GT, and every 0/x or x/x call gets
 #   for AF the fraction of variant reads (rounded to 2 decimals), HR
 #   and x/y calls get '.';
@@ -44,7 +46,7 @@ $0 = basename($0);
 # Reduce if you are filling up $tmpDir (which should be on a RAMDISK),
 # increase if jobs are almost instantaneous (because you are then 
 # wasting time in parallelization overhead)
-my $batchSize = 500000;
+my $batchSize = 50000;
 
 
 # heuristics for fixing low-quality or blatantly wrong genotype calls 
@@ -75,6 +77,10 @@ my $metadata;
 # other samples are skipped. If empty every sample is kept.
 my $samplesOfInterest;
 
+# keepHR: if true keep lines even if they have only homoref calls 
+# (ie produce GVCF), otherwise HR-only lines are skipped (produce VCF)
+my $keepHR = '';
+
 # for multi-threading, need to create a tmpDir. It will
 # be removed when we are done and must not pre-exist.
 # To improve performance it should be on a ramdisk.
@@ -90,13 +96,14 @@ my $verbose = 0;
 # help: if true just print $USAGE and exit
 my $help = '';
 
-my $USAGE = "Parse a Strelka GVCF on stdin, print to stdout a similar GVCF where:
+my $USAGE = "Parse a Strelka GVCF on stdin, print to stdout a similar GVCF or VCF where:
 - calls that fail basic quality filters are changed to NOCALL,
 - calls that are blatantly wrong are fixed,
-- lines are only printed if at least one sample has a non-HR genotype call.\n
+- lines are only printed if at least one sample still has some genotype call (including HomoRefs with --keepHR, excluding HomoRefs without).
 Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --metadata string [no default] : patient metadata xlsx file, with path
 --samplesOfInterest string [default = all samples in metadata xlsx] : comma-separated list of sampleIDs of interest (other samples are ignored)
+--keepHR : keep lines even if the only genotype call is homoref
 --tmpdir string [default = $tmpDir] : subdir where tmp files will be created (on a RAMDISK if possible), must not pre-exist and will be removed after execution
 --jobs N [default = $numJobs] : number of parallel jobs=threads to run
 --verbose N [default 0] : if > 0 increase verbosity on stderr
@@ -114,6 +121,7 @@ $addToHeader = "##filterBadCalls=<commandLine=\"$addToHeader\">\n";
 
 GetOptions ("metadata=s" => \$metadata,
 	    "samplesOfInterest=s" => \$samplesOfInterest,
+	    "keepHR" => \$keepHR,
 	    "jobs=i" => \$numJobs,
 	    "verbose=i" => \$verbose,
 	    "tmpdir=s" => \$tmpDir,
@@ -274,7 +282,7 @@ while (!$lastBatch) {
     open(my $tmpOutFH, "> $tmpOut") || die "E $0: cannot open $tmpOut for writing\n";
 
     # process this batch
-    &processBatch(\@lines,$tmpOutFH,\%filterParams,\@skippedCols,$verbose);
+    &processBatch(\@lines,$tmpOutFH,\%filterParams,\@skippedCols,$keepHR,$verbose);
 
     # done, close tmp FH and create flag-file
     close($tmpOutFH) || die "E $0: cannot close tmp outFH $tmpOutFH\n";
@@ -311,10 +319,11 @@ warn "I $0: $now - ALL DONE, completed successfully!\n";
 # - outFH open filehandle to print to
 # - hashref with filter params
 # - ref to array saying which columns to skip
+# - $keepHR: HR-only lines are skipped if false, kept if true
 # - $verbose, 0 is quiet, increase value for more verbosity
 sub processBatch {
-    (@_ == 5) || die "E $0: processBatch needs 5 args\n";
-    my ($linesR,$outFH,$filterParamsR,$skippedColsR,$verbose) = @_;
+    (@_ == 6) || die "E $0: processBatch needs 6 args\n";
+    my ($linesR,$outFH,$filterParamsR,$skippedColsR,$keepHR,$verbose) = @_;
 
     # counters for number of blatant errors fixed to HV or HET
     my $fixedToHV = 0;
@@ -326,22 +335,30 @@ sub processBatch {
 	my $keepLine = 0;
 	my @data = split(/\t/, $line);
 	(@data >= 10) || die "E $0: no sample data in line?\n$line\n";
-	# if no ALT in line, skip immediately
-	(($data[4] eq '.') || ($data[4] eq '<NON_REF>')) && next;
+	# if not --keepHR and there is no ALT in line, skip immediately
+	(! $keepHR) && (($data[4] eq '.') || ($data[4] eq '<NON_REF>')) && next;
 	# GATK4 produces useless lines where there are NO sequencing reads
 	# (where FORMAT is eg GT or GT:GQ:PL), skip them immediately:
-	# any line with supporting reads must have an AD field
-	($data[8] =~ /:AD:/) || next;
+	# any line with supporting reads must have a DP or DPI field
+	($data[8] =~ /:DP:/) || ($data[8] =~ /:DPI:/) || next;
 	# grab alleleNum of ALT '*' if it's present
 	my $starNum = -1;
 	my @alts = split(/,/,$data[4]);
 	foreach my $alti (0..$#alts) {
 	    ($alts[$alti] eq '*') && ($starNum = $alti + 1);
 	}
-	# first 9 fields are copied except: QUAL and INFO are cleared, and AF is added to FORMAT after GT
+	# first 9 fields are copied except: QUAL is cleared, INFO is cleared except of it contains END=,
+	# and AF is added to FORMAT after GT
 	my $lineToPrint = join("\t",@data[0..4]);
-	# clear QUAL, copy FILTER, clear INFO
-	$lineToPrint .= "\t.\t$data[6]\t.";
+	# clear QUAL, copy FILTER
+	$lineToPrint .= "\t.\t$data[6]";
+	# copy INFO if it contains END=, clear otherwise
+	if ($data[7] =~ /^END=/) {
+	    $lineToPrint .= "\t$data[7]";
+	}
+	else {
+	    $lineToPrint .= "\t.";
+	}
 	my $format = $data[8];
 	my $newFormat = $format;
 	($newFormat =~ s/^GT:/GT:AF:/)  || 
@@ -356,8 +373,8 @@ sub processBatch {
 	    }
 	}
 	# sanity: make sure the fields we need are there
-	(defined $format{"GQ"}) || die "E $0: no GQ key in FORMAT string for line:\n$line\n";
 	(defined $format{"GT"}) || die "E $0: no GT key in FORMAT string for line:\n$line\n";
+	(defined $format{"GQ"}) || (defined $format{"GQX"}) ||die "E $0: no GQ or GQX key in FORMAT string for line:\n$line\n";
 	(defined $format{"AD"}) || (defined $format{"DP"}) || die "E $0: no AD or DP key in FORMAT string for line:\n$line\n";
 
 	# now deal with actual data fields
@@ -381,7 +398,7 @@ sub processBatch {
 	    # calculate $gq = max(GQ,GQX) making sure things are defined.
 	    # $gq stays at -1 if GQ and GQX are both undef or '.'
 	    my $gq = -1;
-	    if ((defined $thisData[$format{"GQ"}]) && ($thisData[$format{"GQ"}] ne '.')) {
+	    if ((defined $format{"GQ"}) && (defined $thisData[$format{"GQ"}]) && ($thisData[$format{"GQ"}] ne '.')) {
 		$gq = $thisData[$format{"GQ"}];
 	    }
 	    if ((defined $format{"GQX"}) && (defined $thisData[$format{"GQX"}]) &&
@@ -421,7 +438,7 @@ sub processBatch {
 	    # clean up GTs and calculate AF, for fracVarReads filter:
 	    # Strelka and GATK make some phased calls sometimes, homogenize as unphased
 	    $thisData[$format{"GT"}] =~ s~\|~/~ ;
-	    # Strelka also makes some hemizygous calls (eg when the position
+	    # Strelka also makes some hemizygous calls as 'x' (eg when the position
 	    # is in a HET deletion), makes sense but still, homogenize as HOMO
 	    $thisData[$format{"GT"}] =~ s~^(\d+)$~$1/$1~;
 	    # grab geno
@@ -496,11 +513,11 @@ sub processBatch {
 	    # other filters (eg strandDisc) would go here
 
 	    # OK data passed all filters but $thisData(GT) may have been changed
-	    # -> fix GT in $data and set $keepLine if at least one called allele is not REF
+	    # -> fix GT in $data and set $keepLine if needed
 	    ($data =~ s/^([^:]+):/$thisData[$format{"GT"}]:$af:/) || 
 		die "E $0: cannot fix GT to $thisData[$format{'GT'}] and add AF $af after the geno in: $data\n";
 	    $lineToPrint .= "\t$data";
-	    if ($thisData[$format{"GT"}] ne '0/0') {
+	    if ($keepHR || ($thisData[$format{"GT"}] ne '0/0')) {
 		$keepLine = 1;
 	    }
 	}
