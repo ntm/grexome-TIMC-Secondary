@@ -260,10 +260,15 @@ my $batchNum = 0;
 while (!$lastBatch) {
     $batchNum++;
     my @lines = ();
-    foreach my $i (1..$batchSize) {
+    my $cnt = $batchSize;
+    while ($cnt > 0) {
 	if (my $line = <STDIN>) {
 	    chomp($line);
 	    push(@lines,$line);
+	    $cnt--;
+	    # if we ate enough lines but current line is a
+	    # non-variant block, eat one more line
+	    ($cnt == 0) && ($line =~ /END=/) && (++$cnt);
 	}
 	else {
 	    # no more lines
@@ -321,6 +326,9 @@ warn "I $0: $now - ALL DONE, completed successfully!\n";
 # - ref to array saying which columns to skip
 # - $keepHR: HR-only lines are skipped if false, kept if true
 # - $verbose, 0 is quiet, increase value for more verbosity
+# PRECONDITION: last line of batch must not be a non-variant
+# block, except if it's the last line of an infile (so we don't
+# miss decrementing an END= for the strelka bug)
 sub processBatch {
     (@_ == 6) || die "E $0: processBatch needs 6 args\n";
     my ($linesR,$outFH,$filterParamsR,$skippedColsR,$keepHR,$verbose) = @_;
@@ -329,12 +337,29 @@ sub processBatch {
     my $fixedToHV = 0;
     my $fixedToHET = 0;
 
+    # delay printing lines so we can decrement END= if needed
+    # (to work-around strelka bug: when a non-variant block is
+    # followed by an indel, the END= coord goes one too far)
+    my $prevToPrint = '';
+    
     foreach my $line (@$linesR) {
 	# $keepLine: boolean, true if at least one non-'*' ALT is called for at 
 	# least one sample after filtering
 	my $keepLine = 0;
 	my @data = split(/\t/, $line);
 	(@data >= 10) || die "E $0: no sample data in line?\n$line\n";
+
+	# BEFORE ANYTHING ELSE: deal with $prevToPrint
+	if ($prevToPrint) {
+	    # we only want to decrement END= if it was ending at current POS
+	    my $thisPos = $data[1];
+	    my $prevEnd = $thisPos - 1;
+	    # assuming chroms were the same if we match END=$thisPos
+	    $prevToPrint =~ s/END=$thisPos;/END=$prevEnd;/;
+	    print $outFH $prevToPrint;
+	    $prevToPrint = '';
+	}
+	
 	# if not --keepHR and there is no ALT in line, skip immediately
 	(! $keepHR) && (($data[4] eq '.') || ($data[4] eq '<NON_REF>')) && next;
 	# GATK4 produces useless lines where there are NO sequencing reads
@@ -534,9 +559,11 @@ sub processBatch {
 		$keepLine = 1;
 	    }
 	}
-	# done with $line, print if at least one sample is not NOCALL|HOMOREF
-	($keepLine) && (print $outFH "$lineToPrint\n");
+	# done with $line, save for printing if $keepLine
+	($keepLine) && ($prevToPrint = "$lineToPrint\n");
     }
+    # print last line if needed
+    ($prevToPrint) && (print $outFH $prevToPrint);
     # INFO with number of fixed calls in this batch, we don't care that this
     # comes out of order to stderr
     ($verbose) && (warn "I $0: fixed $fixedToHV calls from HET to HV\n");
