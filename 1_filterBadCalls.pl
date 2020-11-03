@@ -21,9 +21,9 @@
 #   is not met (see "heuristics"), or if previous call was '.' (the Strelka NOCALL);
 # - without --keepHR, lines where every sample is now ./. or 0/0 are skipped;
 # - with --keepHR, lines where every sample is now ./. are skipped;
-# - AF is added to FORMAT right after GT, and every 0/x or x/x call gets
-#   for AF the fraction of variant reads (rounded to 2 decimals), HR
-#   and x/y calls get '.';
+# - AF is moved (if it pre-exists) or added (otherwise) to FORMAT right after GT, 
+#   and every 0/x or x/x call gets for AF the fraction of variant reads (rounded
+#   to 2 decimals), HR and x/y calls get '.';
 # - fix blatantly wrong genotype calls, see "heuristics" below.
 
 use strict;
@@ -347,8 +347,8 @@ sub processBatch {
 	foreach my $alti (0..$#alts) {
 	    ($alts[$alti] eq '*') && ($starNum = $alti + 1);
 	}
-	# first 9 fields are copied except: QUAL is cleared, INFO is cleared except of it contains END=,
-	# and AF is added to FORMAT after GT
+	# first 9 fields are copied except: QUAL is cleared, INFO is cleared except 
+	# if it contains END=, and AF is moved or added to FORMAT after GT
 	my $lineToPrint = join("\t",@data[0..4]);
 	# clear QUAL, copy FILTER
 	$lineToPrint .= "\t.\t$data[6]";
@@ -361,6 +361,8 @@ sub processBatch {
 	}
 	my $format = $data[8];
 	my $newFormat = $format;
+	# if AF already there we remove it (then add it back right after GT)
+	($newFormat =~ s/:AF:/:/);
 	($newFormat =~ s/^GT:/GT:AF:/)  || 
 	    die "E $0: cannot add AF after GT in format: $format\n";
 	$lineToPrint .= "\t$newFormat";
@@ -380,20 +382,20 @@ sub processBatch {
 	# now deal with actual data fields
 	foreach my $i (9..$#data) {
 	    ($skippedColsR->[$i]) && next;
-	    my $data = $data[$i];
+	    my $thisData = $data[$i];
 	    # if genotype is already '.' or './.' == NOCALL, just use ./.
-	    if (($data =~ m~^\.$~) || ($data =~ m~^\.:~) || ($data =~ m~^\./\.~)) {
+	    if (($thisData =~ m~^\.$~) || ($thisData =~ m~^\.:~) || ($thisData =~ m~^\./\.~)) {
 		$lineToPrint .= "\t./." ;
 		next;
 	    }
 	    # also if call is */* or *|* , just replace with ./.
-	    if ($data =~ m~^$starNum[/|]$starNum:~) {
+	    if ($thisData =~ m~^$starNum[/|]$starNum:~) {
 		$lineToPrint .= "\t./." ;
 		next;
 	    }
 
 	    # otherwise examine content and apply filters
-	    my @thisData = split(/:/, $data) ;
+	    my @thisData = split(/:/, $thisData) ;
 
 	    # calculate $gq = max(GQ,GQX) making sure things are defined.
 	    # $gq stays at -1 if GQ and GQX are both undef or '.'
@@ -467,26 +469,32 @@ sub processBatch {
 		$thisData[$format{"GT"}] = "$geno1/$geno2";
 	    }
 
-	    my $af = '.';
-	    if (($geno2 != 0) && (($geno1 == 0) || ($geno1 == $geno2))) {
+	    my $af;
+	    if ((defined $format{"AF"}) && ($thisData[$format{"AF"}])) {
+		# AF was already there, just reuse
+		$af = $thisData[$format{"AF"}];
+	    }
+	    elsif (($geno2 != 0) && (($geno1 == 0) || ($geno1 == $geno2))) {
 		# 0/x HET or x/x HV, AD should always be there
 		if ((! $thisData[$format{"AD"}]) || ($thisData[$format{"AD"}] !~ /^[\d,]+$/)) {
-		    die "E $0: GT is HET or HV but we don't have AD or AD data is blank in:\n$line\nright after:\n$lineToPrint\n";
+		    die "E $0: GT is HET or HV but we don't have AD or AD data is blank in:\n$line\n";
 		}
 		my @ads = split(/,/, $thisData[$format{"AD"}]);
 		# $geno2 is always the index of the VAR (thanks to sorting above)
 		my $fracVarReads = $ads[$geno2] / $thisDP ;
-		if ($fracVarReads < $filterParamsR->{"minAF"}) {
-		    # fracVarReads too low, change to NOCALL
-		    $lineToPrint .= "\t./.";
-		    next;
-		}
-		else {
-		    # keeping, round AF to nearest float with 2 decimals
-		    $af = sprintf("%.2f",$fracVarReads);
-		}
+		# round AF to nearest float with 2 decimals
+		$af = sprintf("%.2f",$fracVarReads);
 	    }
-	    # else this is HR or x/y, minAF doesn't apply, use default AF='.'
+	    else {
+		# AF doesn't pre-exist and this is HR or x/y, set AF='.'
+		$af = '.';
+	    }
+
+	    if (($af ne '.') && ($af < $filterParamsR->{"minAF"})) {
+		# AF too low, change to NOCALL
+		$lineToPrint .= "\t./.";
+		next;
+	    }
 
 	    # we have $thisDP and $af , fix blatantly wrong calls
 	    if (($thisDP >= $filterParamsR->{"minDP_HV"}) && ($geno1 == 0) &&
@@ -512,11 +520,16 @@ sub processBatch {
 
 	    # other filters (eg strandDisc) would go here
 
-	    # OK data passed all filters but $thisData(GT) may have been changed
-	    # -> fix GT in $data and set $keepLine if needed
-	    ($data =~ s/^([^:]+):/$thisData[$format{"GT"}]:$af:/) || 
-		die "E $0: cannot fix GT to $thisData[$format{'GT'}] and add AF $af after the geno in: $data\n";
-	    $lineToPrint .= "\t$data";
+	    # OK data passed all filters, AF needs to be moved or added
+	    if ((defined $format{"AF"}) && ($thisData[$format{"AF"}])) {
+		# remove from previous position, wherever it was
+		splice(@thisData, $format{"AF"}, 1);
+	    }
+	    # add back in second position
+	    splice(@thisData, 1, 0,$af);
+
+	    $lineToPrint .= "\t".join(':',@thisData);
+
 	    if ($keepHR || ($thisData[$format{"GT"}] ne '0/0')) {
 		$keepLine = 1;
 	    }
