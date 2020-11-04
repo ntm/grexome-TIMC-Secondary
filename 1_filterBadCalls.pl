@@ -49,7 +49,7 @@ $0 = basename($0);
 # Reduce if you are filling up $tmpDir (which should be on a RAMDISK),
 # increase if jobs are almost instantaneous (because you are then 
 # wasting time in parallelization overhead)
-my $batchSize = 50000;
+my $batchSize = 500000;
 
 
 # heuristics for fixing low-quality or blatantly wrong genotype calls 
@@ -624,7 +624,7 @@ sub eatTmpFiles {
 	    next;
 	}
 
-	elsif (-e $tmpOutLast) {
+	elsif ((-e $tmpOutLast) && (! -z $tmpOutLast)) {
 	    open (IN, $tmpOutLast) || 
 		die "E $0: in eatTmpFiles, cannot open tmpOutLast $tmpOutLast although it exists: $!\n";
 	    $lastBatch = <IN>;
