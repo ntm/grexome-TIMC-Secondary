@@ -265,7 +265,7 @@ while(my $line = <STDIN>) {
 
     # HV
     $lineToPrint .= "\t";
-    foreach my $geno (keys %geno2samples) {
+    foreach my $geno (sort keys %geno2samples) {
 	($geno eq '0/0') && next; # skip HR
 	($geno =~ m~^(\d+)/\1$~) || next;
 	my $allele = $1;
@@ -283,7 +283,7 @@ while(my $line = <STDIN>) {
 
     # HET == 0/*
     $lineToPrint .= "\t";
-    foreach my $geno (keys %geno2samples) {
+    foreach my $geno (sort keys %geno2samples) {
 	($geno eq '0/0') && next; # skip HR
 	($geno =~ m~^0/(\d+)$~) || next;
 	my $allele = $1;
