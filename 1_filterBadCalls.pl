@@ -290,13 +290,16 @@ while ($lineForNextBatch) {
     my $eaten = 0;
     while (my $line = <STDIN>) {
 	chomp($line);
-	if (($eaten >= $batchSize) && ($line =~ /^[^\t]+\t[^\t]+\t[^\t]+\t.\t.\t/)) {
-	    # batch already has enough lines and $line has single-char REF and ALT,
-	    # it can't be an indel
-	    $lineForNextBatch = $line;
-	    last;
+	if (($eaten >= $batchSize) && ($line =~ /^[^\t]+\t[^\t]+\t[^\t]+\t.\t([^\t]+)\t/)) {
+	    # batch already has enough lines and has a single-char REF...
+	    my $alts = $1;
+	    if (($alts eq '<NON_REF>') || ($alts =~ /^.,<NON_REF>$/) || ($alts =~ /^.$/)) {
+		# non-variant position or single-char ALT, can't be an indel
+		$lineForNextBatch = $line;
+		last;
+	    }
 	}
-	# else batch isn't full yet, or $line might be an indel -> in both cases eat it
+	# if we didn't "last" batch isn't full yet, or $line might be an indel -> in both cases eat it
 	push(@lines,$line);
 	$eaten++;
     }
