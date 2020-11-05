@@ -265,7 +265,7 @@ while(my $line = <STDIN>) {
 
     # HV
     $lineToPrint .= "\t";
-    foreach my $geno (sort keys %geno2samples) {
+    foreach my $geno (sort GENOSORT keys %geno2samples) {
 	($geno eq '0/0') && next; # skip HR
 	($geno =~ m~^(\d+)/\1$~) || next;
 	my $allele = $1;
@@ -283,7 +283,7 @@ while(my $line = <STDIN>) {
 
     # HET == 0/*
     $lineToPrint .= "\t";
-    foreach my $geno (sort keys %geno2samples) {
+    foreach my $geno (sort GENOSORT keys %geno2samples) {
 	($geno eq '0/0') && next; # skip HR
 	($geno =~ m~^0/(\d+)$~) || next;
 	my $allele = $1;
@@ -301,7 +301,7 @@ while(my $line = <STDIN>) {
 
     # OTHER
     $lineToPrint .= "\t";
-    foreach my $geno (sort keys %geno2samples) {
+    foreach my $geno (sort GENOSORT keys %geno2samples) {
 	($geno eq '0/0') && next; # skip HR
 	($geno =~ m~^(\d+)/(\d+)$~) || die "E $0: cannot parse geno $geno in line:\n$line\n";
 	my ($allele1,$allele2) = ($1,$2);
@@ -339,3 +339,14 @@ while(my $line = <STDIN>) {
 
 $now = strftime("%F %T", localtime);
 warn "I $0: $now - ALL DONE, completed successfully!\n";
+
+
+#######################################
+# sort function for genotypes x/y (x and y are ints)
+sub GENOSORT {
+    ($a =~ m~^(\d+)/(\d+)$~) || die "E $0 in GENOSORT: cannot decompose a $a\n";
+    my ($a1,$a2) = ($1,$2);
+    ($b =~ m~^(\d+)/(\d+)$~) || die "E $0 in GENOSORT: cannot decompose b $b\n";
+    my ($b1,$b2) = ($1,$2);
+    return(($a1 <=> $b1) || ($a2 <=> $b2));
+}
