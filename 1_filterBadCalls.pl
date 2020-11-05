@@ -212,15 +212,21 @@ if ($samplesOfInterest) {
 # eg they were dupes of other samples with better sequencing)
 my @skippedCols = ();
 
+# accumulator for header, so we can avoid printing anything if stdin doesn't 
+# contain any samples (of interest)
+my $headerToPrint = "";
+
 # parse header, just copy it except we remove samples that don't exist anymore
 while(my $line = <STDIN>) {
     if ($line =~ /^##/) {
-	print $line;
+	$headerToPrint .= $line;
     }
     elsif ($line =~ /^#CHROM/) {
 	# add ##comment with full command line run
-	print $addToHeader;
+	$headerToPrint .= $addToHeader;
 	# remove samples that don't exist in $metadata (anymore) or are not of interest
+	# also remeber if at least one sample remains
+	my $goodSamples = 0;
 	chomp($line);
 	my @fields = split(/\t/,$line);
 	foreach my $i (reverse(9..$#fields)) {
@@ -229,14 +235,28 @@ while(my $line = <STDIN>) {
 		splice(@fields,$i,1);
 		$skippedCols[$i] = 1;
 	    }
+	    else {
+		$goodSamples = 1;
+	    }
 	}
-	print join("\t",@fields)."\n";
-	last;
+	if (! $goodSamples) {
+	    # STDIN doesn't contain any samples of interest
+	    warn "W $0: no valid samples (of interest) here, nothing to do\n";
+	    rmdir($tmpDir) || 
+		die "E $0: no samples of interest but cannot rmdir tmpDir $tmpDir, why? $!\n";
+	    exit(0);
+	}
+	else {
+	    $headerToPrint .= join("\t",@fields)."\n";
+	    print $headerToPrint;
+	    last;
+	}
     }
     else {
 	die "E $0: parsing header, found bad line:\n$line";
     }
 }
+
 
 # flush stdout before starting our eatTmpFiles job
 STDOUT->flush();
