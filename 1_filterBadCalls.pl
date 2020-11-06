@@ -404,7 +404,7 @@ sub processBatch {
 	my $starNum = -1;
 	my @alts = split(/,/,$data[4]);
 	foreach my $alti (0..$#alts) {
-	    ($alts[$alti] eq '*') && ($starNum = $alti + 1);
+	    ($alts[$alti] eq '*') && ($starNum = $alti + 1) && last;
 	}
 	# first 9 fields are copied except: QUAL is cleared, INFO is cleared except 
 	# if it contains END=, and AF is moved or added to FORMAT after GT
@@ -472,12 +472,62 @@ sub processBatch {
 		next;
 	    }
 
+	    # clean up GTs:
+	    # Strelka and GATK make some phased calls sometimes, homogenize as unphased
+	    $thisData[$format{"GT"}] =~ s~\|~/~ ;
+	    # Strelka makes some hemizygous calls as 'x' (eg when the position
+	    # is in a HET deletion), makes sense but still, homogenize as HOMO
+	    $thisData[$format{"GT"}] =~ s~^(\d+)$~$1/$1~;
+	    # grab geno
+	    my ($geno1,$geno2) = split(/\//, $thisData[$format{"GT"}]);
+	    ((defined $geno1) && (defined $geno2)) ||
+		die "E $0: a sample's genotype cannot be split: ".$thisData[$format{"GT"}]."in:\n$line\n";
+	    # GATK hemizygous calls (eg under a HET DEL) appear as x/* or */x, fix to x/x
+	    if ($starNum != -1) {
+		if ($geno2 == $starNum) {
+		    # */* shouldn't exist (replaced by ./. and next'd earlier)
+		    ($geno1 == $starNum) &&
+			die "E $0: WTF genotype */* shouln't exist anymore!\n$line\n$lineToPrint\n"; 
+		    $geno2 = $geno1;
+		}
+		elsif ($geno1 == $starNum) {
+		    $geno1 = $geno2;
+		}
+	    }
+	    # make sure alleles are in sorted order
+	    if ($geno2 < $geno1) {
+		my $genot = $geno1;
+		$geno1 = $geno2;
+		$geno2 = $genot;
+	    }
+	    # OK save clean GT
+	    $thisData[$format{"GT"}] = "$geno1/$geno2";
+
+	    # if '*' is in ALTs we want to ignore any reads attributed to it in DP and AD,
+	    # so our DP and AF are correct (and to avoid incorrectly "fixing" calls)
+	    # NOTE: we don't touch GQ, PL or SB
+	    if (($starNum != -1) && (defined $format{"AD"}) && (defined $thisData[$format{"AD"}]) &&
+		($thisData[$format{"AD"}] ne '.')) {
+		# '*' is in ALTs and AD is defined and has data
+		my @ADs = split(/,/,$thisData[$format{"AD"}]);
+		# sanity
+		(@ADs == 1 + @alts) ||
+		    die "E $0: WTF! AD has wrong number of values in $thisData from line:\n$line\n";
+		# sanity: '*' means this is GATK and if we have AD in GATK we must have DP
+		((defined $format{"DP"}) && (defined $thisData[$format{"DP"}]) && ($thisData[$format{"DP"}] =~ /^\d+$/)) ||
+		    die "E $0: WTF! we have AD but not DP in $thisData from line:\n$line\n";
+		# decrement DP as needed and set AD for '*' to 0
+		$thisData[$format{"DP"}] -= $ADs[$starNum];
+		$ADs[$starNum] = 0;
+		$thisData[$format{"AD"}] = join(',', @ADs);
+	    }
+
 	    # grab the depth (DP or sumOfADs, whichever is defined and higher)
 	    my $thisDP = -1;
-	    if ((defined $format{"DP"}) && ($thisData[$format{"DP"}]) && ($thisData[$format{"DP"}] ne '.')) {
+	    if ((defined $format{"DP"}) && (defined $thisData[$format{"DP"}]) && ($thisData[$format{"DP"}] ne '.')) {
 		$thisDP = $thisData[$format{"DP"}];
 	    }
-	    if ((defined $format{"AD"}) && ($thisData[$format{"AD"}]) && ($thisData[$format{"AD"}] =~ /^[\d,]+$/)) {
+	    if ((defined $format{"AD"}) && (defined $thisData[$format{"AD"}]) && ($thisData[$format{"AD"}] =~ /^[\d,]+$/)) {
 		my $sumOfADs = 0;
 		foreach my $ad (split(/,/,$thisData[$format{"AD"}])) {
 		    $sumOfADs += $ad;
@@ -493,46 +543,16 @@ sub processBatch {
 	    # with GATK I had some issues with DP=0 calls, causing illegal divisions
 	    # by zero when calculating AF, but that is now skipped above
 
-	    # clean up GTs and calculate AF, for fracVarReads filter:
-	    # Strelka and GATK make some phased calls sometimes, homogenize as unphased
-	    $thisData[$format{"GT"}] =~ s~\|~/~ ;
-	    # Strelka also makes some hemizygous calls as 'x' (eg when the position
-	    # is in a HET deletion), makes sense but still, homogenize as HOMO
-	    $thisData[$format{"GT"}] =~ s~^(\d+)$~$1/$1~;
-	    # grab geno
-	    my ($geno1,$geno2) = split(/\//, $thisData[$format{"GT"}]);
-	    ((defined $geno1) && (defined $geno2)) ||
-		die "E $0: a sample's genotype cannot be split: ".$thisData[$format{"GT"}]."in:\n$line\n";
-	    # GATK hemizygous calls (eg under a HET DEL) appear as x/* or */x, fix to x/x
-	    if ($starNum != -1) {
-		if ($geno2 == $starNum) {
-		    # */* shouldn't exist (replaced by ./. earlier)
-		    ($geno1 == $starNum) &&
-			die "E $0: WTF genotype */* shouln't exist anymore!\n$line\n$lineToPrint\n"; 
-		    $geno2 = $geno1;
-		    $thisData[$format{"GT"}] = "$geno1/$geno2";
-		}
-		elsif ($geno1 == $starNum) {
-		    $geno1 = $geno2;
-		    $thisData[$format{"GT"}] = "$geno1/$geno2";
-		}
-	    }
-	    # make sure alleles are in sorted order
-	    if ($geno2 < $geno1) {
-		my $genot = $geno1;
-		$geno1 = $geno2;
-		$geno2 = $genot;
-		$thisData[$format{"GT"}] = "$geno1/$geno2";
-	    }
 
+	    # calculate AF, for fracVarReads filter:
 	    my $af;
-	    if ((defined $format{"AF"}) && ($thisData[$format{"AF"}])) {
+	    if ((defined $format{"AF"}) && (defined $thisData[$format{"AF"}])) {
 		# AF was already there, just reuse
 		$af = $thisData[$format{"AF"}];
 	    }
 	    elsif (($geno2 != 0) && (($geno1 == 0) || ($geno1 == $geno2))) {
 		# 0/x HET or x/x HV, AD should always be there
-		if ((! $thisData[$format{"AD"}]) || ($thisData[$format{"AD"}] !~ /^[\d,]+$/)) {
+		if ((!defined $thisData[$format{"AD"}]) || ($thisData[$format{"AD"}] !~ /^[\d,]+$/)) {
 		    die "E $0: GT is HET or HV but we don't have AD or AD data is blank in:\n$line\n";
 		}
 		my @ads = split(/,/, $thisData[$format{"AD"}]);
@@ -577,12 +597,12 @@ sub processBatch {
 	    # other filters (eg strandDisc) would go here
 
 	    # OK data passed all filters, AF needs to be moved or added
-	    if ((defined $format{"AF"}) && ($thisData[$format{"AF"}])) {
+	    if ((defined $format{"AF"}) && (defined $thisData[$format{"AF"}])) {
 		# remove from previous position, wherever it was
 		splice(@thisData, $format{"AF"}, 1);
 	    }
 	    # add back in second position
-	    splice(@thisData, 1, 0,$af);
+	    splice(@thisData, 1, 0, $af);
 
 	    $lineToPrint .= "\t".join(':',@thisData);
 
