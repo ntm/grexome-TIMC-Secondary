@@ -398,8 +398,8 @@ sub processBatch {
 	(! $keepHR) && (($data[4] eq '.') || ($data[4] eq '<NON_REF>')) && next;
 	# GATK4 produces useless lines where there are NO sequencing reads
 	# (where FORMAT is eg GT or GT:GQ:PL), skip them immediately:
-	# any line with supporting reads must have a DP or DPI field
-	($data[8] =~ /:DP:/) || ($data[8] =~ /:DPI:/) || next;
+	# any line with supporting reads must have a DP or AD field
+	($data[8] =~ /:DP:/) || ($data[8] =~ /:AD:/) || next;
 	# grab alleleNum of ALT '*' if it's present
 	my $starNum = -1;
 	my @alts = split(/,/,$data[4]);
@@ -472,13 +472,10 @@ sub processBatch {
 		next;
 	    }
 
-	    # grab the depth (DP or DPI or sumOfADs, whichever is defined and higher)
+	    # grab the depth (DP or sumOfADs, whichever is defined and higher)
 	    my $thisDP = -1;
 	    if ((defined $format{"DP"}) && ($thisData[$format{"DP"}]) && ($thisData[$format{"DP"}] ne '.')) {
 		$thisDP = $thisData[$format{"DP"}];
-	    }
-	    if ((defined $format{"DPI"}) && ($thisData[$format{"DPI"}]) && ($thisData[$format{"DPI"}] ne '.')) {
-		($thisDP < $thisData[$format{"DPI"}]) && ($thisDP = $thisData[$format{"DPI"}]);
 	    }
 	    if ((defined $format{"AD"}) && ($thisData[$format{"AD"}]) && ($thisData[$format{"AD"}] =~ /^[\d,]+$/)) {
 		my $sumOfADs = 0;
@@ -665,7 +662,7 @@ sub eatTmpFiles {
 
 	else {
 	    # wait a few seconds before looking again
-	    sleep(10);
+	    sleep(2);
 	    next;
 	}
     }
