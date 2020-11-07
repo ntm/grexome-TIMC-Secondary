@@ -507,7 +507,7 @@ sub processBatch {
 	    # so our DP and AF are correct (and to avoid incorrectly "fixing" calls)
 	    # NOTE: we don't touch GQ, PL or SB
 	    if (($starNum != -1) && (defined $format{"AD"}) && (defined $thisData[$format{"AD"}]) &&
-		($thisData[$format{"AD"}] ne '.')) {
+		($thisData[$format{"AD"}]  =~ /^[\d,]+$/)) {
 		# '*' is in ALTs and AD is defined and has data
 		my @ADs = split(/,/,$thisData[$format{"AD"}]);
 		# sanity
