@@ -25,7 +25,7 @@ our @ISA = ('Exporter');
 # provide the customized *config.pm as an argument, see --config in
 # grexome-TIMC-secondary.pl for an example.
 our @EXPORT_OK = qw(refGenome vepCacheFile vepPluginDataPath fastTmpPath 
-                    coveragePath gtexDatafile gtexFavoriteTissues compatible);
+                    coveragePath gtexDatafile gtexFavoriteTissues compatible subCohorts);
 
 
 #################################################################
@@ -150,6 +150,17 @@ sub compatible {
 		      ["Azoo","Ovo","Macro","IOP"],
 		      ["Globo","Macro","Terato"]);
     return(\@compatible);
+}
+
+
+# Return a ref to a hash:
+# key==path+file defining a subCohort (filename must start with subCohort_ and end with .txt),
+# value==pathology (must match the "pathology" column of the metadata xlsx).
+sub subCohorts {
+    my %subCohorts = ("/home/nthierry/VariantCalling/GrexomeFauve/Grexome_Metadata/4-SubCohorts/subCohort_FV.txt" => "Azoo",
+		      "/home/nthierry/VariantCalling/GrexomeFauve/Grexome_Metadata/4-SubCohorts/subCohort_London.txt" => "Azoo",
+		      "/home/nthierry/VariantCalling/GrexomeFauve/Grexome_Metadata/4-SubCohorts/subCohort_AzooZouari.txt" => "Azoo");
+    return(\%subCohorts);
 }
 
 

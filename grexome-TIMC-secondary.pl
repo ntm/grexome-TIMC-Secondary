@@ -104,7 +104,7 @@ GetOptions ("metadata=s" => \$metadata,
 (-f $config) ||  die "E $0: the supplied config.pm doesn't exist: $config\n";
 require($config);
 grexomeTIMCsec_config->import(qw(refGenome vepCacheFile vepPluginDataPath fastTmpPath), 
-			      qw(coveragePath gtexDatafile gtexFavoriteTissues));
+			      qw(coveragePath gtexDatafile gtexFavoriteTissues subCohorts));
 
 ($outDir) || die "E $0: you must provide an outDir\n";
 (-e $outDir) && 
@@ -238,37 +238,50 @@ system($com) && die "E $0: step9-finalCohorts failed: $?";
 ######################
 # STEP 9 - SUBCOHORTS (can run after requireUndiagnosed and addPatientIDs)
 #
-# this step is not generic yet...
-# The idea is to produce Cohorts and Transcripts files corresponding to subsets of
+# Only runs if sub-cohorts are defined in &subCohorts() (and the files exist):
+# the idea is to produce Cohorts and Transcripts files corresponding to subsets of
 # samples, all affected with the same pathology. Typically the subsets are samples
 # that were provided by collaborators, and this allows us to send them the results
 # concerning their patients.
 
 # key==path+file defining a subCohort, value==pathology
-my %subCohorts = ("~/VariantCalling/GrexomeFauve/Grexome_Metadata/4-SubCohorts/subCohort_FV.txt" => "Azoo",
-		  "~/VariantCalling/GrexomeFauve/Grexome_Metadata/4-SubCohorts/subCohort_London.txt" => "Azoo",
-		  "~/VariantCalling/GrexomeFauve/Grexome_Metadata/4-SubCohorts/subCohort_AzooZouari.txt" => "Azoo");
+my $subCohortsR = &subCohorts();
 
-mkdir("$outDir/SubCohorts") || die "E $0: cannot mkdir $outDir/SubCohorts\n";
-$com = "( ";
-foreach my $subC (keys(%subCohorts)) {
-    my $patho = $subCohorts{$subC};
-    # grab filename from $subC and remove leading "subCohort_" and trailing .txt
-    my $outFileRoot = basename($subC);
-    ($outFileRoot =~ s/^subCohort_//) || die "E $0: cannot remove leading subCohort_ from subCohortFile $outFileRoot\n";
-    ($outFileRoot =~ s/\.txt$//) || die "E $0: cannot remove .txt from subCohortFile $outFileRoot\n";
-    $outFileRoot = "$outDir/SubCohorts/$outFileRoot";
-   
-    $com .= "perl $RealBin/9_extractSubcohort.pl $subC < $outDir/Cohorts/$patho.final.patientIDs.csv > $outFileRoot.cohort.csv ; ";
-    $com .= "perl $RealBin/9_extractSubcohort.pl $subC < $outDir/Transcripts/$patho.Transcripts.patientIDs.csv > $outFileRoot.transcripts.csv ; ";
+# don't do anything if no subcohort file exists
+my $doSubCs = 0;
+foreach my $subC (keys(%$subCohortsR)) {
+    if (-e $subC) {
+	$doSubCs=1;
+    }
+    else {
+	warn "W $0: sub-cohort file $subC defined in \&subCohorts() but this file doesn't exist. Skipping this sub-cohort.\n";
+    }
 }
-if ($debug) {
-    $com .= "2> $outDir/step9-subCohorts.err )";
+if ($doSubCs) {
+    mkdir("$outDir/SubCohorts") || die "E $0: cannot mkdir $outDir/SubCohorts\n";
+    $com = "( ";
+    foreach my $subC (keys(%$subCohortsR)) {
+	my $patho = $subCohortsR->{$subC};
+	# grab filename from $subC and remove leading "subCohort_" and trailing .txt
+	my $outFileRoot = basename($subC);
+	($outFileRoot =~ s/^subCohort_//) || die "E $0: cannot remove leading subCohort_ from subCohortFile $outFileRoot\n";
+	($outFileRoot =~ s/\.txt$//) || die "E $0: cannot remove .txt from subCohortFile $outFileRoot\n";
+	$outFileRoot = "$outDir/SubCohorts/$outFileRoot";
+	
+	$com .= "perl $RealBin/9_extractSubcohort.pl $subC < $outDir/Cohorts/$patho.final.patientIDs.csv > $outFileRoot.cohort.csv ; ";
+	$com .= "perl $RealBin/9_extractSubcohort.pl $subC < $outDir/Transcripts/$patho.Transcripts.patientIDs.csv > $outFileRoot.transcripts.csv ; ";
+    }
+    if ($debug) {
+	$com .= "2> $outDir/step9-subCohorts.err )";
+    }
+    else {
+	$com .= " )";
+    }
+    system($com) && die "E $0: step9-subCohorts failed: $?";
 }
 else {
-    $com .= " )";
+    warn "I $0: no existing sub-cohort, step9-subCohorts skipped\n";
 }
-system($com) && die "E $0: step9-subCohorts failed: $?";
 
 ######################
 # all done, clean up tmpdir
