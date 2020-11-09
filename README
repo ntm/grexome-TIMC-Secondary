@@ -1,0 +1,61 @@
+Exome pipeline from TIMC in Grenoble - secondary analyses:
+from a single multi-sample GVCF or VCF file to a set of analysis-ready TSVs.
+
+
+DEPENDENCIES:
+*************
+We try to keep external dependencies to a minimum. The only required perl modules are listed below. Most are standard modules and should already be available on your system, a few will probably need to be installed from your distribution's standard repositories (e.g. "sudo yum install perl-Parallel-ForkManager" on RHEL7). Required modules:
+Exporter
+File::Basename
+File::Copy
+File::Temp
+FindBin
+Getopt::Long
+POSIX
+Parallel::ForkManager
+Spreadsheet::XLSX
+Storable
+
+
+In addition we use the excellent Ensembl Variant Effect Predictor (VEP [1]) for annotating variants. VEP must be installed along with the Ensembl cache (we use Homo sapiens cache 101_GRCh38 at time of writing). We also use some VEP plugins (currently dbNSFP and dbscSNV), they must be installed along with the associated datafiles if any. This can all be customized by editing the short "construct the full VEP command-line" section of 3_runVEP.pl and/or via &vepPluginDataPath() in grexomeTIMCsec_config.pm.
+
+[1] http://www.ensembl.org/info/docs/tools/vep/script
+
+
+METADATA FILES:
+***************
+The pipeline requires 2 xlsx files with metadata: one describing the samples, and the other listing candidate genes. Examples are provided in the Documentation/ subdirectory, these can serve as starting points. All columns present in the example files (listed below) are required by the pipeline, don't change their names! However, you can add more columns and/or change the order or columns.
+
+1. patient_summary.xlsx describes the samples. Required columns:
+- sampleID: unique identifier for each sample, these can be created with a uniform naming scheme when receiving new samples and use them internally throughout the pipeline;
+- specimenID: external identifier for each sample, typically related to the BAM or FASTQ filenames;
+- patientID: a more user-friendly identifier for each sample - can be empty, but if it isn't it will be used instead of specimenID as external sample identifier;
+- pathology: the phenotype of each patient/sample, used to construct the "cohorts", see also &compatible() in grexomeTIMCsec_config.pm;
+- Causal gene: contains the name of the gene when a causal variant is identified for a patient (can be empty).
+
+2. candidateGenes.xlsx lists candidate genes. Required columns:
+- Candidate gene: name of gene (should be the HGNC name, see www.genenames.org)
+- pathology: phenotype, same as in patient_summary.xlsx
+- Level: indicates how confident you are that LOF variants in this gene are causal for this pathology. Use integers between 1 and 5, 5 means the gene is definitely causal.
+
+In addition you can construct "sub-cohort" files (e.g. Documentation/subCohort_Darwin.txt). A subCohort file simply lists some samples by their sampleID (same as in patient_summary.xlsx), one sample per line. This allows to produce Cohorts and Transcripts files corresponding to subsets of samples, all affected by the same pathology. Typically the subsets are samples that were provided by collaborators, and this allows us to send them the results concerning their patients.
+To add or remove sub-cohorts you have to edit &subCohorts() in grexomeTIMCsec_config.pm .
+
+
+CONFIGURATION:
+**************
+Before using the pipeline you must customize the grexomeTIMCsec_config.pm file, which defines every install-specific parameter (eg path+name of the reference human genome fasta file). To do this you can either copy the file somewhere and edit the copy, then use --config; or edit the distributed copy in-place (not as flexible).
+Every subroutine in grexomeTIMCsec_config.pm is self-documented and will probably need to be customized. The top-of-file comments in grexomeTIMCsec_config.pm lists the few other hard-coded things that we believe users may wish to tweak. If comments are unclear or if you believe something should be moved to *config.pm, please report it.
+
+
+EXAMPLE USAGE:
+**************
+perl ../SecondaryAnalyses/grexome-TIMC-secondary.pl --metadata=../Grexome_Metadata/patient_summary.xlsx --candidateGenes=../Grexome_Metadata/candidateGenes.xlsx --infile=../GVCFs_Merged/grexomes_merged.g.vcf.gz --outDir=SecondaryAnalyses --config=../Grexome_Metadata/grexomeTIMCsec_config.pm  2> grexomeTIMCsec.log &
+
+This will create
+
+In our hands on a dual-CPU system (two Intel Xeon Silver 4114 CPUs), the above command takes ~2 hours to analyze a GVCF containing ~500 exomes.
+NOTE that this timing is observed with a vepCacheFile that was previously populated by running the pipeline on a GVCF containing the first 490 of these 500 exomes, while a "fresh" run with empty vepCacheFile would take longer. Indeed, our use case is the N+1 case: we regularly receive new samples, which we analyze using [2]. We therefore produce individual single-sample GVCFs, which we then merge into into our "master" multi-sample GVCF. This master GVCF is fed as --infile to grexome-TIMC-secondary.pl, but since the pipeline uses an internal cache for VEP annotations (see &vepCacheFile() in *config.pm), VEP actually only runs on variants detected in the newest samples and never seen before. 
+
+
+[2] https://github.com/ntm/grexome-TIMC-Primary
