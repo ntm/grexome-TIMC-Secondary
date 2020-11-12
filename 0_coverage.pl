@@ -229,7 +229,7 @@ while (my $line = <GENES>) {
 	    my ($pos,$info,$format,@sampleData) = @gvcfFields[1,7..$#gvcfFields];
 	    my $end = $pos;
 	    # if this is a non-var block...
-	    if ($info =~ /END=(\d+);/) {
+	    if ($info =~ /END=(\d+)/) {
 		$end = $1;
 	    }
 	    # this line must overlap $range but it may go beyond, adjust if needed
