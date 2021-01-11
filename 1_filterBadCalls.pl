@@ -84,8 +84,8 @@ my $samplesOfInterest;
 # (ie produce GVCF), otherwise HR-only lines are skipped (produce VCF)
 my $keepHR = '';
 
-# for multi-threading, need to create a tmpDir. It will
-# be removed when we are done and must not pre-exist.
+# for multi-threading, need to create a tmpDir. It will be removed
+# when we are done and must not pre-exist (but it's parent must exist).
 # To improve performance it should be on a ramdisk.
 my $tmpDir = "tmpdir_filterBadCalls/";
 
@@ -107,7 +107,8 @@ Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --metadata string [no default] : patient metadata xlsx file, with path
 --samplesOfInterest string [default = all samples in metadata xlsx] : comma-separated list of sampleIDs of interest (other samples are ignored)
 --keepHR : keep lines even if the only genotype call is homoref
---tmpdir string [default = $tmpDir] : subdir where tmp files will be created (on a RAMDISK if possible), must not pre-exist and will be removed after execution
+--tmpdir string [default = $tmpDir] : subdir where tmp files will be created (on a RAMDISK if possible), it must not pre-exist (but it's 
+	 parent must exist) and it will be removed after execution
 --jobs N [default = $numJobs] : number of parallel jobs=threads to run
 --verbose N [default 0] : if > 0 increase verbosity on stderr
 --help : print this USAGE";
