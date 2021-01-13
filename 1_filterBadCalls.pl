@@ -53,7 +53,7 @@ my $batchSize = 500000;
 
 
 # heuristics for fixing low-quality or blatantly wrong genotype calls 
-# [$dp below represents max(DP,sumOfADs)]:
+# [$dp below represents max(DP,sumOfADs), except for non-variant blocks where it is MIN_DP]:
 # if $dp < $minDP , any call becomes NOCALL
 # if max(GQ,GQX) < $minGQ , any call becomes NOCALL
 # if AF < $minAF and call was REF/VAR or VAR/VAR, call becomes NOCALL
@@ -523,7 +523,7 @@ sub processBatch {
 		$thisData[$format{"AD"}] = join(',', @ADs);
 	    }
 
-	    # grab the depth (DP or sumOfADs, whichever is defined and higher)
+	    # grab the depth (DP or sumOfADs, whichever is defined and higher, except use MIN_DP if in a non-var block)
 	    my $thisDP = -1;
 	    if ((defined $format{"DP"}) && (defined $thisData[$format{"DP"}]) && ($thisData[$format{"DP"}] ne '.')) {
 		$thisDP = $thisData[$format{"DP"}];
@@ -535,7 +535,9 @@ sub processBatch {
 		}
 		($thisDP < $sumOfADs) && ($thisDP = $sumOfADs);
 	    }
-
+	    if ((defined $format{"MIN_DP"}) && (defined $thisData[$format{"MIN_DP"}]) && ($thisData[$format{"MIN_DP"}] ne '.')) {
+		$thisDP = $thisData[$format{"MIN_DP"}];
+	    }
 	    # if depth too low or undefined for this sample, change to NOCALL
 	    if ($thisDP < $filterParamsR->{"minDP"}) {
 		$lineToPrint .= "\t./.";
