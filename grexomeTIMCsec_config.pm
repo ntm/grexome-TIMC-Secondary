@@ -148,7 +148,7 @@ sub gtexFavoriteTissues {
 sub compatible {
     my @compatible = (["Flag","Astheno","Headless"],
 		      ["Azoo","Ovo","Macro","IOP"],
-		      ["Globo","Macro","Terato"]);
+		      ["Globo","Macro","Terato","prePRM2"]);
     return(\@compatible);
 }
 

@@ -13,7 +13,7 @@
 # $covDir is optional, if provided it is a subdir containing per-sample 
 # coverage files as produced by 0_coverage.pl.
 #
-# Filenames in $outDirwill include patientID/specimenID.
+# Filenames in $outDir will include patientID/specimenID.
 # If $covDir is provided, the global coverage data (ALL_CANDIDATES and ALL_SAMPLED)
 # for each sample is grabbed from $covDir and appended at the end of the header line.
 # For a sample, we only print lines from its cohort file and where 
