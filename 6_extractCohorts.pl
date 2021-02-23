@@ -226,8 +226,8 @@ my %sample2causal = ();
     
     foreach my $row ($rowMin+1..$rowMax) {
 	my $sample = $worksheet->get_cell($row, $sampleCol)->value;
-	# skip "none" lines
-	($sample eq "none") && next;
+	# skip "0" lines
+	($sample eq "0") && next;
 	(defined $sample2cohort{$sample}) && 
 	    die "E $0: parsing xlsx: have 2 lines with sample $sample\n";
 	my $cohort = $worksheet->get_cell($row, $cohortCol)->value;

@@ -105,8 +105,8 @@ my %sample2patient = ();
 	(defined $worksheet->get_cell($row, $sampleCol)) ||
 	    die "E: $0 - cell undefined for row $row, col $sampleCol\n";
 	my $sample = $worksheet->get_cell($row, $sampleCol)->value;
-	# skip "none" lines
-	($sample eq "none") && next;
+	# skip "0" lines
+	($sample eq "0") && next;
 	my $cohort = $worksheet->get_cell($row, $cohortCol)->value;
 	(defined $cohort2samples{$cohort}) || ($cohort2samples{$cohort} = []);
 	push(@{$cohort2samples{$cohort}}, $sample);

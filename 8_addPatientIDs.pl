@@ -75,8 +75,8 @@ my %sample2patient = ();
     
     foreach my $row ($rowMin+1..$rowMax) {
 	my $sample = $worksheet->get_cell($row, $sampleCol)->value;
-	# skip "none" lines
-	($sample eq "none") && next;
+	# skip "0" lines
+	($sample eq "0") && next;
 	my $patient = $worksheet->get_cell($row, $specimenCol)->unformatted();
 	if ($worksheet->get_cell($row, $patientCol)) {
 	    my $tmp = $worksheet->get_cell($row, $patientCol)->unformatted();

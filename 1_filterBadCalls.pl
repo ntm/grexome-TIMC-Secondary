@@ -176,8 +176,8 @@ my %samples = ();
 
     foreach my $row ($rowMin+1..$rowMax) {
 	my $sample = $worksheet->get_cell($row, $sampleCol)->value;
-	# skip "none" lines
-	($sample eq "none") && next;
+	# skip "0" lines
+	($sample eq "0") && next;
 	(defined $samples{$sample}) && 
 	    die "E $0: parsing xlsx: have 2 lines with sample $sample\n";
 	$samples{$sample} = 1;
