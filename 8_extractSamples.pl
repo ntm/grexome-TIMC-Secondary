@@ -104,7 +104,7 @@ my %sample2patient = ();
     foreach my $row ($rowMin+1..$rowMax) {
 	(defined $worksheet->get_cell($row, $sampleCol)) ||
 	    die "E: $0 - cell undefined for row $row, col $sampleCol\n";
-	my $sample = $worksheet->get_cell($row, $sampleCol)->value;
+	my $sample = $worksheet->get_cell($row, $sampleCol)->unformatted();
 	# skip "0" lines
 	($sample eq "0") && next;
 	my $cohort = $worksheet->get_cell($row, $cohortCol)->value;

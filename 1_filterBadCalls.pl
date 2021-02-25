@@ -175,7 +175,7 @@ my %samples = ();
 	die "E $0: parsing xlsx: no column title is sampleID\n";
 
     foreach my $row ($rowMin+1..$rowMax) {
-	my $sample = $worksheet->get_cell($row, $sampleCol)->value;
+	my $sample = $worksheet->get_cell($row, $sampleCol)->unformatted();
 	# skip "0" lines
 	($sample eq "0") && next;
 	(defined $samples{$sample}) && 
