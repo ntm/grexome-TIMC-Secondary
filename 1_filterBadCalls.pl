@@ -144,7 +144,7 @@ mkdir($tmpDir) ||
     die "E $0: cannot mkdir tmpDir $tmpDir\n";
 
 my $now = strftime("%F %T", localtime);
-warn "I $0: $now - starting to run\n";
+warn "I $now: $0 - starting to run\n";
 
 
 #########################################################
@@ -338,8 +338,8 @@ $pm->wait_all_children;
 
 $now = strftime("%F %T", localtime);
 rmdir($tmpDir) || 
-    die "E $0: $now - all done but cannot rmdir tmpDir $tmpDir, why? $!\n";
-warn "I $0: $now - ALL DONE, completed successfully!\n";
+    die "E $now: $0 - all done but cannot rmdir tmpDir $tmpDir, why? $!\n";
+warn "I $now: $0 - ALL DONE, completed successfully!\n";
 
 
 #############################################
@@ -660,9 +660,10 @@ sub eatTmpFiles {
 	    close(IN);
 	    (unlink($tmpOut,$tmpOutFlag) == 2) ||
 		die "E $0: in eatTmpFiles, done with tmpFile $tmpOut and flagfile $tmpOutFlag but cannot unlink them: $!\n";
-	    my $now = strftime("%F %T", localtime);
 	    # progress log: one INFO message every 10 batches
-	    ($nextBatch % 10) || warn("I $0: $now - done processing batch $nextBatch\n");
+	    if (! $nextBatch % 10) {
+		my $now = strftime("%F %T", localtime);
+		warn "I $now: $0 - done processing batch $nextBatch\n";
 	    $nextBatch++;
 	    next;
 	}
