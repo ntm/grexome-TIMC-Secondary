@@ -664,6 +664,7 @@ sub eatTmpFiles {
 	    if (! $nextBatch % 10) {
 		my $now = strftime("%F %T", localtime);
 		warn "I $now: $0 - done processing batch $nextBatch\n";
+	    }
 	    $nextBatch++;
 	    next;
 	}
