@@ -143,7 +143,8 @@ foreach my $candidatesFile (split(/,/, $candidatesFiles)) {
     (defined $workbook) ||
 	die "E $0: when parsing xlsx $candidatesFile\n";
     ($workbook->worksheet_count() == 1) || ($workbook->worksheet_count() == 2) ||
-	die "E $0: parsing xlsx: expecting one or two worksheets, got ".$workbook->worksheet_count()."\n";
+	die "E $0: parsing xlsx $candidatesFile: expecting one or two worksheets, got "
+	.$workbook->worksheet_count()."\n";
     my $worksheet = $workbook->worksheet(0);
     my ($colMin, $colMax) = $worksheet->col_range();
     my ($rowMin, $rowMax) = $worksheet->row_range();
