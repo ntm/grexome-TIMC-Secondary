@@ -3,15 +3,15 @@
 # 29/08/2019
 # NTM
 
-# Takes 4 args: a $candidatesFile xlsx, a gzipped tsv $transciptsFile
-# as produced in Transcripts_Data/, a merged bgzipped $gvcf (must be 
-# tabix-indexed), and an $outDir.
+# Takes 4 args: a comma-separated list of $candidatesFiles xlsx,
+# a gzipped tsv $transciptsFile as produced in Transcripts_Data/,
+# a merged bgzipped $gvcf (must be  tabix-indexed), and an $outDir.
 # If $outDir doesn't exist it is created; if it exists any pre-existing
 # coverage*tsv file in it is not remade (considered good).
 # For each sample found in $gvcf and lacking a coverage*tsv
 # in $outDir, produce $outDir/coverage*.tsv with:
 # for each coding transcript in $transcriptsFile that is transcribed
-# from a candidate gene listed in $candidatesFile, print
+# from a candidate gene listed in a $candidatesFiles, print
 # one line per exon (limited to CDS parts of exons),
 # for each exon we report the percentage of its bases 
 # (going to +-10 into neighboring introns) that are covered 
@@ -42,11 +42,10 @@ $0 = basename($0);
 
 #########################################################
 
-(@ARGV == 4) || die "E $0: needs 4 args: a candidatesFile, a tsv.gz, a GVCF and an outDir\n";
-my ($candidatesFile, $transcriptsFile, $gvcf, $outDir) = @ARGV;
+(@ARGV == 4) ||
+    die "E $0: needs 4 args: a comma-separated list of candidatesFiles, a tsv.gz, a GVCF and an outDir\n";
+my ($candidatesFiles, $transcriptsFile, $gvcf, $outDir) = @ARGV;
 
-(-f $candidatesFile) ||
-    die "E $0: the supplied candidates file $candidatesFile doesn't exist\n";
 (-f $transcriptsFile) ||
     die "E $0: transcriptsFile $transcriptsFile doesn't exist or isn't a file\n";
 (-f $gvcf) ||
@@ -65,13 +64,16 @@ warn "I $0: $now - starting to run\n";
 # but not seen yet, 2 if it's been seen
 my %candidateGenes = ();
 
-{
+foreach my $candidatesFile (split(/,/, $candidatesFiles)) {
     # code adapted from 6_extractCohorts.pl
+    (-f $candidatesFile) ||
+	die "E $0: the supplied candidateGenes file $candidatesFile doesn't exist\n";
     my $workbook = Spreadsheet::XLSX->new("$candidatesFile");
     (defined $workbook) ||
-	die "E $0: when parsing xlsx\n";
+	die "E $0: when parsing xlsx $candidatesFile\n";
     ($workbook->worksheet_count() == 1) || ($workbook->worksheet_count() == 2) ||
-	die "E $0: parsing xlsx: expecting one or two worksheets, got ".$workbook->worksheet_count()."\n";
+	die "E $0: parsing xlsx $candidatesFile: expecting one or two worksheets, got "
+	.$workbook->worksheet_count()."\n";
     my $worksheet = $workbook->worksheet(0);
     my ($colMin, $colMax) = $worksheet->col_range();
     my ($rowMin, $rowMax) = $worksheet->row_range();
@@ -83,7 +85,7 @@ my %candidateGenes = ();
 	    ($geneCol = $col);
      }
     ($geneCol >= 0) ||
-	die "E $0: parsing xlsx: no col title is Candidate gene\n";
+	die "E $0: parsing xlsx $candidatesFile: no col title is Candidate gene\n";
     
     foreach my $row ($rowMin+1..$rowMax) {
 	my $gene = $worksheet->get_cell($row, $geneCol)->unformatted();

@@ -41,7 +41,7 @@ my $numJobs6 = 16;
 # metadata file with all samples
 my $metadata;
 
-# path+file holding known candidate genes
+# comma-separated list of path+files holding known candidate genes
 my $candidateGenes;
 
 # input bgzipped multi-sample GVCF or VCF
@@ -49,7 +49,7 @@ my $inFile;
 
 # outDir must not exist, it will be created and populated with
 # subdirs (containing the pipeline results), logfiles (in debug mode),
-# and copies of the provided metadata and candidateGenes.
+# and copies of the provided metadata and candidateGenes files.
 my $outDir;
 
 # path+file of the config file holding all install-specific params,
@@ -71,11 +71,11 @@ my $USAGE = "Parse a GVCF or VCF, run the complete grexome-TIMC secondary analys
 Each step of the pipeline is a stand-alone self-documented script, this is just a wrapper.
 Every install-specific param (eg paths to required data) should be in grexomeTIMCsec_config.pm.
 Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
---metadata string [no default] : patient metadata xlsx file, with path
---candidateGenes string [no default] : known candidate genes in xlsx file, with path
---infile string [no default] : bgzipped multi-sample GVCF or VCF file to parse
---outdir string [no default] : subdir where resulting cohort files will be created, must not pre-exist
---config string [$config] : your customized copy (with path) of the distributed *config.pm
+--metadata : patient metadata xlsx file, with path
+--candidateGenes : known candidate genes in xlsx files, comma-separated, with paths
+--infile : bgzipped multi-sample GVCF or VCF file to parse
+--outdir : subdir where resulting cohort files will be created, must not pre-exist
+--config [$config] : your customized copy (with path) of the distributed *config.pm
 --debug : activate debug mode => slower, keeps all intermediate files, produce individual logfiles
 --help : print this USAGE";
 
@@ -93,8 +93,6 @@ GetOptions ("metadata=s" => \$metadata,
 
 ($metadata) || die "E $0: you must provide a metadata file\n";
 (-f $metadata) || die "E $0: the supplied metadata file doesn't exist:\n$metadata\n";
-($candidateGenes) || die "E $0: you must provide a candidateGenes file\n";
-(-f $candidateGenes) || die "E $0: the supplied candidateGenes file $candidateGenes doesn't exist:\n$candidateGenes\n";
 
 ($inFile) || die "E $0: you must provide an input bgzipped (G)VCF file\n";
 (-f $inFile) || die "E $0: the supplied infile doesn't exist\n";
@@ -114,11 +112,18 @@ mkdir($outDir) || die "E $0: cannot mkdir outDir $outDir\n";
 # copy the provided metadata and candidateGenes files into $outDir
 copy($metadata, $outDir) ||
     die "E $0: cannot copy metadata to outDir: $!\n";
-copy($candidateGenes, $outDir) ||
-    die "E $0: cannot copy candidateGenes to outDir: $!\n";
 # use the copied versions in scripts (eg if original gets edited while analysis is running...)
 $metadata = "$outDir/".basename($metadata);
-$candidateGenes = "$outDir/".basename($candidateGenes);
+my @candNew = ();
+foreach my $candFile (split(/,/, $candidateGenes)) {
+    (-f $candFile) ||
+	die "E $0: the supplied candidateGenes file $candFile doesn't exist\n";
+    copy($candFile, $outDir) ||
+	die "E $0: cannot copy candidateGenes file $candFile to outDir: $!\n";
+    # use the copies in script
+    push(@candNew, "$outDir/".basename($candFile));
+}
+$candidateGenes = join(',', @candNew);
 
 # number of samples in $inFile, needed to set $min_hr (for filtering)
 my $numSamples = scalar(split(/\s+/, `zgrep --max-count=1 '#CHROM' $inFile`)) - 9;
@@ -180,7 +185,9 @@ if ($debug) {
 }
 
 # step 6
-$com .= " | perl $RealBin/6_extractCohorts.pl --metadata=$metadata --candidateGenes=$candidateGenes --outDir=$tmpdir/Cohorts/ --tmpDir=$tmpdir/TmpExtract/ --config $config --jobs=$numJobs6 ";
+$com .= " | perl $RealBin/6_extractCohorts.pl --metadata=$metadata ";
+($candidateGenes) && ($com .= "--candidateGenes=$candidateGenes ");
+$com .= "--outDir=$tmpdir/Cohorts/ --tmpDir=$tmpdir/TmpExtract/ --config $config --jobs=$numJobs6 ";
 if ($debug) {
     $com .= "2> $outDir/step6.err";
     system($com) && die "E $0: debug mode on, step6 failed: $?";

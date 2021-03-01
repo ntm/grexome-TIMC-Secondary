@@ -3,8 +3,8 @@
 # 25/03/2018
 # NTM
 
-# Takes as arguments a $metadata xlsx file, a $candidatesFile xlsx
-# file, a $config pm file, an $outDir and a $tmpDir that don't exist; 
+# Takes as arguments a $metadata xlsx file, a comma-separated list of xlsx
+# candidateGenes files, a $config pm file, an $outDir and a $tmpDir that don't exist; 
 # reads on stdin a fully annotated TSV file;
 # makes $outDir and creates in it one gzipped TSV file per cohort.
 # The cohorts are defined in $metadata.
@@ -15,7 +15,7 @@
 # For optimal performance $tmpDir should be on a RAMDISK (eg tmpfs).
 #
 # A new KNOWN_CANDIDATE_GENE column is inserted right after SYMBOL:
-# it holds the "Level" value parsed from  $candidatesFile if SYMBOL is a known 
+# it holds the "Level" value parsed from  a $candidatesFile if SYMBOL is a known 
 # candidate gene for this cohort (as specified in $candidatesFile), 
 # 0 otherwise. Any $causalGene from $metadata is considered a
 # known candidate gene with Level=5.
@@ -70,7 +70,7 @@ my $batchSize = 20000;
 my $numJobs = 16;
 
 # metadata and candidateGenes XLSX files, no defaults
-my ($metadata, $candidatesFile);
+my ($metadata, $candidatesFiles);
 
 # outDir and tmpDir, also no defaults
 my ($outDir, $tmpDir);
@@ -84,16 +84,16 @@ my $help = '';
 
 my $USAGE = "\nParse on STDIN a fully annotated TSV file as produced by steps 1-5 of this secondaryAnalysis pipeline; create in outDir one gzipped TSV file per cohort.\n
 Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
---metadata string [no default] : patient metadata xlsx file, with path
---candidateGenes string [no default] : known candidate genes in xlsx file, with path
---outdir string [no default] : subdir where resulting cohort files will be created, must not pre-exist
---tmpdir string [no default] : subdir where tmp files will be created (on a RAMDISK if possible), must not pre-exist and will be removed after execution
---config string [no default] : your customized copy (with path) of the distributed *config.pm
---jobs N [default = $numJobs] : number of parallel jobs=threads to run
+--metadata string : patient metadata xlsx file, with path
+--candidateGenes string : comma-separated list of xlsx files holding known candidate genes, with paths
+--outdir string : subdir where resulting cohort files will be created, must not pre-exist
+--tmpdir string : subdir where tmp files will be created (on a RAMDISK if possible), must not pre-exist and will be removed after execution
+--config string : your customized copy (with path) of the distributed *config.pm
+--jobs [$numJobs] : number of parallel jobs=threads to run
 --help : print this USAGE";
 
 GetOptions ("metadata=s" => \$metadata,
-	    "candidateGenes=s" => \$candidatesFile,
+	    "candidateGenes=s" => \$candidatesFiles,
 	    "outdir=s" => \$outDir,
 	    "tmpdir=s" => \$tmpDir,
 	    "config=s" => \$config,
@@ -106,8 +106,6 @@ GetOptions ("metadata=s" => \$metadata,
 
 ($metadata) || die "E $0: you must provide a metadata file\n";
 (-f $metadata) || die "E $0: the supplied metadata file doesn't exist\n";
-($candidatesFile) || die "E $0: you must provide a candidateGenes file\n";
-(-f $candidatesFile) || die "E $0: the supplied candidateGenes file $candidatesFile doesn't exist\n";
 
 # immediately import $config, so we die if file is broken
 (-f $config) ||  die "E $0: the supplied config.pm doesn't exist: $config\n";
@@ -129,19 +127,21 @@ warn "I $0: $now - starting to run\n";
 
 
 #########################################################
-# parse known candidate genes file
+# parse known candidate genes files
 
 # %knownCandidateGenes: key==$cohort, value is a hashref whose keys 
-# are gene names and values are the "Level" from $candidatesFile,
+# are gene names and values are the "Level" from a $candidatesFile,
 # or 5 if the gene is "Causal" for a $cohort patient in $metadata.
 # I use %knownCandidatesSeen (defined below) to sanity-check the lists: any gene 
 # name that is never seen will be reported to stderr (and probably a typo needs fixing).
 my %knownCandidateGenes = ();
 
-{
+foreach my $candidatesFile (split(/,/, $candidatesFiles)) {
+    (-f $candidatesFile) ||
+	die "E $0: the supplied candidateGenes file $candidatesFile doesn't exist\n";
     my $workbook = Spreadsheet::XLSX->new("$candidatesFile");
     (defined $workbook) ||
-	die "E $0: when parsing xlsx\n";
+	die "E $0: when parsing xlsx $candidatesFile\n";
     ($workbook->worksheet_count() == 1) || ($workbook->worksheet_count() == 2) ||
 	die "E $0: parsing xlsx: expecting one or two worksheets, got ".$workbook->worksheet_count()."\n";
     my $worksheet = $workbook->worksheet(0);
@@ -159,11 +159,11 @@ my %knownCandidateGenes = ();
 	    ($levelCol = $col);
      }
     ($pathoCol >= 0) ||
-	die "E $0: parsing xlsx: no col title is pathology\n";
+	die "E $0: parsing xlsx $candidatesFile: no col title is pathology\n";
     ($geneCol >= 0) ||
-	die "E $0: parsing xlsx: no col title is Candidate gene\n";
+	die "E $0: parsing xlsx $candidatesFile: no col title is Candidate gene\n";
     ($levelCol >= 0) ||
-	die "E $0: parsing xlsx: no col title is Level\n";
+	die "E $0: parsing xlsx $candidatesFile: no col title is Level\n";
     
     foreach my $row ($rowMin+1..$rowMax) {
 	my $cohort = $worksheet->get_cell($row, $pathoCol)->unformatted();
@@ -177,7 +177,7 @@ my %knownCandidateGenes = ();
 	(defined $knownCandidateGenes{$cohort}) ||
 	    ($knownCandidateGenes{$cohort} = {});
 	(defined $knownCandidateGenes{$cohort}->{$gene}) && 
-	    die "E $0: parsing candidatesFile xlsx: have 2 lines with same gene $gene and pathology $cohort\n";
+	    die "E $0: parsing xlsx $candidatesFile: have 2 lines with same gene $gene and pathology $cohort\n";
 	$knownCandidateGenes{$cohort}->{$gene} = $level;
     }
 }
