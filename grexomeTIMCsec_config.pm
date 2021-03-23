@@ -146,7 +146,7 @@ sub gtexFavoriteTissues {
 # should NOT be used as neg controls for each other.
 # The cohort names must match the "pathology" column of the $metadata xlsx.
 sub compatible {
-    my @compatible = (["Flag","Astheno","Headless"],
+    my @compatible = (["Flag","AST","Headless"],
 		      ["Azoo","Ovo","Macro","IOP"],
 		      ["Globo","Macro","Terato","prePRM2"]);
     return(\@compatible);
