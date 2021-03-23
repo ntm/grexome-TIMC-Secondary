@@ -290,6 +290,8 @@ my %compatible = ();
 # array of filehandles open for writing, one for each cohort, same indexes as @cohorts
 my @outFHs;
 foreach my $cohorti (0..$#cohorts) {
+    # sanity check (eg spaces in a cohort name break things)
+    ($cohorts[$cohorti] =~ /^\w+$/) || die "E $0: cohort names must be alphanum only\n";
     my $outFile = "$outDir/$cohorts[$cohorti].csv.gz";
     open (my $FH, "| gzip -c > $outFile") || die "E $0: cannot gzip-open $outFile for writing";
     $outFHs[$cohorti] = $FH ;
