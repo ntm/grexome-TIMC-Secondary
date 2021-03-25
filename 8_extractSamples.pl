@@ -19,7 +19,7 @@
 # For a sample, we only print lines from its cohort file and where 
 # it has an HV or HET genotype: this genotype is printed in new columns
 # GENOTYPE and DP:AF, inserted right after KNOWN_CANDIDATE_GENE.
-# Immediately after DP:AF we insert a new column BOTH_ALLELES, value is one of:
+# Immediately after DP:AF we insert a new column BIALLELIC, value is one of:
 #   HIGH -> patient has >=2 HET or at >=1 HV HIGH variants;
 #   MODHIGH -> patient has >=2 HET or >=1 HV variants of impact HIGH or MODHIGH,
 #     but isn't in HIGH category;
@@ -195,7 +195,7 @@ while (my $inFile = readdir(INDIR)) {
 	    $knownCandidateCol = $i;
 	    $header[$i] .= "\tGENOTYPE";
 	    $header[$i] .= "\tDP:AF";
-	    $header[$i] .= "\tBOTH_ALLELES";
+	    $header[$i] .= "\tBIALLELIC";
 	}
 	elsif ($header[$i] eq "Feature") {
 	    $featureCol = $i;
