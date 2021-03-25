@@ -17,7 +17,7 @@
 # Print to stdout a sub-cohort file, identical to the infile except it
 # only has the lines where one of the samples of the sub-cohort is:
 # - Cohorts -> HV or HET (OTHERCAUSE is not enough)
-# - Transcripts -> HV or COMPHET (including OTHERCAUSE)
+# - Transcripts -> HV or BIALLELIC (including OTHERCAUSE)
 
 
 use strict;
@@ -100,7 +100,7 @@ foreach my $i (0..$#header) {
     }
     elsif ($type==2) {
 	# transcripts
-	if (($header[$i] =~ /^HV_/) || ($header[$i] =~ /^COMPHET_/) ||
+	if (($header[$i] =~ /^HV_/) || ($header[$i] =~ /^BIALLELIC_/) ||
 	    ($header[$i] =~ /^OTHERCAUSE_/)) {
 	    push(@genoCols, $i);
 	}

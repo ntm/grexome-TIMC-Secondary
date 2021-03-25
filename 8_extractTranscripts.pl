@@ -23,11 +23,11 @@
 #   least one HV MODHIGH-or-HIGH variant
 # - COUNTSAMPLES_HV_MODER+ = number of distinct samples with at
 #   least one HV MODERATE-or-MODHIGH-or-HIGH variant
-# - COUNTSAMPLES_COMPHET_HIGH+ = number of distinct samples with at
+# - COUNTSAMPLES_BIALLELIC_HIGH+ = number of distinct samples with at
 #   least TWO HET (or one HV) HIGH variants
-# - COUNTSAMPLES_COMPHET_MODHIGH+ = number of distinct samples with at
+# - COUNTSAMPLES_BIALLELIC_MODHIGH+ = number of distinct samples with at
 #   least TWO HET (or one HV) MODHIGH-or-HIGH variants
-# - COUNTSAMPLES_COMPHET_MODER+ = number of distinct samples with at
+# - COUNTSAMPLES_BIALLELIC_MODER+ = number of distinct samples with at
 #   least TWO HET (or one HV) MODERATE-or-MODHIGH-or-HIGH variants
 # - 1 more column COUNTSAMPLES_OTHERCAUSE with similar counts but counting
 #   the samples with a "known causal variant" in another gene, all concatenated
@@ -36,11 +36,11 @@
 #   the samples belonging to compatible cohorts (as defined in $config)
 # - 6 final columns COUNTSAMPLES_NEGCTRL_* similar to $cohort counts but counting
 #   the control samples (as in extractCohorts again).
-# - HV_HIGH, HV_MODHIGH, HV_MODER, COMPHET_HIGH, COMPHET_MODHIGH, COMPHET_MODER:
+# - HV_HIGH, HV_MODHIGH, HV_MODER, BIALLELIC_HIGH, BIALLELIC_MODHIGH, BIALLELIC_MODER:
 #   non-redundant list of samples counted in the corresponding COUNTSAMPLES columns
 #   (so eg the *MODHIGH columns don't list the corresponding *HIGH samples,
 #   even though COUNTSAMPLES*MODHIGH+ counts them);
-# - OTHERCAUSE_COMPHET_MODHIGH+, COMPAT_COMPHET_MODHIGH+, NEGCTRL_COMPHET_MODHIGH+:
+# - OTHERCAUSE_BIALLELIC_MODHIGH+, COMPAT_BIALLELIC_MODHIGH+, NEGCTRL_BIALLELIC_MODHIGH+:
 #   all samples counted in corresponding COUNTSAMPLES columns (we don't list the
 #   MODER samples).
 # In addition, several useful columns from the source file are
@@ -74,7 +74,7 @@ my @keptColumnsSpecific = qw(KNOWN_CANDIDATE_GENE);
 
 
 # also for convenience: the types of samples to count
-my @countTypes = ("HV_HIGH","HV_MODHIGH","HV_MODER","COMPHET_HIGH","COMPHET_MODHIGH","COMPHET_MODER");
+my @countTypes = ("HV_HIGH","HV_MODHIGH","HV_MODER","BIALLELIC_HIGH","BIALLELIC_MODHIGH","BIALLELIC_MODER");
 
 
 #############################################
@@ -202,7 +202,7 @@ my %transcript2cohort2start;
 # each hash has key==$sample, value==number of variants (of that
 # category), MODHIGH includes HIGH samples and MODER includes MODHIGH
 # and HIGH samples,
-# COMPHET also lists the samples that are HV (but these count as 2 variants)
+# BIALLELIC also lists the samples that are HV (but these count as 2 variants)
 my %transcript2cohort2samples;
 # %transcript2cohort2samplesOC: same as %transcript2cohort2samples but counting
 # OTHERCAUSE variants
@@ -267,10 +267,10 @@ while (my $inFile = readdir(INDIR)) {
     foreach my $ct (@countTypes) {
 	$newHeaders .= "\t$ct";
     }
-    # other SAMPLES: OC, COMPAT, NEGCTRL -> only list COMPHET_MODHIGH cumulatively
-    $newHeaders .= "\tOTHERCAUSE_COMPHET_MODHIGH+";
-    $newHeaders .= "\tCOMPAT_COMPHET_MODHIGH+";
-    $newHeaders .= "\tNEGCTRL_COMPHET_MODHIGH+";
+    # other SAMPLES: OC, COMPAT, NEGCTRL -> only list BIALLELIC_MODHIGH cumulatively
+    $newHeaders .= "\tOTHERCAUSE_BIALLELIC_MODHIGH+";
+    $newHeaders .= "\tCOMPAT_BIALLELIC_MODHIGH+";
+    $newHeaders .= "\tNEGCTRL_BIALLELIC_MODHIGH+";
     
     # GTEX headers are added when parsing $headers and filling @destCols
     foreach my $hi (0..$#headers) {
@@ -428,8 +428,8 @@ while (my $inFile = readdir(INDIR)) {
 			}
 		    }
 		}
-		# whether $isHV or not, COUNTSAMPLES_COMPHET_HIGH COUNTSAMPLES_COMPHET_MODHIGH and
-		# COUNTSAMPLES_COMPHET_MODER (or their OC counterparts) may get updated, but
+		# whether $isHV or not, COUNTSAMPLES_BIALLELIC_HIGH COUNTSAMPLES_BIALLELIC_MODHIGH and
+		# COUNTSAMPLES_BIALLELIC_MODER (or their OC counterparts) may get updated, but
 		# HV variants count as 2
 		foreach my $ai (3+$impactStart..5) {
 		    ($transcript2cohort2samples{$transcript}->{$cohort}->[$ai]->{$sampleID}) ||
@@ -463,7 +463,7 @@ my @transcripts = sort {($transcript2chr{$a} <=> $transcript2chr{$b}) || ($trans
 
 # for HV counts and lists we want samples with at least one variant (some
 # keys got created at zero and stayed there, delete them);
-# and for COMPHET counts and lists we only want samples with at least 2 variants.
+# and for BIALLELIC counts and lists we only want samples with at least 2 variants.
 # the OC version is defined for exactly the same transcripts and cohorts as the
 # normal version, but samples can be different
 foreach my $transcript (keys %transcript2cohort2samples) {
@@ -479,7 +479,7 @@ foreach my $transcript (keys %transcript2cohort2samples) {
 		    (delete $transcript2cohort2samplesOC{$transcript}->{$cohort}->[$t2si]->{$sample});
 	    }
 	}
-	# COMPHETs
+	# BIALLELICs
 	foreach my $t2si (3..5) {
 	    foreach my $sample (keys %{$transcript2cohort2samples{$transcript}->{$cohort}->[$t2si]}) {
 		($transcript2cohort2samples{$transcript}->{$cohort}->[$t2si]->{$sample} >= 2) ||
@@ -559,7 +559,7 @@ foreach my $transcript (@transcripts) {
 	}
 
 	# $toPrint{$cohort} stays undef for this cohort if it doesn't at least have a
-	# COMPHET_MODER sample, otherwise save $toPrint
+	# BIALLELIC_MODER sample, otherwise save $toPrint
 	if ($counts[5] > 0) {
 	    $toPrint{$cohort} = $toPrint;
 	}
@@ -575,23 +575,23 @@ foreach my $transcript (@transcripts) {
 	    }
 	}
 	foreach my $t (keys(%{$transcript2cohort2samples{$transcript}->{$cohort}->[1]})) {
-	    # HV_MODHIGH -> remove from HV_MODER, COMPHET_MODHIGH and COMPHET_MODER
+	    # HV_MODHIGH -> remove from HV_MODER, BIALLELIC_MODHIGH and BIALLELIC_MODER
 	    foreach my $i (2,4,5) {
 		delete($transcript2cohort2samples{$transcript}->{$cohort}->[$i]->{$t});
 	    }
 	}
 	foreach my $t (keys(%{$transcript2cohort2samples{$transcript}->{$cohort}->[2]})) {
-	    # HV_MODER -> remove from COMPHET_MODER
+	    # HV_MODER -> remove from BIALLELIC_MODER
 	    delete($transcript2cohort2samples{$transcript}->{$cohort}->[5]->{$t});
 	}
 	foreach my $t (keys(%{$transcript2cohort2samples{$transcript}->{$cohort}->[3]})) {
-	    # COMPHET_HIGH -> remove from COMPHET_MODHIGH and COMPHET_MODER
+	    # BIALLELIC_HIGH -> remove from BIALLELIC_MODHIGH and BIALLELIC_MODER
 	    foreach my $i (4,5) {
 		delete($transcript2cohort2samples{$transcript}->{$cohort}->[$i]->{$t});
 	    }
 	}
 	foreach my $t (keys(%{$transcript2cohort2samples{$transcript}->{$cohort}->[4]})) {
-	    # COMPHET_MODHIGH -> remove from COMPHET_MODER
+	    # BIALLELIC_MODHIGH -> remove from BIALLELIC_MODER
 	    delete($transcript2cohort2samples{$transcript}->{$cohort}->[5]->{$t});
 	}
     }
@@ -604,18 +604,18 @@ foreach my $transcript (@transcripts) {
 	    $toPrint .= "\t".join(',',sort(keys(%{$transcript2cohort2samples{$transcript}->{$cohort}->[$i]})));
 	}
 	
-	#  OTHERCAUSE_COMPHET_MODHIGH is complete, just copy it (COMPHET_MODHIGH -> index 4)
+	#  OTHERCAUSE_BIALLELIC_MODHIGH is complete, just copy it (BIALLELIC_MODHIGH -> index 4)
 	$toPrint .= "\t".join(',',sort(keys(%{$transcript2cohort2samplesOC{$transcript}->{$cohort}->[4]})));
 	
-	# COMPAT_COMPHET_MODHIGH, NEGCTRL_COMPHET_MODHIGH: need to examine all other cohorts
+	# COMPAT_BIALLELIC_MODHIGH, NEGCTRL_BIALLELIC_MODHIGH: need to examine all other cohorts
 	my @compat = ();
 	my @negctrl = ();
 	foreach my $thisCohort (keys(%cohort2header)) {
 	    ($cohort eq $thisCohort) && next;
-	    # otherwise we want all COMPHET_MODHIGH (or better) samples from $thisCohort,
+	    # otherwise we want all BIALLELIC_MODHIGH (or better) samples from $thisCohort,
 	    # including the OTHERCAUSE ones
 	    my @goodSamples;
-	    # build full $cohort_COMPHET_MODHIGH+: need indexes 0,1,3,4
+	    # build full $cohort_BIALLELIC_MODHIGH+: need indexes 0,1,3,4
 	    foreach my $i (0,1,3,4) {
 		push(@goodSamples, keys(%{$transcript2cohort2samples{$transcript}->{$thisCohort}->[$i]}));
 	    }
