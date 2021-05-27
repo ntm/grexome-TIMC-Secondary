@@ -18,8 +18,10 @@ use warnings;
 use File::Basename qw(basename);
 use Getopt::Long;
 use POSIX qw(strftime);
+# import LOCK_* constants
+use Fcntl qw(:flock);
 # Storable for the cache
-use Storable;
+use Storable qw(store retrieve lock_retrieve);
 
 # we use $0 in every stderr message but we really only want
 # the program name, not the path
@@ -184,9 +186,12 @@ open(VEPTEST, "> $vcf4vepTest") ||
 my $cache = {};
 # grab previously cached data
 if (-f $cacheFile) {
-    $cache = &retrieve($cacheFile) ||
+    $cache = &lock_retrieve($cacheFile) ||
 	die "E $0: cachefile $cacheFile exists but I can't retrieve hash from it.\n";
 }
+# $cacheUpdate is a hashref, similar to $cache but holding info
+# that wasn't found in $cache; key=="chr:pos:ref:alt", value==CSQ
+my $cacheUpdate = {};
 
 # header
 while (my $line = <STDIN>) {
@@ -222,11 +227,12 @@ while (my $line = <VEPTEST_OUT>) {
 		unlink($vcf4vep,$vcfFromCache,$vcf4vepTest);
 		rmdir($tmpDir) || warn "W $0: VEP version mismatch but can't rmdir tmpDir $tmpDir\n";
 		die "E: $0 - cached VEP version and ##VEP line from VCF are different:\n$cacheLine\n$lineClean\n".
-		    "if you updated your VEP cache this script's cachefile is now stale, you need to rm $cacheFile (or change the cacheFile in $0)\n\n";
+		    "if you updated your VEP cache this script's cachefile is now stale, you need to rm $cacheFile".
+		    " (or change the cacheFile in $0)\n\n";
 	    }
 	}
 	else {
-	    $cache->{"VEPversion"} = $lineClean;
+	    $cacheUpdate->{"VEPversion"} = $lineClean;
 	}
     }
     elsif ($line =~ /^##INFO=<ID=CSQ/) {
@@ -243,7 +249,7 @@ while (my $line = <VEPTEST_OUT>) {
 	    }
 	}
 	else {
-	    $cache->{"INFOCSQ"} = $line;
+	    $cacheUpdate->{"INFOCSQ"} = $line;
 	}
     }
 }
@@ -289,7 +295,7 @@ warn "I $0: $now - finished running VEP on the new variants\n";
 
 ##########################################################################
 # merge $vcfFromVep and $vcfFromCache, printing resulting VCF to stdout;
-# also update cache with new CSQs from $vcfFromVep
+# also fill $cacheUpdate with new CSQs from $vcfFromVep
 
 open(VCFVEP,"gunzip -c $vcfFromVep |") || 
     die "E $0: cannot gunzip-open VCFVEP $vcfFromVep\n";
@@ -340,14 +346,14 @@ while ($nextVep || $nextCache) {
 	    # and this VEP data must be printed now!
 	    print $nextVep;
 
-	    # also update cache
+	    # also save for updating cache at the end
 	    my @f = split(/\t/,$nextVep);
 	    (@f >= 8) || die "E $0: nextVep line doesn't have >=8 columns:\n$nextVep";
 	    # key: chrom:pos:ref:alt
 	    my $key = "$f[0]:$f[1]:$f[3]:$f[4]";
 	    ($f[7] =~ /CSQ=([^;]+)/) || die "E $0: cannot grab CSQ in nextVep line:\n$nextVep";
 	    my $csq = $1;
-	    $cache->{$key} = $csq;
+	    $cacheUpdate->{$key} = $csq;
 
 	    # read next VEP line
 	    $nextVep = <VCFVEP>;
@@ -382,10 +388,38 @@ while ($nextVep || $nextCache) {
 close(VCFVEP);
 close(VCFCACHE);
 
-# save cache
+##########################################################################
+# save any new entries to $cacheFile: we lock $cacheFile and retrieve a fresh copy
+# (which will include any updates made by other processes while this process was running),
+# then add any new entries and store
+# -> works correctly even if several jobs are running in parallel
+open(CACHELOCK, ">>$cacheFile") ||
+    die "E $0: I want to update cacheFile but I can't open it for locking\n";
+flock(CACHELOCK, LOCK_EX) || die "E $0: cannot get lock on cachefile\n";
+
+$cache = &retrieve($cacheFile) ||
+    die "E $0: I can't retrieve cache from fresh copy of cachefile $cacheFile\n";
+foreach my $k (keys(%$cacheUpdate)) {
+    if (defined($cache->{$k})) {
+	# annotation for key $k has been added to $cacheFile while we were running,
+	# make sure it's consistent
+	($cache->{$k} eq $cacheUpdate->{$k}) ||
+	    die "E $0: cacheFile entry for $k was added while we were running, and disagrees with our entry:\n".
+	    $cache->{$k}."\n".$cacheUpdate->{$k}."\n";
+    }
+    else {
+	$cache->{$k} = $cacheUpdate->{$k};
+    }
+}
 &store($cache, $cacheFile) || 
     die "E $0: produced/updated cache but cannot store to cachefile $cacheFile\n";
 
+# ok, release lock
+flock(CACHELOCK, LOCK_UN);
+close(CACHELOCK);
+
+
+##########################################################################
 # clean up
 unlink($vcf4vep) || die "E $0: cannot unlink tmpfile vcf4vep $vcf4vep\n";
 unlink($vcfFromCache) || die "E $0: cannot unlink tmpfile vcfFromCache $vcfFromCache\n";
