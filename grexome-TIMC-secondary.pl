@@ -129,16 +129,17 @@ if ($pathologies) {
 }
 
 my @candNew = ();
-foreach my $candFile (split(/,/, $candidateGenes)) {
-    (-f $candFile) ||
-	die "E $0: the supplied candidateGenes file $candFile doesn't exist\n";
-    copy($candFile, $outDir) ||
-	die "E $0: cannot copy candidateGenes file $candFile to outDir: $!\n";
-    # use the copies in script
-    push(@candNew, "$outDir/".basename($candFile));
+if ($candidateGenes) {
+    foreach my $candFile (split(/,/, $candidateGenes)) {
+	(-f $candFile) ||
+	    die "E $0: the supplied candidateGenes file $candFile doesn't exist\n";
+	copy($candFile, $outDir) ||
+	    die "E $0: cannot copy candidateGenes file $candFile to outDir: $!\n";
+	# use the copies in script
+	push(@candNew, "$outDir/".basename($candFile));
+    }
+    $candidateGenes = join(',', @candNew);
 }
-$candidateGenes = join(',', @candNew);
-
 # number of samples in $inFile, needed to set $min_hr (for filtering)
 my $numSamples = scalar(split(/\s+/, `zgrep --max-count=1 '#CHROM' $inFile`)) - 9;
 

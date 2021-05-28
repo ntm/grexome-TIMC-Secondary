@@ -147,53 +147,54 @@ if ($pathologies) {
 # name that is never seen will be reported to stderr (and probably a typo needs fixing).
 my %knownCandidateGenes = ();
 
-foreach my $candidatesFile (split(/,/, $candidatesFiles)) {
-    (-f $candidatesFile) ||
-	die "E $0: the supplied candidateGenes file $candidatesFile doesn't exist\n";
-    my $workbook = Spreadsheet::XLSX->new("$candidatesFile");
-    (defined $workbook) ||
-	die "E $0: when parsing xlsx $candidatesFile\n";
-    ($workbook->worksheet_count() == 1) || ($workbook->worksheet_count() == 2) ||
-	die "E $0: parsing xlsx $candidatesFile: expecting one or two worksheets, got "
-	.$workbook->worksheet_count()."\n";
-    my $worksheet = $workbook->worksheet(0);
-    my ($colMin, $colMax) = $worksheet->col_range();
-    my ($rowMin, $rowMax) = $worksheet->row_range();
-    # check the column titles and grab indexes of our columns of interest
-    my ($pathoCol, $geneCol,$levelCol) = (-1,-1,-1);
-    foreach my $col ($colMin..$colMax) {
-	my $cell = $worksheet->get_cell($rowMin, $col);
-	($cell->value() eq "pathologyID") &&
-	    ($pathoCol = $col);
-	($cell->value() eq "Candidate gene") &&
-	    ($geneCol = $col);
-	($cell->value() eq "Level") &&
-	    ($levelCol = $col);
-     }
-    ($pathoCol >= 0) ||
-	die "E $0: parsing xlsx $candidatesFile: no col title is pathologyID\n";
-    ($geneCol >= 0) ||
-	die "E $0: parsing xlsx $candidatesFile: no col title is Candidate gene\n";
-    ($levelCol >= 0) ||
-	die "E $0: parsing xlsx $candidatesFile: no col title is Level\n";
-    
-    foreach my $row ($rowMin+1..$rowMax) {
-	my $cohort = $worksheet->get_cell($row, $pathoCol)->unformatted();
-	my $gene = $worksheet->get_cell($row, $geneCol)->unformatted();
-	my $level = $worksheet->get_cell($row, $levelCol)->unformatted();
+if ($candidatesFiles) {
+    foreach my $candidatesFile (split(/,/, $candidatesFiles)) {
+	(-f $candidatesFile) ||
+	    die "E $0: the supplied candidateGenes file $candidatesFile doesn't exist\n";
+	my $workbook = Spreadsheet::XLSX->new("$candidatesFile");
+	(defined $workbook) ||
+	    die "E $0: when parsing xlsx $candidatesFile\n";
+	($workbook->worksheet_count() == 1) || ($workbook->worksheet_count() == 2) ||
+	    die "E $0: parsing xlsx $candidatesFile: expecting one or two worksheets, got "
+	    .$workbook->worksheet_count()."\n";
+	my $worksheet = $workbook->worksheet(0);
+	my ($colMin, $colMax) = $worksheet->col_range();
+	my ($rowMin, $rowMax) = $worksheet->row_range();
+	# check the column titles and grab indexes of our columns of interest
+	my ($pathoCol, $geneCol,$levelCol) = (-1,-1,-1);
+	foreach my $col ($colMin..$colMax) {
+	    my $cell = $worksheet->get_cell($rowMin, $col);
+	    ($cell->value() eq "pathologyID") &&
+		($pathoCol = $col);
+	    ($cell->value() eq "Candidate gene") &&
+		($geneCol = $col);
+	    ($cell->value() eq "Level") &&
+		($levelCol = $col);
+	}
+	($pathoCol >= 0) ||
+	    die "E $0: parsing xlsx $candidatesFile: no col title is pathologyID\n";
+	($geneCol >= 0) ||
+	    die "E $0: parsing xlsx $candidatesFile: no col title is Candidate gene\n";
+	($levelCol >= 0) ||
+	    die "E $0: parsing xlsx $candidatesFile: no col title is Level\n";
+	
+	foreach my $row ($rowMin+1..$rowMax) {
+	    my $cohort = $worksheet->get_cell($row, $pathoCol)->unformatted();
+	    my $gene = $worksheet->get_cell($row, $geneCol)->unformatted();
+	    my $level = $worksheet->get_cell($row, $levelCol)->unformatted();
 
-	# clean up $gene
-	$gene =~ s/^\s+//;
-	$gene =~ s/\s+$//;
+	    # clean up $gene
+	    $gene =~ s/^\s+//;
+	    $gene =~ s/\s+$//;
 
-	(defined $knownCandidateGenes{$cohort}) ||
-	    ($knownCandidateGenes{$cohort} = {});
-	(defined $knownCandidateGenes{$cohort}->{$gene}) && 
-	    die "E $0: parsing xlsx $candidatesFile: have 2 lines with same gene $gene and pathologyID $cohort\n";
-	$knownCandidateGenes{$cohort}->{$gene} = $level;
+	    (defined $knownCandidateGenes{$cohort}) ||
+		($knownCandidateGenes{$cohort} = {});
+	    (defined $knownCandidateGenes{$cohort}->{$gene}) && 
+		die "E $0: parsing xlsx $candidatesFile: have 2 lines with same gene $gene and pathologyID $cohort\n";
+	    $knownCandidateGenes{$cohort}->{$gene} = $level;
+	}
     }
 }
-
 
 #########################################################
 # parse patient metadata file
