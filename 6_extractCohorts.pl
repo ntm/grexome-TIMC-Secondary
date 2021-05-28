@@ -163,7 +163,7 @@ foreach my $candidatesFile (split(/,/, $candidatesFiles)) {
     my ($pathoCol, $geneCol,$levelCol) = (-1,-1,-1);
     foreach my $col ($colMin..$colMax) {
 	my $cell = $worksheet->get_cell($rowMin, $col);
-	($cell->value() eq "pathology") &&
+	($cell->value() eq "pathologyID") &&
 	    ($pathoCol = $col);
 	($cell->value() eq "Candidate gene") &&
 	    ($geneCol = $col);
@@ -171,7 +171,7 @@ foreach my $candidatesFile (split(/,/, $candidatesFiles)) {
 	    ($levelCol = $col);
      }
     ($pathoCol >= 0) ||
-	die "E $0: parsing xlsx $candidatesFile: no col title is pathology\n";
+	die "E $0: parsing xlsx $candidatesFile: no col title is pathologyID\n";
     ($geneCol >= 0) ||
 	die "E $0: parsing xlsx $candidatesFile: no col title is Candidate gene\n";
     ($levelCol >= 0) ||
@@ -189,7 +189,7 @@ foreach my $candidatesFile (split(/,/, $candidatesFiles)) {
 	(defined $knownCandidateGenes{$cohort}) ||
 	    ($knownCandidateGenes{$cohort} = {});
 	(defined $knownCandidateGenes{$cohort}->{$gene}) && 
-	    die "E $0: parsing xlsx $candidatesFile: have 2 lines with same gene $gene and pathology $cohort\n";
+	    die "E $0: parsing xlsx $candidatesFile: have 2 lines with same gene $gene and pathologyID $cohort\n";
 	$knownCandidateGenes{$cohort}->{$gene} = $level;
     }
 }
@@ -224,7 +224,7 @@ my %sample2causal = ();
 	(defined $cell) || next;
 	($cell->value() eq "sampleID") &&
 	    ($sampleCol = $col);
-	($cell->value() eq "pathology") &&
+	($cell->value() eq "pathologyID") &&
 	    ($cohortCol = $col);
 	($cell->value() eq "Causal gene") &&
 	    ($causalCol = $col);
@@ -232,7 +232,7 @@ my %sample2causal = ();
     ($sampleCol >= 0) ||
 	die "E $0: parsing xlsx: no column title is sampleID\n";
     ($cohortCol >= 0) ||
-	die "E $0: parsing xlsx: no col title is pathology\n";
+	die "E $0: parsing xlsx: no col title is pathologyID\n";
     ($causalCol >= 0) ||
 	die "E $0: parsing xlsx: no col title is Causal gene\n";
     

@@ -88,14 +88,14 @@ my %sample2patient = ();
 	my $cell = $worksheet->get_cell($rowMin, $col);
 	(defined $cell) || next;
 	($cell->value() eq "sampleID") && ($sampleCol = $col);
-	($cell->value() eq "pathology") && ($cohortCol = $col);
+	($cell->value() eq "pathologyID") && ($cohortCol = $col);
 	($cell->value() eq "specimenID") && ($specimenCol = $col);
 	($cell->value() eq "patientID") && ($patientCol = $col);
     }
     ($sampleCol >= 0) ||
 	die "E: $0 - parsing xlsx: no column title is sampleID\n";
     ($cohortCol >= 0) ||
-	die "E: $0 - parsing xlsx: no col title is pathology\n";
+	die "E: $0 - parsing xlsx: no col title is pathologyID\n";
     ($specimenCol >= 0) ||
 	die "E: $0 - parsing xlsx: no column title is specimenID\n";
     ($patientCol >= 0) ||

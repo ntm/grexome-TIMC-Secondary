@@ -267,7 +267,7 @@ system($com) && die "E $0: step9-finalCohorts failed: $?";
 # that were provided by collaborators, and this allows us to send them the results
 # concerning their patients.
 
-# key==path+file defining a subCohort, value==pathology
+# key==path+file defining a subCohort, value==pathologyID
 my $subCohortsR = &subCohorts();
 
 # don't do anything if no subcohort file exists
