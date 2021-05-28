@@ -3,15 +3,17 @@
 # 25/03/2018
 # NTM
 
-# Takes as arguments a $metadata xlsx file, a comma-separated list of xlsx
-# candidateGenes files, a $config pm file, an $outDir and a $tmpDir that don't exist; 
+# Takes as arguments a $metadata xlsx file, a $pathologies xlsx file, a
+# comma-separated list of xlsx candidateGenes files, an $outDir and
+# a $tmpDir that don't exist; 
 # reads on stdin a fully annotated TSV file;
 # makes $outDir and creates in it one gzipped TSV file per cohort.
-# The cohorts are defined in $metadata.
+# The cohorts are defined in $pathologies and/or $metadata.
 # For each sample, any identified causal (mutation in a) gene 
 # is grabbed from $metadata.
-# @compatible provided by $config says which cohorts should
-# NOT be used as negative controls for each other.
+# "Compatible" cohorts (ie belonging to a common compatibility group in the
+# pathologies metadata XLSX file) appear in COMPAT columns and are NOT used
+# as negative controls for each other.
 # For optimal performance $tmpDir should be on a RAMDISK (eg tmpfs).
 #
 # A new KNOWN_CANDIDATE_GENE column is inserted right after SYMBOL:
@@ -32,7 +34,7 @@
 #
 # In addition, new COUNT_* columns are created for each of the above columns,
 # in the same order, followed by a single COUNT_HR column (counting HR samples
-# from any cohort without caring about @compatible or $causalGene).
+# from any cohort without caring about $compatible or $causalGene).
 # The COUNTs are inserted right after the new KNOWN_CANDIDATE_GENE column.
 #
 # Lines where no samples from the cohort are HV|HET (for this alt allele)
@@ -45,13 +47,19 @@ use warnings;
 use File::Basename qw(basename);
 use FindBin qw($RealBin);
 use Getopt::Long;
-use Spreadsheet::XLSX;
 use POSIX qw(strftime);
 use Parallel::ForkManager;
+
 
 # we use $0 in every stderr message but we really only want
 # the program name, not the path
 $0 = basename($0);
+
+# import metaParse.pm (from the dir that contains $0)
+my $metaParse = "$RealBin/grexome_metaParse.pm";
+(-f $metaParse) ||  die "E $0: cannot find metaParse.pm, looking for: $metaParse\n";
+require($metaParse);
+grexome_metaParse->import(qw(parsePathologies));
 
 
 #############################################
@@ -69,14 +77,11 @@ my $batchSize = 20000;
 # number of jobs
 my $numJobs = 16;
 
-# metadata and candidateGenes XLSX files, no defaults
-my ($metadata, $candidatesFiles);
+# metadata, pathologies and candidateGenes XLSX files, no defaults
+my ($metadata, $pathologies, $candidatesFiles);
 
 # outDir and tmpDir, also no defaults
 my ($outDir, $tmpDir);
-
-# path+file of the config file providing "compatible", no default
-my $config = "";
 
 # help: if true just print $USAGE and exit
 my $help = '';
@@ -84,19 +89,19 @@ my $help = '';
 
 my $USAGE = "\nParse on STDIN a fully annotated TSV file as produced by steps 1-5 of this secondaryAnalysis pipeline; create in outDir one gzipped TSV file per cohort.\n
 Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
---metadata string : patient metadata xlsx file, with path
+--metadata string : samples metadata xlsx file, with path
+--pathologies string : pathologies metadata xlsx file, with path
 --candidateGenes string : comma-separated list of xlsx files holding known candidate genes, with paths
 --outdir string : subdir where resulting cohort files will be created, must not pre-exist
 --tmpdir string : subdir where tmp files will be created (on a RAMDISK if possible), must not pre-exist and will be removed after execution
---config string : your customized copy (with path) of the distributed *config.pm
 --jobs [$numJobs] : number of parallel jobs=threads to run
 --help : print this USAGE";
 
 GetOptions ("metadata=s" => \$metadata,
+	    "pathologies=s" => \$pathologies,
 	    "candidateGenes=s" => \$candidatesFiles,
 	    "outdir=s" => \$outDir,
 	    "tmpdir=s" => \$tmpDir,
-	    "config=s" => \$config,
 	    "jobs=i" => \$numJobs,
 	    "help" => \$help)
     or die("E $0: Error in command line arguments\n$USAGE\n");
@@ -107,10 +112,8 @@ GetOptions ("metadata=s" => \$metadata,
 ($metadata) || die "E $0: you must provide a metadata file\n";
 (-f $metadata) || die "E $0: the supplied metadata file doesn't exist\n";
 
-# immediately import $config, so we die if file is broken
-(-f $config) ||  die "E $0: the supplied config.pm doesn't exist: $config\n";
-require($config);
-grexomeTIMCsec_config->import('compatible');
+($pathologies) || die "E $0: you must provide a pathologies file\n";
+(-f $pathologies) || die "E $0: the supplied pathologies file doesn't exist\n";
 
 ($outDir) || die "E $0: you must provide an outDir\n";
 (-e $outDir) && 
@@ -127,7 +130,12 @@ warn "I $0: $now - starting to run\n";
 
 
 #########################################################
-# parse known candidate genes files
+# parse all provided metadata files
+
+# $compatibleR: hashref, key is a cohort name, value is a hashref
+# with keys == cohorts that are compatible with this cohort, value==1
+my $compatibleR = &parsePathologies($pathologies);
+
 
 # %knownCandidateGenes: key==$cohort, value is a hashref whose keys 
 # are gene names and values are the "Level" from a $candidatesFile,
@@ -257,33 +265,6 @@ foreach my $c (keys(%knownCandidateGenes)) {
     }
 }
 
-#########################################################
-# check @compatible cohort names and store in %compatible hash
-
-# %compatible: key is a cohort name, value is a hashref
-# with keys == cohorts that shouldn't be used as negative 
-# controls for this cohort, value==1
-my %compatible = ();
-
-{
-    # @$compatibleAR: array of arrayrefs, each arrayref holds cohorts that
-    # should NOT be used as neg controls for each other.
-    # The cohort names must match the "pathology" column of the $metadata xlsx
-    # (this is checked).
-    my $compatibleAR = &compatible();
-
-    foreach my $notConR (@$compatibleAR) {
-	foreach my $cohort (@$notConR) {
-	    (grep($cohort eq $_, @cohorts)) ||
-		die "E $0: cohort $cohort from compatible is not in cohorts: @cohorts\n";
-	    (defined $compatible{$cohort}) || ($compatible{$cohort} = {});
-	    foreach my $notC (@$notConR) {
-		($notC eq $cohort) && next;
-		$compatible{$cohort}->{$notC} = 1;
-	    }
-	}
-    }
-}
 
 #########################################################
 
@@ -421,7 +402,7 @@ while (!$lastBatch) {
 
     # process this batch
     &processBatch(\@lines,\%knownCandidateGenes,\%sample2cohort,\@cohorts,
-		  \%sample2causal,\%compatible,$symbolCol,\%genoCols,\@tmpOutFHs,$tmpSeenFH);
+		  \%sample2causal,$compatibleR,$symbolCol,\%genoCols,\@tmpOutFHs,$tmpSeenFH);
 
     # done, close tmp FHs and create flag-file
     foreach my $outFH (@tmpOutFHs,$tmpSeenFH) {

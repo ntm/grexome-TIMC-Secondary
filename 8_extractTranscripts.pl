@@ -3,13 +3,12 @@
 # 19/08/2019, but starting from 6_extractCohorts.pl
 # NTM
 
-# Takes as arguments: $inDir $outDir $config
+# Takes as arguments: $inDir $outDir $pathologies
 # - $inDir must contain cohort TSVs as produced by extractCohorts.pl,
 #   filtered and reordered by filterVariants.pl and reorderColumns.pl;
 # - $outDir doesn't exist, it will be created and filled with one TSV
 #   per infile, adding .Transcripts to the name;
-# - $config is a customized copy of grexomeTIMCsec_config.pm and
-#    provides 'compatible'
+# - $pathologies is the pathologies metadata file.
 #
 # We expect that cohort files were filtered to consider only rare variants 
 # (max_af_*) in picked transcripts, that aren't seen in too many CTRLs 
@@ -33,7 +32,7 @@
 #   the samples with a "known causal variant" in another gene, all concatenated
 #   into a single :-separated string (with :: between HVs and HETs)
 # - another column COUNTSAMPLES_COMPAT same as OTHERCAUSE but counting
-#   the samples belonging to compatible cohorts (as defined in $config)
+#   the samples belonging to compatible cohorts (as defined in $pathologies)
 # - 6 final columns COUNTSAMPLES_NEGCTRL_* similar to $cohort counts but counting
 #   the control samples (as in extractCohorts again).
 # - HV_HIGH, HV_MODHIGH, HV_MODER, BIALLELIC_HIGH, BIALLELIC_MODHIGH, BIALLELIC_MODER:
@@ -55,9 +54,16 @@ use FindBin qw($RealBin);
 use Getopt::Long;
 use POSIX qw(strftime);
 
+
 # we use $0 in every stderr message but we really only want
 # the program name, not the path
 $0 = basename($0);
+
+# import metaParse.pm (from the dir that contains $0)
+my $metaParse = "$RealBin/grexome_metaParse.pm";
+(-f $metaParse) ||  die "E $0: cannot find metaParse.pm, looking for: $metaParse\n";
+require($metaParse);
+grexome_metaParse->import(qw(parsePathologies));
 
 
 #############################################
@@ -83,8 +89,8 @@ my @countTypes = ("HV_HIGH","HV_MODHIGH","HV_MODER","BIALLELIC_HIGH","BIALLELIC_
 # inDir contains cohort TSVs, $outDir must not pre-exist, no defaults
 my ($inDir, $outDir);
 
-# path+file of the config file providing "compatible", no default
-my $config = "";
+# path+file of the pathologies XLSX file, no default
+my $pathologies = "";
 
 # help: if true just print $USAGE and exit
 my $help = '';
@@ -94,22 +100,17 @@ Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --indir string [no default] : subdir containing cohort TSVs as produced by extractCohorts.pl, 
                               filtered and reordered by filterVariants.pl and reorderColumns.pl;
 --outdir string [no default] : subdir where resulting Transcripts TSV files will be created, must not pre-exist
---config string [no default] : your customized copy (with path) of the distributed *config.pm
+--pathologies string [no default] : pathologies metadata xlsx file, with path
 --help : print this USAGE";
 
 GetOptions ("indir=s" => \$inDir,
 	    "outdir=s" => \$outDir,
-	    "config=s" => \$config,
+	    "pathologies=s" => \$pathologies,
 	    "help" => \$help)
     or die("E $0: Error in command line arguments\n$USAGE\n");
 
 # make sure required options were provided and sanity check them
 ($help) && die "$USAGE\n\n";
-
-# immediately import $config, so we die if file is broken
-(-f $config) ||  die "E $0: the supplied config.pm doesn't exist: $config\n";
-require($config);
-grexomeTIMCsec_config->import('compatible');
 
 (-d $inDir) ||
     die "E $0: inDir $inDir doesn't exist or isn't a directory\n";
@@ -120,10 +121,11 @@ opendir(INDIR, $inDir) ||
     die "E $0: found argument outDir $outDir but it already exists, remove it or choose another name.\n";
 mkdir($outDir) || die "E $0: cannot mkdir outDir $outDir\n";
 
+($pathologies) || die "E $0: you must provide a pathologies file\n";
+(-f $pathologies) || die "E $0: the supplied pathologies file doesn't exist\n";
 
 my $now = strftime("%F %T", localtime);
 warn "I $0: $now - starting to run\n";
-
 
 
 #########################################################
@@ -144,31 +146,10 @@ foreach my $col (@keptColumnsSpecific) {
     delete($keptCols{$col});
 }
 
+# $compatibleR: hashref, key is a cohort name, value is a hashref
+# with keys == cohorts that are compatible with this cohort, value==1
+my $compatibleR = &parsePathologies($pathologies);
 
-# store @compatible cohorts in %compatible hash
-
-# %compatible: key is a cohort name, value is a hashref
-# with keys == cohorts that shouldn't be used as negative 
-# controls for this cohort, value==1
-my %compatible = ();
-
-{
-    # @$compatibleAR: array of arrayrefs, each arrayref holds cohorts that
-    # should NOT be used as neg controls for each other.
-    # The cohort names must match the "pathology" column of the $metadata xlsx
-    # (not checked here, but already checked in 6_extractCohorts.pl).
-    my $compatibleAR = &compatible();
-
-    foreach my $notConR (@$compatibleAR) {
-	foreach my $cohort (@$notConR) {
-	    (defined $compatible{$cohort}) || ($compatible{$cohort} = {});
-	    foreach my $notC (@$notConR) {
-		($notC eq $cohort) && next;
-		$compatible{$cohort}->{$notC} = 1;
-	    }
-	}
-    }
-}
 
 #########################################################
 
@@ -536,7 +517,7 @@ foreach my $transcript (@transcripts) {
 		# for COMPATs and NEGCTRLs we need to add non-OC and OC counts
 		# $indexInCounts is 12 if $thisCohort is compatible with $cohort and 18 if it's a NEGCTRL
 		my $indexInCounts = 18;
-		if ($compatible{$cohort}->{$thisCohort}) {
+		if ($compatibleR->{$cohort}->{$thisCohort}) {
 		    $indexInCounts = 12;
 		}
 		foreach my $i (0..5) {
@@ -622,7 +603,7 @@ foreach my $transcript (@transcripts) {
 	    # add OCs (it's complete, just grab list at index 4)
 	    push(@goodSamples, keys(%{$transcript2cohort2samplesOC{$transcript}->{$thisCohort}->[4]}));
 
-	    if ($compatible{$cohort}->{$thisCohort}) {
+	    if ($compatibleR->{$cohort}->{$thisCohort}) {
 		push(@compat, @goodSamples); 
 	    }
 	    else {

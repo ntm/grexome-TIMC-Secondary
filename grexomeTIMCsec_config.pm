@@ -4,7 +4,7 @@
 # Define the paths and filenames that should be install-specific and
 # are needed by grexome-TIMC-secondary.pl .
 # Every hard-coded path/filename in the pipeline should be here.
-# Also define some data-specific or behavioral config (eg "compatible").
+# Also define some data-specific or behavioral config (eg "gtexFavoriteTissues").
 # Other hard-coded stuff you may want to tweak to adjust the pipeline's
 # behavior include:
 # - some stuff in 3_runVEP.pl (eg VEP plugins and params to use)
@@ -25,7 +25,7 @@ our @ISA = ('Exporter');
 # provide the customized *config.pm as an argument, see --config in
 # grexome-TIMC-secondary.pl for an example.
 our @EXPORT_OK = qw(refGenome vepCacheFile vepPluginDataPath fastTmpPath 
-                    coveragePath gtexDatafile gtexFavoriteTissues compatible subCohorts);
+                    coveragePath gtexDatafile gtexFavoriteTissues subCohorts);
 
 
 #################################################################
@@ -141,21 +141,9 @@ sub gtexFavoriteTissues {
     return($favoriteTissues);
 }
 
-
-# Return a ref to an array of arrayrefs, each arrayref holds cohorts that
-# should NOT be used as neg controls for each other.
-# The cohort names must match the "pathology" column of the $metadata xlsx.
-sub compatible {
-    my @compatible = (["MMAF","AST","Headless"],
-		      ["Azoo","Ovo","Macro","POF"],
-		      ["Globo","Macro","Terato","prePRM2"]);
-    return(\@compatible);
-}
-
-
 # Return a ref to a hash:
 # key==path+file defining a subCohort (filename must start with subCohort_ and end with .txt),
-# value==pathology (must match the "pathology" column of the metadata xlsx).
+# value==pathology (must match the "Acronym" column of the pathologies metadata xlsx).
 sub subCohorts {
     my %subCohorts = ("/home/nthierry/VariantCalling/GrexomeFauve/Grexome_Metadata/4-SubCohorts/subCohort_FV.txt" => "Azoo",
 		      "/home/nthierry/VariantCalling/GrexomeFauve/Grexome_Metadata/4-SubCohorts/subCohort_London.txt" => "Azoo",
