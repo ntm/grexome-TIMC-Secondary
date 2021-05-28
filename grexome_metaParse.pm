@@ -19,12 +19,12 @@ our @EXPORT_OK = qw(parsePathologies);
 
 #################################################################
 
-# Parse pathologies metadata XLSX file: required columns are "Acronym"
-# and "Compatibility groups" (can be in any order but they MUST exist).
+# Parse pathologies metadata XLSX file: required columns are "pathologyID"
+# and "compatibility groups" (can be in any order but they MUST exist).
 #
 # Return a hashref:
-# - key is a pathology acronym (used as cohort identifier)
-# - value is a hashref, with keys==pathos that are compatible with
+# - key is a pathologyID (used as cohort identifier)
+# - value is a hashref, with keys==pathoIDs that are compatible with
 #   the current patho and values==1
 sub parsePathologies {
     (@_ == 1) || die "E: parsePathologies needs one arg";
@@ -51,33 +51,32 @@ sub parsePathologies {
 	my $cell = $worksheet->get_cell($rowMin, $col);
 	# if column has no header just ignore it
 	(defined $cell) || next;
-	if ($cell->value() eq "Acronym") {
+	if ($cell->value() eq "pathologyID") {
 	    ($pathoCol = $col);
 	}
-	elsif ($cell->value() eq "Compatibility groups") {
+	elsif ($cell->value() eq "compatibility groups") {
 	    ($compatCol = $col);
 	}
     }
     ($pathoCol >= 0) ||
-	die "E in parsePathologies: missing required column title: 'Acronym'";
+	die "E in parsePathologies: missing required column title: 'pathologyID'";
     ($compatCol >= 0) ||
-	die "E in parsePathologies: missing required column title: 'Compatibility groups'";
+	die "E in parsePathologies: missing required column title: 'compatibility groups'";
 
     foreach my $row ($rowMin+1..$rowMax) {
 	my $patho = $worksheet->get_cell($row, $pathoCol);
-	# skip lines without an acronym
+	# skip lines without a pathoID
 	($patho) || next;
 	$patho = $patho->unformatted();
 	# require alphanumeric strings
 	($patho =~ /^\w+$/) ||
-	    die "E in parsePathologies: acronyms must be alphanumeric strings, found \"$patho\" in row $row";
+	    die "E in parsePathologies: pathologyIDs must be alphanumeric strings, found \"$patho\" in row $row";
 	(defined $compatible{$patho}) && 
-	    die "E in parsePathologies: there are 2 lines with same acronym $patho";
+	    die "E in parsePathologies: there are 2 lines with same pathologyID $patho";
 	# initialize with anonymous empty hash
 	$compatible{$patho} = {};
 
-	# 'Compatibility group' must be a comma-separated list of group identifiers (alphanum strings,
-	# eg simply ints)
+	# 'Compatibility group' must be a comma-separated list of group identifiers (alphanum strings)
 	my $compats = $worksheet->get_cell($row, $compatCol);
 	(defined $compats) || next;
 	$compats = $compats->unformatted();
