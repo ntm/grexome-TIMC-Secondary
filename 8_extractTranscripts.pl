@@ -3,12 +3,12 @@
 # 19/08/2019, but starting from 6_extractCohorts.pl
 # NTM
 
-# Takes as arguments: $inDir $outDir $pathologies
+# Takes as arguments: $inDir $outDir [$pathologies]
 # - $inDir must contain cohort TSVs as produced by extractCohorts.pl,
 #   filtered and reordered by filterVariants.pl and reorderColumns.pl;
 # - $outDir doesn't exist, it will be created and filled with one TSV
 #   per infile, adding .Transcripts to the name;
-# - $pathologies is the pathologies metadata file.
+# - $pathologies (optional) is the pathologies metadata file.
 #
 # We expect that cohort files were filtered to consider only rare variants 
 # (max_af_*) in picked transcripts, that aren't seen in too many CTRLs 
@@ -89,7 +89,7 @@ my @countTypes = ("HV_HIGH","HV_MODHIGH","HV_MODER","BIALLELIC_HIGH","BIALLELIC_
 # inDir contains cohort TSVs, $outDir must not pre-exist, no defaults
 my ($inDir, $outDir);
 
-# path+file of the pathologies XLSX file, no default
+# path+file of the pathologies XLSX file
 my $pathologies = "";
 
 # help: if true just print $USAGE and exit
@@ -97,10 +97,10 @@ my $help = '';
 
 my $USAGE = "\nParse cohort TSVs from inDir, create transcript TSVs in outDir.
 Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
---indir string [no default] : subdir containing cohort TSVs as produced by extractCohorts.pl, 
+--indir string: subdir containing cohort TSVs as produced by extractCohorts.pl, 
                               filtered and reordered by filterVariants.pl and reorderColumns.pl;
---outdir string [no default] : subdir where resulting Transcripts TSV files will be created, must not pre-exist
---pathologies string [no default] : pathologies metadata xlsx file, with path
+--outdir string: subdir where resulting Transcripts TSV files will be created, must not pre-exist
+--pathologies [optional] : pathologies metadata xlsx file, with path
 --help : print this USAGE";
 
 GetOptions ("indir=s" => \$inDir,
@@ -121,8 +121,16 @@ opendir(INDIR, $inDir) ||
     die "E $0: found argument outDir $outDir but it already exists, remove it or choose another name.\n";
 mkdir($outDir) || die "E $0: cannot mkdir outDir $outDir\n";
 
-($pathologies) || die "E $0: you must provide a pathologies file\n";
-(-f $pathologies) || die "E $0: the supplied pathologies file doesn't exist\n";
+# If $pathologies was provided we want to parse (and check) it now, it is used
+# to populate $compatibleR
+# $compatibleR: hashref, key is a cohort name, value is a hashref
+# with keys == cohorts that are compatible with this cohort, value==1
+my $compatibleR;
+if ($pathologies) {
+    (-f $pathologies) || die "E $0: the supplied pathologies file $pathologies doesn't exist\n";
+    $compatibleR = &parsePathologies($pathologies);
+}
+# else $compatibleR stays undef
 
 my $now = strftime("%F %T", localtime);
 warn "I $0: $now - starting to run\n";
@@ -145,11 +153,6 @@ foreach my $col (@keptColumnsSpecific) {
     $keptColsSpecific{$col} = $keptCols{$col};
     delete($keptCols{$col});
 }
-
-# $compatibleR: hashref, key is a cohort name, value is a hashref
-# with keys == cohorts that are compatible with this cohort, value==1
-my $compatibleR = &parsePathologies($pathologies);
-
 
 #########################################################
 

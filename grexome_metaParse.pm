@@ -30,6 +30,8 @@ sub parsePathologies {
     (@_ == 1) || die "E: parsePathologies needs one arg";
     my ($pathosFile) = @_;
 
+    (-f $pathosFile) || die "E in parsePathologies: provided file $pathosFile doesn't exist";
+
     # ref to %compatible will be returned, as defined above
     my %compatible = ();
 

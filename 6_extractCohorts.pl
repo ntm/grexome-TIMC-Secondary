@@ -90,8 +90,8 @@ my $help = '';
 my $USAGE = "\nParse on STDIN a fully annotated TSV file as produced by steps 1-5 of this secondaryAnalysis pipeline; create in outDir one gzipped TSV file per cohort.\n
 Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --metadata string : samples metadata xlsx file, with path
---pathologies string : pathologies metadata xlsx file, with path
---candidateGenes string : comma-separated list of xlsx files holding known candidate genes, with paths
+--pathologies string [optional] : pathologies metadata xlsx file, with path
+--candidateGenes string [optional] : comma-separated list of xlsx files holding known candidate genes, with paths
 --outdir string : subdir where resulting cohort files will be created, must not pre-exist
 --tmpdir string : subdir where tmp files will be created (on a RAMDISK if possible), must not pre-exist and will be removed after execution
 --jobs [$numJobs] : number of parallel jobs=threads to run
@@ -112,9 +112,6 @@ GetOptions ("metadata=s" => \$metadata,
 ($metadata) || die "E $0: you must provide a metadata file\n";
 (-f $metadata) || die "E $0: the supplied metadata file doesn't exist\n";
 
-($pathologies) || die "E $0: you must provide a pathologies file\n";
-(-f $pathologies) || die "E $0: the supplied pathologies file doesn't exist\n";
-
 ($outDir) || die "E $0: you must provide an outDir\n";
 (-e $outDir) && 
     die "E $0: found argument $outDir but it already exists, remove it or choose another name.\n";
@@ -132,10 +129,16 @@ warn "I $0: $now - starting to run\n";
 #########################################################
 # parse all provided metadata files
 
+# If $pathologies was provided we want to parse (and check) it now, it is used
+# to populate $compatibleR
 # $compatibleR: hashref, key is a cohort name, value is a hashref
 # with keys == cohorts that are compatible with this cohort, value==1
-my $compatibleR = &parsePathologies($pathologies);
-
+my $compatibleR;
+if ($pathologies) {
+    (-f $pathologies) || die "E $0: the supplied pathologies file $pathologies doesn't exist\n";
+    $compatibleR = &parsePathologies($pathologies);
+}
+# else $compatibleR stays undef
 
 # %knownCandidateGenes: key==$cohort, value is a hashref whose keys 
 # are gene names and values are the "Level" from a $candidatesFile,
