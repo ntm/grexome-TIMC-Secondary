@@ -25,9 +25,13 @@
 #   and every 0/x or x/x call gets for AF the fraction of variant reads (rounded
 #   to 2 decimals), HR and x/y calls get '.';
 # - fix blatantly wrong genotype calls, see "heuristics" below.
+# - ALTs that are not called in any sample (after fixing errors) are removed, and
+#   DATA values are adjusted accordingly: GT is fixed (new ALT indexes), AD/ADF/ADR and
+#   PL values for removed ALTs are discarded
 # - work around strelka "feature": indel positions can be preceded by an HR call
 #   that includes the first base of the indel (HR call at $pos or non-variant block
 #   with END=$pos followed by indel call at the same $pos).
+
 
 use strict;
 use warnings;
@@ -99,9 +103,10 @@ my $verbose = 0;
 # help: if true just print $USAGE and exit
 my $help = '';
 
-my $USAGE = "Parse a Strelka GVCF on stdin, print to stdout a similar GVCF or VCF where:
+my $USAGE = "Parse a Strelka or GATK4 GVCF on stdin, print to stdout a similar GVCF or VCF where:
 - calls that fail basic quality filters are changed to NOCALL,
 - calls that are blatantly wrong are fixed,
+- ALTs that are never called are removed,
 - lines are only printed if at least one sample still has some genotype call (including HomoRefs with --keepHR, excluding HomoRefs without).
 Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --metadata string [no default] : patient metadata xlsx file, with path
