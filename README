@@ -27,7 +27,7 @@ METADATA FILES:
 The pipeline can use several xlsx files containing metadata, some are REQUIRED and some are OPTIONAL. Examples are provided in the Documentation/ subdirectory, these can serve as starting points. All columns present in the Documentation/ example files (and listed below) are required by the pipeline, don't change their names! You can add new columns and/or change the order of columns to your taste, just don't touch the pre-existing column names. The filenames can also be modified, you provide them as arguments to grexome-TIMC-secondary.pl.
 
 1. samples.xlsx: REQUIRED, describes the samples. Required columns:
-- sampleID: unique identifier for each sample, these are typically created with a uniform naming scheme when new samples are integrated into the pipeline and are used internally throughout the pipeline.
+- sampleID: unique identifier for each sample, these are typically created with a uniform naming scheme when new samples are integrated into the pipeline and are used internally throughout the pipeline. Rows with sampleID=="0" are ignored, this allows to retain metadata info about obsolete samples.
 - specimenID: external identifier for each sample, typically related to the BAM or FASTQ filenames.
 - patientID: a more user-friendly identifier for each sample - can be empty, but if it isn't it will be used instead of specimenID as external sample identifier.
 - pathologyID: the phenotype of each patient/sample, used to define the "cohorts". Must be listed in pathologies.xlsx if that file is provided.
