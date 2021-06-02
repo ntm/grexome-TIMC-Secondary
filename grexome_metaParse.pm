@@ -15,7 +15,7 @@ use warnings;
 use Spreadsheet::XLSX;
 use Exporter;
 our @ISA = ('Exporter');
-our @EXPORT_OK = qw(parsePathologies);
+our @EXPORT_OK = qw(parsePathologies parseSamples);
 
 
 #################################################################
