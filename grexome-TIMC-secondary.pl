@@ -158,7 +158,7 @@ my $tmpdir = tempdir(DIR => &fastTmpPath());
 # STEPS 1-6, piped into each other except in debug mode
 
 # decompress infile and step 1
-my $com = "bgzip -cd -@".$numJobsGunzip." $inFile | perl $RealBin/1_filterBadCalls.pl --metadata=$metadata --tmpdir=$tmpdir/FilterTmp/ --jobs $numJobs1 ";
+my $com = "bgzip -cd -@".$numJobsGunzip." $inFile | perl $RealBin/1_filterBadCalls.pl --samplesFile=$metadata --tmpdir=$tmpdir/FilterTmp/ --jobs $numJobs1 ";
 if ($debug) {
     # specific logfile from step and save its output
     $com .= "2> $outDir/step1.err > $outDir/step1.out";

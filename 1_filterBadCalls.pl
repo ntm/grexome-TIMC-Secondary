@@ -7,7 +7,7 @@
 # Parses on stdin a Strelka or GATK GVCF file with one or more sample data columns;
 # Args: see $USAGE.
 # Prints to stdout a VCF (default) or GVCF (with --keepHR) file where:
-# - samples that don't appear in $metadata "sampleID" column are removed
+# - samples that don't appear in $samplesFile "sampleID" column are removed
 #   (allows to discard data for samples that are in the GVCF but were
 #   obsoleted as dupes);
 # - ignore all samples except the $samplesOfInterest, if specified;
@@ -36,14 +36,22 @@
 use strict;
 use warnings;
 use File::Basename qw(basename);
+use FindBin qw($RealBin);
 use Getopt::Long;
-use Spreadsheet::XLSX;
 use POSIX qw(strftime);
 use Parallel::ForkManager;
+
 
 # we use $0 in every stderr message but we really only want
 # the program name, not the path
 $0 = basename($0);
+
+# import metaParse.pm (from the dir that contains $0)
+my $metaParse = "$RealBin/grexome_metaParse.pm";
+(-f $metaParse) ||  die "E $0: cannot find metaParse.pm, looking for: $metaParse\n";
+require($metaParse);
+grexome_metaParse->import(qw(parseSamples));
+
 
 #############################################
 ## hard-coded stuff that shouldn't change much
@@ -77,8 +85,8 @@ my %filterParams = (
 #############################################
 ## options / params from the command-line
 
-# metadata XLSX, no default
-my $metadata;
+# samples metadata XLSX, no default
+my $samplesFile;
 
 # comma-separated list of samples of interest, if not empty all
 # other samples are skipped. If empty every sample is kept.
@@ -109,8 +117,8 @@ my $USAGE = "Parse a Strelka or GATK4 GVCF on stdin, print to stdout a similar G
 - ALTs that are never called are removed,
 - lines are only printed if at least one sample still has some genotype call (including HomoRefs with --keepHR, excluding HomoRefs without).
 Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
---metadata string [no default] : patient metadata xlsx file, with path
---samplesOfInterest string [default = all samples in metadata xlsx] : comma-separated list of sampleIDs of interest (other samples are ignored)
+--samplesFile string [no default] : samples metadata xlsx file, with path
+--samplesOfInterest string [default = all samples in xlsx] : comma-separated list of sampleIDs of interest (other samples are ignored)
 --keepHR : keep lines even if the only genotype call is homoref
 --tmpdir string [default = $tmpDir] : subdir where tmp files will be created (on a RAMDISK if possible), it must not pre-exist (but it's 
 	 parent must exist) and it will be removed after execution
@@ -128,7 +136,7 @@ $addToHeader .= " 2> ".`readlink -f /proc/$$/fd/2` ;
 chomp($addToHeader);
 $addToHeader = "##filterBadCalls=<commandLine=\"$addToHeader\">\n";
 
-GetOptions ("metadata=s" => \$metadata,
+GetOptions ("samplesFile=s" => \$samplesFile,
 	    "samplesOfInterest=s" => \$samplesOfInterest,
 	    "keepHR" => \$keepHR,
 	    "jobs=i" => \$numJobs,
@@ -140,8 +148,8 @@ GetOptions ("metadata=s" => \$metadata,
 # make sure required options were provided and sanity check them
 ($help) && die "$USAGE\n\n";
 
-($metadata) || die "E $0: you must provide a metadata file\n";
-(-f $metadata) || die "E $0: the supplied metadata file doesn't exist\n";
+($samplesFile) || die "E $0: you must provide a samplesFile file\n";
+(-f $samplesFile) || die "E $0: the supplied samplesFile file doesn't exist\n";
 
 (-e $tmpDir) && 
     die "E $0: tmpDir $tmpDir exists, please remove or rename it, or provide a different one with --tmpdir\n";
@@ -153,47 +161,22 @@ warn "I $now: $0 - starting to run\n";
 
 
 #########################################################
-# parse patient metadata file to grab sampleIDs, limit to samples of interest
+# parse samples metadata file to grab sampleIDs, limit to samples of interest
 
 # key==existing sample of interest, value==1
 my %samples = ();
 
-{
-    my $workbook = Spreadsheet::XLSX->new("$metadata");
-    (defined $workbook) ||
-	die "E $0: when parsing xlsx\n";
-    ($workbook->worksheet_count() == 1) ||
-	die "E $0: parsing xlsx: expecting a single worksheet, got ".$workbook->worksheet_count()."\n";
-    my $worksheet = $workbook->worksheet(0);
-    my ($colMin, $colMax) = $worksheet->col_range();
-    my ($rowMin, $rowMax) = $worksheet->row_range();
-    # check the column titles and grab indexes of our columns of interest
-    my ($sampleCol) = (-1);
-    foreach my $col ($colMin..$colMax) {
-	my $cell = $worksheet->get_cell($rowMin, $col);
-	# if column has no header just ignore it
-	(defined $cell) || next;
-	($cell->value() eq "sampleID") &&
-	    ($sampleCol = $col);
-    }
-    ($sampleCol >= 0) ||
-	die "E $0: parsing xlsx: no column title is sampleID\n";
-
-    foreach my $row ($rowMin+1..$rowMax) {
-	my $sample = $worksheet->get_cell($row, $sampleCol)->unformatted();
-	# skip "0" lines
-	($sample eq "0") && next;
-	(defined $samples{$sample}) && 
-	    die "E $0: parsing xlsx: have 2 lines with sample $sample\n";
-	$samples{$sample} = 1;
-    }
+# just use the first hashref from parseSamples, ignoring pathologyIDs
+my ($s2pathoR) = &parseSamples($samplesFile);
+foreach my $s (keys %$s2pathoR) {
+    $samples{$s} = 1;
 }
 
 if ($samplesOfInterest) {
     # make sure every listed sample is in %samples and promote it's value to 2
     foreach my $soi (split(/,/, $samplesOfInterest)) {
 	($samples{$soi}) ||
-	    die "E $0: processing samplesOfInterest: a specified sample $soi does not exist in the metadata file\n";
+	    die "E $0: processing samplesOfInterest: a specified sample $soi does not exist in the samples metadata file\n";
 	($samples{$soi} == 1) ||
 	    warn "W $0: processing samplesOfInterest: sample $soi was specified twice, is that a typo?\n";
 	$samples{$soi} = 2;
@@ -214,7 +197,7 @@ if ($samplesOfInterest) {
 
 # array, same number of elements as there are columns in the #CHROM line
 # (and hence in each data line), value is true iff column must be skipped
-# (corresponding to samples that no longer exist in the metadata file, 
+# (corresponding to samples that no longer exist or are obsoleted in samplesFile, 
 # eg they were dupes of other samples with better sequencing)
 my @skippedCols = ();
 
@@ -222,7 +205,7 @@ my @skippedCols = ();
 # contain any samples (of interest)
 my $headerToPrint = "";
 
-# parse header, just copy it except we remove samples that don't exist anymore
+# parse header, just copy it except #CHROM
 while(my $line = <STDIN>) {
     if ($line =~ /^##/) {
 	$headerToPrint .= $line;
@@ -230,8 +213,8 @@ while(my $line = <STDIN>) {
     elsif ($line =~ /^#CHROM/) {
 	# add ##comment with full command line run
 	$headerToPrint .= $addToHeader;
-	# remove samples that don't exist in $metadata (anymore) or are not of interest
-	# also remeber if at least one sample remains
+	# remove samples that don't exist in $samplesFile (anymore) or are not of interest
+	# also remember if at least one sample remains
 	my $goodSamples = 0;
 	chomp($line);
 	my @fields = split(/\t/,$line);
