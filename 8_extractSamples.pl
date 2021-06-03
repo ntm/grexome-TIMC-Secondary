@@ -31,8 +31,11 @@
 use strict;
 use warnings;
 use File::Basename qw(basename);
+use FindBin qw($RealBin);
 use POSIX qw(strftime);
-use Spreadsheet::XLSX;
+
+use lib "$RealBin";
+use grexome_metaParse qw(parseSamples);
 
 # we use $0 in every stderr message but we really only want
 # the program name, not the path
@@ -55,7 +58,7 @@ if ($covDir) {
 	die "E: $0 - covDir $covDir was provided but it doesn't exist or isn't a directory\n";
 }
 else {
-    warn "W: $0 - no covDir provided, coverage statistics won't be appended to the header lines\n";
+    warn "I: $0 - no covDir provided, coverage statistics won't be appended to the header lines\n";
 }
 
 my $now = strftime("%F %T", localtime);
@@ -63,61 +66,23 @@ warn "I $0: $now - starting to run\n";
 
 
 #########################################################
-# parse samplesFile
+# parse useful info from samplesFile
 
-# key==cohort name, value is an arrayref of all samples from this cohort
+# key==pathologyID, value is an arrayref of all samples with this patho
 my %cohort2samples = ();
 
 # key==sample, value is patientID if it exists, specimenID otherwise
-my %sample2patient = ();
+my $sample2patientR;
 
-(-f $samplesFile) ||
-    die "E: $0 - the supplied samples metadata file doesn't exist\n";
 {
-    my $workbook = Spreadsheet::XLSX->new("$samplesFile");
-    (defined $workbook) ||
-	die "E: $0 - E when parsing xlsx\n";
-    ($workbook->worksheet_count() == 1) ||
-	die "E: $0 - parsing xlsx: expecting a single worksheet, got ".$workbook->worksheet_count()."\n";
-    my $worksheet = $workbook->worksheet(0);
-    my ($colMin, $colMax) = $worksheet->col_range();
-    my ($rowMin, $rowMax) = $worksheet->row_range();
-    # check the column titles and grab indexes of our columns of interest
-    my ($sampleCol, $cohortCol, $specimenCol, $patientCol) = (-1,-1,-1,-1);
-    foreach my $col ($colMin..$colMax) {
-	my $cell = $worksheet->get_cell($rowMin, $col);
-	(defined $cell) || next;
-	($cell->value() eq "sampleID") && ($sampleCol = $col);
-	($cell->value() eq "pathologyID") && ($cohortCol = $col);
-	($cell->value() eq "specimenID") && ($specimenCol = $col);
-	($cell->value() eq "patientID") && ($patientCol = $col);
-    }
-    ($sampleCol >= 0) ||
-	die "E: $0 - parsing xlsx: no column title is sampleID\n";
-    ($cohortCol >= 0) ||
-	die "E: $0 - parsing xlsx: no col title is pathologyID\n";
-    ($specimenCol >= 0) ||
-	die "E: $0 - parsing xlsx: no column title is specimenID\n";
-    ($patientCol >= 0) ||
-	die "E: $0 - parsing xlsx: no column title is patientID\n";
-    
-    foreach my $row ($rowMin+1..$rowMax) {
-	(defined $worksheet->get_cell($row, $sampleCol)) ||
-	    die "E: $0 - cell undefined for row $row, col $sampleCol\n";
-	my $sample = $worksheet->get_cell($row, $sampleCol)->unformatted();
-	# skip "0" lines
-	($sample eq "0") && next;
-	my $cohort = $worksheet->get_cell($row, $cohortCol)->value;
-	(defined $cohort2samples{$cohort}) || ($cohort2samples{$cohort} = []);
-	push(@{$cohort2samples{$cohort}}, $sample);
-	my $patient = $worksheet->get_cell($row, $specimenCol)->unformatted();
-	if ($worksheet->get_cell($row, $patientCol)) {
-	    my $tmp = $worksheet->get_cell($row, $patientCol)->unformatted();
-	    $tmp =~ s/^\s+//;
-	    $tmp =~ s/\s+$//;
-	    ($tmp) && ($patient = $tmp);
-	}
-	$sample2patient{$sample} = $patient;
+    my @parsed = &parseSamples($samplesFile);
+    my $sample2pathoR = $parsed[0];
+    $sample2patientR = $parsed[2];
+
+    foreach my $sample (sort keys %$sample2pathoR) {
+	my $patho = $sample2pathoR->{$sample};
+	(defined $cohort2samples{$patho}) || ($cohort2samples{$patho} = []);
+	push(@{$cohort2samples{$patho}}, $sample);
     }
 }
 
@@ -221,7 +186,7 @@ while (my $inFile = readdir(INDIR)) {
     ($cohort2samples{$cohort}) || 
 	die "E: $0 - cohort $cohort parsed from filename of infile $inFile is not in $samplesFile\n";
     foreach my $sample (@{$cohort2samples{$cohort}}) {
-	my $patient = $sample2patient{$sample};
+	my $patient = $sample2patientR->{$sample};
 	my $outFile = "$outDir/$cohort.$sample.$patient.$fileEnd";
 	($gz) && ($outFile .= ".gz");
 	my $outFull = " > $outFile";
