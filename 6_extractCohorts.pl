@@ -74,8 +74,8 @@ my $batchSize = 20000;
 # number of jobs
 my $numJobs = 16;
 
-# samples, pathologies and candidateGenes XLSX files, no defaults
-my ($samplesFile, $pathologies, $candidatesFiles);
+# samples, pathologies and candidateGenes XLSX files, empty defaults
+my ($samplesFile, $pathologies, $candidatesFiles) = ("","","");
 
 # outDir and tmpDir, also no defaults
 my ($outDir, $tmpDir);
@@ -140,7 +140,7 @@ if ($pathologies) {
 # %knownCandidateGenes: key==$cohort, value is a hashref whose keys 
 # are gene names and values are the "Level" from a $candidatesFile,
 # or 5 if the gene is "Causal" for a $cohort patient in $samplesFile.
-# I use %knownCandidatesSeen (defined below) to sanity-check the lists: any gene 
+# We use %knownCandidatesSeen (defined below) to sanity-check the lists: any gene 
 # name that is never seen will be reported to stderr (and probably a typo needs fixing).
 my %knownCandidateGenes = ();
 
@@ -194,71 +194,38 @@ if ($candidatesFiles) {
 }
 
 #########################################################
-# parse samples metadata file
+# parse useful info from samples metadata file
 
-# key==sample id, value is the $cohort this sample belongs to
-my %sample2cohort = ();
-# cohort names
-my @cohorts = ();
-# causal gene, key==sample id, value == HGNC gene name
-my %sample2causal = ();
+# hashref, key==sample id, value is the $cohort this sample belongs to (ie pathologyID)
+my $sample2cohortR;
+# hashref, causal gene, key==sample id, value == HGNC gene name
+my $sample2causalR;
 
 {
-    # for cohort names we use a temp hash to avoid redundancy
-    my %cohorts;
-    my $workbook = Spreadsheet::XLSX->new("$samplesFile");
-    (defined $workbook) ||
-	die "E $0: when parsing xlsx $samplesFile\n";
-    ($workbook->worksheet_count() == 1) ||
-	die "E $0: parsing xlsx: expecting a single worksheet, got ".$workbook->worksheet_count()."\n";
-    my $worksheet = $workbook->worksheet(0);
-    my ($colMin, $colMax) = $worksheet->col_range();
-    my ($rowMin, $rowMax) = $worksheet->row_range();
-    # check the column titles and grab indexes of our columns of interest
-    my ($sampleCol, $cohortCol,$causalCol) = (-1,-1,-1);
-    foreach my $col ($colMin..$colMax) {
-	my $cell = $worksheet->get_cell($rowMin, $col);
-	# if column has no header just ignore it
-	(defined $cell) || next;
-	($cell->value() eq "sampleID") &&
-	    ($sampleCol = $col);
-	($cell->value() eq "pathologyID") &&
-	    ($cohortCol = $col);
-	($cell->value() eq "Causal gene") &&
-	    ($causalCol = $col);
-     }
-    ($sampleCol >= 0) ||
-	die "E $0: parsing xlsx: no column title is sampleID\n";
-    ($cohortCol >= 0) ||
-	die "E $0: parsing xlsx: no col title is pathologyID\n";
-    ($causalCol >= 0) ||
-	die "E $0: parsing xlsx: no col title is Causal gene\n";
-    
-    foreach my $row ($rowMin+1..$rowMax) {
-	my $sample = $worksheet->get_cell($row, $sampleCol)->unformatted();
-	# skip "0" lines
-	($sample eq "0") && next;
-	(defined $sample2cohort{$sample}) && 
-	    die "E $0: parsing xlsx: have 2 lines with sample $sample\n";
-	my $cohort = $worksheet->get_cell($row, $cohortCol)->value;
-	$sample2cohort{$sample} = $cohort;
-	$cohorts{$cohort} = 1;
-	if ($worksheet->get_cell($row, $causalCol)) {
-	    my $causal = $worksheet->get_cell($row, $causalCol)->value;
-	    # clean up a bit, remove leading or trailing whitespace
-	    $causal =~ s/^\s+//;
-	    $causal =~ s/\s+$//;
-	    $sample2causal{$sample} = $causal;
-	    # add to knownCandidateGenes with level 5
-	    (defined $knownCandidateGenes{$cohort}) || ($knownCandidateGenes{$cohort} = {});
-	    $knownCandidateGenes{$cohort}->{$causal} = 5;
-	}
+    my @parsed;
+    if ($pathologies) {
+	@parsed = &parseSamples($samplesFile, $pathologies);
     }
-    @cohorts = sort(keys(%cohorts));
+    else {
+	@parsed = &parseSamples($samplesFile);
+    }
+    $sample2cohortR = $parsed[0];
+    $sample2causalR = $parsed[3];
 }
 
-# for sanity-checking known candidate genes:
-# fill this now so we also check the causal genes from $samplesFile
+# cohort names
+my @cohorts = sort(values(%$sample2cohortR));
+
+# add causalGenes to knownCandidateGenes with level 5
+foreach my $sample (keys %$sample2causalR) {
+    my $cohort = $sample2cohortR->{$sample};
+    my $causal = $sample2causalR->{$sample};
+    (defined $knownCandidateGenes{$cohort}) || ($knownCandidateGenes{$cohort} = {});
+    $knownCandidateGenes{$cohort}->{$causal} = 5;
+}
+
+
+# for sanity-checking known candidate and causal genes
 my %knownCandidatesSeen;
 foreach my $c (keys(%knownCandidateGenes)) {
     foreach my $gene (keys(%{$knownCandidateGenes{$c}})) {
@@ -402,8 +369,8 @@ while (!$lastBatch) {
     open(my $tmpSeenFH, "> $tmpSeenFile") || die "E $0: cannot open $tmpSeenFile for writing\n";
 
     # process this batch
-    &processBatch(\@lines,\%knownCandidateGenes,\%sample2cohort,\@cohorts,
-		  \%sample2causal,$compatibleR,$symbolCol,\%genoCols,\@tmpOutFHs,$tmpSeenFH);
+    &processBatch(\@lines,\%knownCandidateGenes,$sample2cohortR,\@cohorts,
+		  $sample2causalR,$compatibleR,$symbolCol,\%genoCols,\@tmpOutFHs,$tmpSeenFH);
 
     # done, close tmp FHs and create flag-file
     foreach my $outFH (@tmpOutFHs,$tmpSeenFH) {
