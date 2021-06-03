@@ -18,6 +18,10 @@ use File::Basename qw(basename);
 use File::Temp qw(tempdir);
 use FindBin qw($RealBin);
 
+use lib "$RealBin";
+use grexome_metaParse qw(parsePathologies parseSamples);
+
+
 # we use $0 in every stderr message but we really only want
 # the program name, not the path
 $0 = basename($0);
@@ -140,6 +144,22 @@ if ($candidateGenes) {
     }
     $candidateGenes = join(',', @candNew);
 }
+
+# sanity-check all provided metadata files: just parse and ignore the results,
+# we'll die if anything is wrong
+if ($pathologies) {
+    &parsePathologies($pathologies);
+    &parseSamples($metadata, $pathologies);
+}
+else {
+    &parseSamples($metadata);
+}
+## TODO when parseCandidates is coded
+#if ($candidateGenes) {
+#    &parseCandidates($candidateGenes);
+#}
+
+
 # number of samples in $inFile, needed to set $min_hr (for filtering)
 my $numSamples = scalar(split(/\s+/, `zgrep --max-count=1 '#CHROM' $inFile`)) - 9;
 
