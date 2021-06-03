@@ -3,23 +3,23 @@
 # 25/03/2018
 # NTM
 
-# Takes as arguments a $metadata xlsx file, a $pathologies xlsx file, a
+# Takes as arguments a $samplesFile xlsx file, a $pathologies xlsx file, a
 # comma-separated list of xlsx candidateGenes files, an $outDir and
 # a $tmpDir that don't exist; 
 # reads on stdin a fully annotated TSV file;
 # makes $outDir and creates in it one gzipped TSV file per cohort.
-# The cohorts are defined in $pathologies and/or $metadata.
+# The cohorts are defined in $pathologies and/or $samplesFile.
 # For each sample, any identified causal (mutation in a) gene 
-# is grabbed from $metadata.
+# is grabbed from $samplesFile.
 # "Compatible" cohorts (ie belonging to a common compatibility group in the
-# pathologies metadata XLSX file) appear in COMPAT columns and are NOT used
+# pathologies XLSX file) appear in COMPAT columns and are NOT used
 # as negative controls for each other.
 # For optimal performance $tmpDir should be on a RAMDISK (eg tmpfs).
 #
 # A new KNOWN_CANDIDATE_GENE column is inserted right after SYMBOL:
 # it holds the "Level" value parsed from  a $candidatesFile if SYMBOL is a known 
 # candidate gene for this cohort (as specified in $candidatesFile), 
-# 0 otherwise. Any $causalGene from $metadata is considered a
+# 0 otherwise. Any $causalGene from $samplesFile is considered a
 # known candidate gene with Level=5.
 #
 # The HV/HET/OTHER/HR columns are removed and used to produce the following
@@ -74,8 +74,8 @@ my $batchSize = 20000;
 # number of jobs
 my $numJobs = 16;
 
-# metadata, pathologies and candidateGenes XLSX files, no defaults
-my ($metadata, $pathologies, $candidatesFiles);
+# samples, pathologies and candidateGenes XLSX files, no defaults
+my ($samplesFile, $pathologies, $candidatesFiles);
 
 # outDir and tmpDir, also no defaults
 my ($outDir, $tmpDir);
@@ -86,7 +86,7 @@ my $help = '';
 
 my $USAGE = "\nParse on STDIN a fully annotated TSV file as produced by steps 1-5 of this secondaryAnalysis pipeline; create in outDir one gzipped TSV file per cohort.\n
 Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
---metadata string : samples metadata xlsx file, with path
+--samples string : samples metadata xlsx file, with path
 --pathologies string [optional] : pathologies metadata xlsx file, with path
 --candidateGenes string [optional] : comma-separated list of xlsx files holding known candidate genes, with paths
 --outdir string : subdir where resulting cohort files will be created, must not pre-exist
@@ -94,7 +94,7 @@ Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --jobs [$numJobs] : number of parallel jobs=threads to run
 --help : print this USAGE";
 
-GetOptions ("metadata=s" => \$metadata,
+GetOptions ("samples=s" => \$samplesFile,
 	    "pathologies=s" => \$pathologies,
 	    "candidateGenes=s" => \$candidatesFiles,
 	    "outdir=s" => \$outDir,
@@ -106,8 +106,8 @@ GetOptions ("metadata=s" => \$metadata,
 # make sure required options were provided and sanity check them
 ($help) && die "$USAGE\n\n";
 
-($metadata) || die "E $0: you must provide a metadata file\n";
-(-f $metadata) || die "E $0: the supplied metadata file doesn't exist\n";
+($samplesFile) || die "E $0: you must provide a samples file\n";
+(-f $samplesFile) || die "E $0: the supplied samples file doesn't exist\n";
 
 ($outDir) || die "E $0: you must provide an outDir\n";
 (-e $outDir) && 
@@ -139,7 +139,7 @@ if ($pathologies) {
 
 # %knownCandidateGenes: key==$cohort, value is a hashref whose keys 
 # are gene names and values are the "Level" from a $candidatesFile,
-# or 5 if the gene is "Causal" for a $cohort patient in $metadata.
+# or 5 if the gene is "Causal" for a $cohort patient in $samplesFile.
 # I use %knownCandidatesSeen (defined below) to sanity-check the lists: any gene 
 # name that is never seen will be reported to stderr (and probably a typo needs fixing).
 my %knownCandidateGenes = ();
@@ -194,7 +194,7 @@ if ($candidatesFiles) {
 }
 
 #########################################################
-# parse patient metadata file
+# parse samples metadata file
 
 # key==sample id, value is the $cohort this sample belongs to
 my %sample2cohort = ();
@@ -206,9 +206,9 @@ my %sample2causal = ();
 {
     # for cohort names we use a temp hash to avoid redundancy
     my %cohorts;
-    my $workbook = Spreadsheet::XLSX->new("$metadata");
+    my $workbook = Spreadsheet::XLSX->new("$samplesFile");
     (defined $workbook) ||
-	die "E $0: when parsing xlsx $metadata\n";
+	die "E $0: when parsing xlsx $samplesFile\n";
     ($workbook->worksheet_count() == 1) ||
 	die "E $0: parsing xlsx: expecting a single worksheet, got ".$workbook->worksheet_count()."\n";
     my $worksheet = $workbook->worksheet(0);
@@ -258,7 +258,7 @@ my %sample2causal = ();
 }
 
 # for sanity-checking known candidate genes:
-# fill this now so we also check the causal genes from $metadata
+# fill this now so we also check the causal genes from $samplesFile
 my %knownCandidatesSeen;
 foreach my $c (keys(%knownCandidateGenes)) {
     foreach my $gene (keys(%{$knownCandidateGenes{$c}})) {

@@ -43,7 +43,7 @@ my $numJobs6 = 16;
 ## options / params from the command-line
 
 # metadata file with all samples
-my $metadata;
+my $samples;
 
 # pathologies metadata file
 my $pathologies;
@@ -56,7 +56,7 @@ my $inFile;
 
 # outDir must not exist, it will be created and populated with
 # subdirs (containing the pipeline results), logfiles (in debug mode),
-# and copies of the provided metadata and candidateGenes files.
+# and copies of all provided metadata files.
 my $outDir;
 
 # path+file of the config file holding all install-specific params,
@@ -78,7 +78,7 @@ my $USAGE = "Parse a GVCF or VCF, run the complete grexome-TIMC secondary analys
 Each step of the pipeline is a stand-alone self-documented script, this is just a wrapper.
 Every install-specific param (eg paths to required data) should be in grexomeTIMCsec_config.pm.
 Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
---metadata : patient metadata xlsx file, with path
+--samples : samples metadata xlsx file, with path
 --pathologies : [optional] pathologies metadata xlsx file, with path
 --candidateGenes : [optional] known candidate genes in xlsx files, comma-separated, with paths
 --infile : bgzipped multi-sample GVCF or VCF file to parse
@@ -87,7 +87,7 @@ Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --debug : activate debug mode => slower, keeps all intermediate files, produce individual logfiles
 --help : print this USAGE";
 
-GetOptions ("metadata=s" => \$metadata,
+GetOptions ("samples=s" => \$samples,
 	    "pathologies=s" => \$pathologies,
 	    "candidateGenes=s" => \$candidateGenes,
 	    "infile=s" => \$inFile,
@@ -100,8 +100,8 @@ GetOptions ("metadata=s" => \$metadata,
 # make sure required options were provided and sanity check them
 ($help) && die "$USAGE\n\n";
 
-($metadata) || die "E $0: you must provide a metadata file\n";
-(-f $metadata) || die "E $0: the supplied metadata file doesn't exist:\n$metadata\n";
+($samples) || die "E $0: you must provide a samples file\n";
+(-f $samples) || die "E $0: the supplied samples file doesn't exist:\n$samples\n";
 
 ($inFile) || die "E $0: you must provide an input bgzipped (G)VCF file\n";
 (-f $inFile) || die "E $0: the supplied infile doesn't exist\n";
@@ -120,10 +120,10 @@ mkdir($outDir) || die "E $0: cannot mkdir outDir $outDir\n";
 
 
 # copy all provided metadata files into $outDir
-copy($metadata, $outDir) ||
-    die "E $0: cannot copy metadata to outDir: $!\n";
+copy($samples, $outDir) ||
+    die "E $0: cannot copy samples metadata to outDir: $!\n";
 # use the copied versions in scripts (eg if original gets edited while analysis is running...)
-$metadata = "$outDir/".basename($metadata);
+$samples = "$outDir/".basename($samples);
 
 if ($pathologies) {
     (-f $pathologies) || die "E $0: the supplied pathologies file doesn't exist\n";
@@ -149,10 +149,10 @@ if ($candidateGenes) {
 # we'll die if anything is wrong
 if ($pathologies) {
     &parsePathologies($pathologies);
-    &parseSamples($metadata, $pathologies);
+    &parseSamples($samples, $pathologies);
 }
 else {
-    &parseSamples($metadata);
+    &parseSamples($samples);
 }
 ## TODO when parseCandidates is coded
 #if ($candidateGenes) {
@@ -178,7 +178,7 @@ my $tmpdir = tempdir(DIR => &fastTmpPath());
 # STEPS 1-6, piped into each other except in debug mode
 
 # decompress infile and step 1
-my $com = "bgzip -cd -@".$numJobsGunzip." $inFile | perl $RealBin/1_filterBadCalls.pl --samplesFile=$metadata --tmpdir=$tmpdir/FilterTmp/ --jobs $numJobs1 ";
+my $com = "bgzip -cd -@".$numJobsGunzip." $inFile | perl $RealBin/1_filterBadCalls.pl --samplesFile=$samples --tmpdir=$tmpdir/FilterTmp/ --jobs $numJobs1 ";
 if ($debug) {
     # specific logfile from step and save its output
     $com .= "2> $outDir/step1.err > $outDir/step1.out";
@@ -220,7 +220,7 @@ if ($debug) {
 }
 
 # step 6
-$com .= " | perl $RealBin/6_extractCohorts.pl --metadata=$metadata ";
+$com .= " | perl $RealBin/6_extractCohorts.pl --samples=$samples ";
 ($pathologies) && ($com .= "--pathologies=$pathologies ");
 ($candidateGenes) && ($com .= "--candidateGenes=$candidateGenes ");
 $com .= "--outDir=$tmpdir/Cohorts/ --tmpDir=$tmpdir/TmpExtract/ --jobs=$numJobs6 ";
@@ -250,7 +250,7 @@ else {
 system($com) && die "E $0: step7 failed: $?";
 
 # STEP 8 - SAMPLES
-$com = "perl $RealBin/8_extractSamples.pl $metadata $tmpdir/Cohorts_Filtered/ $outDir/Samples/ ".&coveragePath()." ";
+$com = "perl $RealBin/8_extractSamples.pl $samples $tmpdir/Cohorts_Filtered/ $outDir/Samples/ ".&coveragePath()." ";
 if ($debug) {
     $com .= "2> $outDir/step8s.err";
 }
@@ -259,7 +259,7 @@ system($com) && die "E $0: step8-samples failed: $?";
 # STEP 8 - TRANSCRIPTS , adding patientIDs
 $com = "( perl $RealBin/8_extractTranscripts.pl --indir $tmpdir/Cohorts_Filtered/ --outdir $tmpdir/Transcripts_noIDs/ ";
 ($pathologies) && ($com .= "--pathologies=$pathologies ");
-$com .= "; perl $RealBin/8_addPatientIDs.pl $metadata $tmpdir/Transcripts_noIDs/ $outDir/Transcripts/ )";
+$com .= "; perl $RealBin/8_addPatientIDs.pl $samples $tmpdir/Transcripts_noIDs/ $outDir/Transcripts/ )";
 if ($debug) {
     $com .= "2> $outDir/step8t.err";
 }
@@ -270,7 +270,7 @@ system($com) && die "E $0: step8-transcripts failed: $?";
 
 # STEP 9 - FINAL COHORTFILES , require at least one HV or HET sample and add patientIDs
 $com = "( perl $RealBin/9_requireUndiagnosed.pl $tmpdir/Cohorts_Filtered/ $tmpdir/Cohorts_FINAL/ ; ";
-$com .= " perl $RealBin/8_addPatientIDs.pl $metadata $tmpdir/Cohorts_FINAL/ $outDir/Cohorts/ )";
+$com .= " perl $RealBin/8_addPatientIDs.pl $samples $tmpdir/Cohorts_FINAL/ $outDir/Cohorts/ )";
 if ($debug) {
     $com .= "2> $outDir/step9-finalCohorts.err";
 }

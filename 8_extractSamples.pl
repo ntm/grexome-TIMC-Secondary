@@ -3,8 +3,8 @@
 # 25/03/2018
 # NTM
 
-# Take 3 or 4 arguments: $metadata $inDir $outDir [$covDir]
-# $metadata is the patient_summary xlsx file (with sampleID etc columns);
+# Take 3 or 4 arguments: $samplesFile $inDir $outDir [$covDir]
+# $samplesFile is the samples metadata xlsx file;
 # $inDir must contain cohort TSVs as produced by extractCohorts.pl,
 # possibly filtered and reordered with 7_filterAndReorderAll.pl, and 
 # possibly gzipped (but not with PatientIDs);
@@ -40,8 +40,8 @@ $0 = basename($0);
 
 
 (@ARGV == 3) || (@ARGV == 4) || 
-    die "E: $0 - needs 3 or 4 args: a metadata XLSX, an inDir, a non-existant outDir and optionally a covDir\n";
-my ($metadata, $inDir, $outDir, $covDir) = @ARGV;
+    die "E: $0 - needs 3 or 4 args: a samples metadata XLSX, an inDir, a non-existant outDir and optionally a covDir\n";
+my ($samplesFile, $inDir, $outDir, $covDir) = @ARGV;
 (-d $inDir) ||
     die "E: $0 - inDir $inDir doesn't exist or isn't a directory\n";
 opendir(INDIR, $inDir) ||
@@ -63,7 +63,7 @@ warn "I $0: $now - starting to run\n";
 
 
 #########################################################
-# parse metadata file
+# parse samplesFile
 
 # key==cohort name, value is an arrayref of all samples from this cohort
 my %cohort2samples = ();
@@ -71,10 +71,10 @@ my %cohort2samples = ();
 # key==sample, value is patientID if it exists, specimenID otherwise
 my %sample2patient = ();
 
-(-f $metadata) ||
-    die "E: $0 - the supplied metadata file doesn't exist\n";
+(-f $samplesFile) ||
+    die "E: $0 - the supplied samples metadata file doesn't exist\n";
 {
-    my $workbook = Spreadsheet::XLSX->new("$metadata");
+    my $workbook = Spreadsheet::XLSX->new("$samplesFile");
     (defined $workbook) ||
 	die "E: $0 - E when parsing xlsx\n";
     ($workbook->worksheet_count() == 1) ||
@@ -219,7 +219,7 @@ while (my $inFile = readdir(INDIR)) {
     my %outFHs;
 
     ($cohort2samples{$cohort}) || 
-	die "E: $0 - cohort $cohort parsed from filename of infile $inFile is not in $metadata\n";
+	die "E: $0 - cohort $cohort parsed from filename of infile $inFile is not in $samplesFile\n";
     foreach my $sample (@{$cohort2samples{$cohort}}) {
 	my $patient = $sample2patient{$sample};
 	my $outFile = "$outDir/$cohort.$sample.$patient.$fileEnd";

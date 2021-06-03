@@ -3,14 +3,14 @@
 # 12/08/2019
 # NTM
 
-# Take 3 arguments: $metadata $inDir $outDir
-# $metadata is the patient_summary xlsx file (with sampleID etc columns);
+# Take 3 arguments: $samplesFile $inDir $outDir
+# $samplesFile is the samples metadata xlsx file;
 # $inDir must contain cohort TSVs as produced by extractCohorts.pl,
 # possibly filtered and reordered with 7_filterAndReorderAll.pl,
 # and possibly gzipped;
 # $outDir doesn't exist, it will be created and filled with 
 # similar TSVs (gzipped if infiles were gzipped), but where every
-# $sample identifier in the genoData columns becomes "$sample($patientID)",
+# $sampleID identifier in the genoData columns becomes "$sampleID($patientID)",
 # with $patientID taken from patientID column if it's not empty, 
 # specimenID otherwise.
 # Filenames get ".patientIDs" added before .csv.
@@ -26,8 +26,8 @@ use Spreadsheet::XLSX;
 $0 = basename($0);
 
 
-(@ARGV == 3) || die "E $0: needs 3 args: a metadata XLSX, an inDir and a non-existant outDir\n";
-my ($metadata, $inDir, $outDir) = @ARGV;
+(@ARGV == 3) || die "E $0: needs 3 args: a samples XLSX, an inDir and a non-existant outDir\n";
+my ($samplesFile, $inDir, $outDir) = @ARGV;
 (-d $inDir) ||
     die "E $0: inDir $inDir doesn't exist or isn't a directory\n";
 opendir(INDIR, $inDir) ||
@@ -41,17 +41,17 @@ warn "I $0: $now - starting to run\n";
 
 
 #########################################################
-# parse metadata file
+# parse samples file
 
 # key==sample, value is patientID if it exists, specimenID otherwise
 my %sample2patient = ();
 
-(-f $metadata) ||
-    die "E $0: the supplied metadata file doesn't exist\n";
+(-f $samplesFile) ||
+    die "E $0: the supplied samples metadata file $samplesFile doesn't exist\n";
 {
-    my $workbook = Spreadsheet::XLSX->new("$metadata");
+    my $workbook = Spreadsheet::XLSX->new("$samplesFile");
     (defined $workbook) ||
-	die "E $0: can't xlsx->open $metadata\n";
+	die "E $0: can't xlsx->open $samplesFile\n";
     ($workbook->worksheet_count() == 1) ||
 	die "E $0: parsing xlsx: expecting a single worksheet, got ".$workbook->worksheet_count()."\n";
     my $worksheet = $workbook->worksheet(0);
