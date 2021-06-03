@@ -18,8 +18,11 @@
 use strict;
 use warnings;
 use File::Basename qw(basename);
+use FindBin qw($RealBin);
 use POSIX qw(strftime);
-use Spreadsheet::XLSX;
+
+use lib "$RealBin";
+use grexome_metaParse qw(parseSamples);
 
 # we use $0 in every stderr message but we really only want
 # the program name, not the path
@@ -41,51 +44,13 @@ warn "I $0: $now - starting to run\n";
 
 
 #########################################################
-# parse samples file
-
-# key==sample, value is patientID if it exists, specimenID otherwise
-my %sample2patient = ();
-
-(-f $samplesFile) ||
-    die "E $0: the supplied samples metadata file $samplesFile doesn't exist\n";
+# parse samples file to populate $sample2patientR:
+# hashref, key==sampleID, value is patientID || specimenID
+my $sample2patientR;
 {
-    my $workbook = Spreadsheet::XLSX->new("$samplesFile");
-    (defined $workbook) ||
-	die "E $0: can't xlsx->open $samplesFile\n";
-    ($workbook->worksheet_count() == 1) ||
-	die "E $0: parsing xlsx: expecting a single worksheet, got ".$workbook->worksheet_count()."\n";
-    my $worksheet = $workbook->worksheet(0);
-    my ($colMin, $colMax) = $worksheet->col_range();
-    my ($rowMin, $rowMax) = $worksheet->row_range();
-    # check the column titles and grab indexes of our columns of interest
-    my ($sampleCol, $specimenCol, $patientCol) = (-1,-1,-1);
-    foreach my $col ($colMin..$colMax) {
-	my $cell = $worksheet->get_cell($rowMin, $col);
-	(defined $cell) || next;
-	($cell->value() eq "sampleID") && ($sampleCol = $col);
-	($cell->value() eq "specimenID") && ($specimenCol = $col);
-	($cell->value() eq "patientID") && ($patientCol = $col);
-    }
-    ($sampleCol >= 0) ||
-	die "E $0: parsing xlsx: no column title is sampleID\n";
-    ($specimenCol >= 0) ||
-	die "E $0: parsing xlsx: no column title is specimenID\n";
-      ($patientCol >= 0) ||
-	  die "E $0: parsing xlsx: no column title is patientID\n";
-    
-    foreach my $row ($rowMin+1..$rowMax) {
-	my $sample = $worksheet->get_cell($row, $sampleCol)->unformatted();
-	# skip "0" lines
-	($sample eq "0") && next;
-	my $patient = $worksheet->get_cell($row, $specimenCol)->unformatted();
-	if ($worksheet->get_cell($row, $patientCol)) {
-	    my $tmp = $worksheet->get_cell($row, $patientCol)->unformatted();
-	    $tmp =~ s/^\s+//;
-	    $tmp =~ s/\s+$//;
-	    ($tmp) && ($patient = $tmp);
-	}
-	$sample2patient{$sample} = $patient;
-    }
+    # we want the third hashref returned by parseSamples
+    my @parsed = &parseSamples($samplesFile);
+    $sample2patientR = $parsed[2];
 }
 
 #########################################################
@@ -121,8 +86,8 @@ while (my $inFile = readdir(INDIR)) {
         # add trailing ',' so we know sampleID is always followed by some char
         $line .= ',';
 	# chuck norris style: brutal but it works...
-	foreach my $sample (keys %sample2patient) {
-	    $line =~ s/$sample([\[,\s|])/$sample($sample2patient{$sample})$1/g ;
+	foreach my $sample (keys %$sample2patientR) {
+	    $line =~ s/$sample([\[,\s|])/$sample($sample2patientR->{$sample})$1/g ;
 	}
 	# remove the trailing ,
 	($line =~ s/,$//) || die "E $0: cannot remove trailing , in:\n$line\n";
