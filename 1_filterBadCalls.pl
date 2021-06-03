@@ -41,16 +41,13 @@ use Getopt::Long;
 use POSIX qw(strftime);
 use Parallel::ForkManager;
 
+use lib "$RealBin";
+use grexome_metaParse qw(parseSamples);
+
 
 # we use $0 in every stderr message but we really only want
 # the program name, not the path
 $0 = basename($0);
-
-# import metaParse.pm (from the dir that contains $0)
-my $metaParse = "$RealBin/grexome_metaParse.pm";
-(-f $metaParse) ||  die "E $0: cannot find metaParse.pm, looking for: $metaParse\n";
-require($metaParse);
-grexome_metaParse->import(qw(parseSamples));
 
 
 #############################################

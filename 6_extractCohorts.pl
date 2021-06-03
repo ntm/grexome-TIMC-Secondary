@@ -50,16 +50,13 @@ use Getopt::Long;
 use POSIX qw(strftime);
 use Parallel::ForkManager;
 
+use lib "$RealBin";
+use grexome_metaParse qw(parsePathologies parseSamples);
+
 
 # we use $0 in every stderr message but we really only want
 # the program name, not the path
 $0 = basename($0);
-
-# import metaParse.pm (from the dir that contains $0)
-my $metaParse = "$RealBin/grexome_metaParse.pm";
-(-f $metaParse) ||  die "E $0: cannot find metaParse.pm, looking for: $metaParse\n";
-require($metaParse);
-grexome_metaParse->import(qw(parsePathologies));
 
 
 #############################################
@@ -445,7 +442,7 @@ close(IN);
     die "E $0: cannot unlink tmpFileCandidatesSeen $tmpFileCandidatesSeen: $!\n";
 foreach my $gene (keys(%knownCandidatesSeen)) {
     ($knownCandidatesSeen{$gene}) ||
-	warn "W $0: \"known candidate gene\" $gene was never seen!! typo in metadata or candidates xlsx files?\n";
+	warn "W $0: \"known candidate/causal gene\" $gene was never seen! typo in samples or candidateGenes xlsx files?\n";
 }
 
 $now = strftime("%F %T", localtime);
