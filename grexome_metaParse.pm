@@ -27,6 +27,8 @@ our @EXPORT_OK = qw(parsePathologies parseSamples);
 # - key is a pathologyID (used as cohort identifier)
 # - value is a hashref, with keys==pathoIDs that are compatible with
 #   the current patho and values==1
+#
+# If the metadata file has errors, log as many as possible and die.
 sub parsePathologies {
     my $subName = (caller(0))[3];
     (@_ == 1) || die "E: $subName needs one arg";
@@ -64,16 +66,25 @@ sub parsePathologies {
     ($compatCol >= 0) ||
 	die "E in $subName: missing required column title: 'compatibility groups'";
 
+    # when parsing data rows, log any errors and only die at the end
+    my $errorsFound = 0;
+    
     foreach my $row ($rowMin+1..$rowMax) {
 	my $patho = $worksheet->get_cell($row, $pathoCol);
 	# skip lines without a pathoID
 	($patho) || next;
 	$patho = $patho->unformatted();
 	# require alphanumeric strings
-	($patho =~ /^\w+$/) ||
-	    die "E in $subName: pathologyIDs must be alphanumeric strings, found \"$patho\" in row $row";
-	(defined $compatible{$patho}) && 
-	    die "E in $subName: there are 2 lines with same pathologyID $patho";
+	if ($patho !~ /^\w+$/) {
+	    warn "E in $subName: pathologyIDs must be alphanumeric strings, found \"$patho\" in row $row";
+	    $errorsFound++;
+	    next;
+	}
+	if (defined $compatible{$patho}) {
+	    warn "E in $subName: there are 2 lines with same pathologyID $patho";
+	    $errorsFound++;
+	    next;
+	}
 	# initialize with anonymous empty hash
 	$compatible{$patho} = {};
 
@@ -82,26 +93,39 @@ sub parsePathologies {
 	(defined $compats) || next;
 	$compats = $compats->unformatted();
 	my @CGs = split(/,/, $compats);
+	my $cgErrors = 0;
 	foreach my $cg (@CGs) {
-	    ($cg =~ /^\w+$/) ||
-		die "E in $subName: compat group identifiers must be alphanumeric strings, found $cg for $patho";
+	    if ($cg !~ /^\w+$/) {
+		warn "E in $subName: compat group identifiers must be alphanumeric strings, found $cg for $patho";
+		$cgErrors++;
+		next;
+	    }
 	    (defined $compatGroups{$cg}) || ($compatGroups{$cg} = []);
 	    push(@{$compatGroups{$cg}}, $patho);
 	}
-    }
-
-    # now populate %compatible from %compatGroups
-    foreach my $cgs (values(%compatGroups)) {
-	foreach my $patho (@$cgs) {
-	    foreach my $compatPatho (@$cgs) {
-		($compatPatho eq $patho) && next;
-		$compatible{$patho}->{$compatPatho} = 1;
-	    }
+	if ($cgErrors) {
+	    $errorsFound += $cgErrors;
+	    next;
 	}
     }
-    
-    return(\%compatible);
+
+    if ($errorsFound) {
+	die "E in $subName: encountered $errorsFound errors while parsing $pathosFile, please fix the file.\n";
+    }
+    else {
+	# populate %compatible from %compatGroups
+	foreach my $cgs (values(%compatGroups)) {
+	    foreach my $patho (@$cgs) {
+		foreach my $compatPatho (@$cgs) {
+		    ($compatPatho eq $patho) && next;
+		    $compatible{$patho}->{$compatPatho} = 1;
+		}
+	    }
+	}
+        return(\%compatible);
+    }
 }
+
 
 #################################################################
 
@@ -118,6 +142,8 @@ sub parsePathologies {
 # - sample2specimen: key is sampleID, value is specimenID
 # - sample2patient: key is sampleID, value is patientID if it exists, specimenID otherwise
 # - sample2causal: key is sampleID, value is casual gene if it exists (undef otherwise)
+#
+# If the metadata file has errors, log as many as possible and die.
 sub parseSamples {
     my $subName = (caller(0))[3];
     (@_ == 1) || (@_ == 2) || die "E: $subName needs one or two args";
@@ -180,38 +206,65 @@ sub parseSamples {
 
     ################
     # parse data rows
+    
+    # when parsing data rows, log any errors and only die at the end
+    my $errorsFound = 0;
+
     foreach my $row ($rowMin+1..$rowMax) {
 	my $sample = $worksheet->get_cell($row, $sampleCol);
-	($sample) ||
-	    die "E in $subName, row $row: every row MUST have a sampleID (use 0 for obsolete samples)";
+	if (! $sample) {
+	    warn "E in $subName, row $row: every row MUST have a sampleID (use 0 for obsolete samples)";
+	    $errorsFound++;
+	    next;
+	}
 	$sample = $sample->unformatted();
 	# skip "0" lines == obsolete samples
 	($sample eq "0") && next;
-	(defined $sample2patho{$sample}) && 
-	    die "E in $subName: found 2 lines with same sampleID $sample";
+	if (defined $sample2patho{$sample}) {
+	    warn "E in $subName: found 2 lines with same sampleID $sample";
+	    $errorsFound++;
+	    next;
+	}
 	
 	################ sample2patho
 	my $patho = $worksheet->get_cell($row, $pathoCol);
-	($patho) || die "E in $subName, row $row: every row MUST have a pathologyID";
+	if (! $patho) {
+	    warn "E in $subName, row $row: every row MUST have a pathologyID";
+	    $errorsFound++;
+	    next;
+	}
 	$patho = $patho->unformatted();
 	if ($pathosFile) {
-	    (defined $pathologiesR->{$patho}) ||
-		die "E in $subName, row $row: pathologyID $patho is not defined in the provided $pathosFile";
+	    if (! defined $pathologiesR->{$patho}) {
+		warn "E in $subName, row $row: pathologyID $patho is not defined in the provided $pathosFile";
+		$errorsFound++;
+		next;
+	    }
 	}
 	else {
 	    # require alphanumeric strings
-	    ($patho =~ /^\w+$/) ||
-		die "E in $subName, row $row: pathologyIDs must be alphanumeric strings, found \"$patho\"";
+	    if ($patho !~ /^\w+$/) {
+		warn "E in $subName, row $row: pathologyIDs must be alphanumeric strings, found \"$patho\"";
+		$errorsFound++;
+		next;
+	    }
 	}
 	$sample2patho{$sample} = $patho;
 
 	################ sample2specimen
 	my $specimen = $worksheet->get_cell($row, $specimenCol);
-	($specimen) || die "E in $subName, row $row: every row MUST have a specimenID";
+	if (! $specimen) {
+	    warn "E in $subName, row $row: every row MUST have a specimenID";
+	    $errorsFound++;
+	    next;
+	}
 	$specimen = $specimen->unformatted();
-	# require alphanumeric strings (really don't want spaces or shell metachars)
-	($specimen =~ /^\w+$/) ||
-	    die "E in $subName, row $row: specimenIDs must be alphanumeric strings, found \"$specimen\"";
+	# require alphanumeric or dashes (really don't want spaces or shell metachars)
+	if ($specimen !~ /^[\w-]+$/) {
+	    warn "E in $subName, row $row: specimenIDs must be alphanumeric (dashes allowed), found \"$specimen\"";
+	    $errorsFound++;
+	    next;
+	}
 	$sample2specimen{$sample} = $specimen;
 
 	################ sample2patient
@@ -221,8 +274,11 @@ sub parseSamples {
 	    $patient = $patient->unformatted();
 	    # require alphanum (or underscores as always) or dashes, this could probably
 	    # be relaxed
-	    ($patient =~ /^[\w-]+$/) ||
-		die "E in $subName, row $row: patientIDs must be alphanumeric (dashes allowed), found \"$patient\"";
+	    if ($patient !~ /^[\w-]+$/) {
+		warn "E in $subName, row $row: patientIDs must be alphanumeric (dashes allowed), found \"$patient\"";
+		$errorsFound++;
+		next;
+	    }
 	}
 	else {
 	    $patient = $specimen;
@@ -234,16 +290,23 @@ sub parseSamples {
 	if ($causal) {
 	    $causal = $causal->unformatted();
 	    # these are HUGO gene names -> must be alphanum+dashes
-	    ($causal =~ /^[\w-]+$/) ||
-		die "E in $subName, row $row: causalGene must be alphanumeric (dashes allowed), found \"$causal\"";
+	    if ($causal !~ /^[\w-]+$/) {
+		warn "E in $subName, row $row: causalGene must be alphanumeric (dashes allowed), found \"$causal\"";
+ 		$errorsFound++;
+		next;
+	    }
 	    $sample2causal{$sample} = $causal;
 	}
     }
 
     ################
-    return(\%sample2patho, \%sample2specimen, \%sample2patient, \%sample2causal);
+    if ($errorsFound) {
+	die "E in $subName: encountered $errorsFound errors while parsing $samplesFile, please fix the file.\n";
+    }
+    else {
+	return(\%sample2patho, \%sample2specimen, \%sample2patient, \%sample2causal);
+    }
 }
-
 
 
 
