@@ -15,7 +15,7 @@ use warnings;
 use Spreadsheet::XLSX;
 use Exporter;
 our @ISA = ('Exporter');
-our @EXPORT_OK = qw(parsePathologies parseSamples);
+our @EXPORT_OK = qw(parsePathologies parseSamples parseCandidateGenes);
 
 
 #################################################################
@@ -141,7 +141,7 @@ sub parsePathologies {
 # - sample2patho: key is sampleID, value is pathologyID
 # - sample2specimen: key is sampleID, value is specimenID
 # - sample2patient: key is sampleID, value is patientID if it exists, specimenID otherwise
-# - sample2causal: key is sampleID, value is casual gene if it exists (undef otherwise)
+# - sample2causal: key is sampleID, value is causal gene if it exists (undef otherwise)
 #
 # If the metadata file has errors, log as many as possible and die.
 sub parseSamples {
@@ -160,7 +160,7 @@ sub parseSamples {
     my %sample2specimen;
     # sample2patient: key is sampleID, value is patientID if it exists, specimenID otherwise
     my %sample2patient;
-    # sample2causal: key is sampleID, value is casual gene if it exists (undef otherwise)
+    # sample2causal: key is sampleID, value is causal gene if it exists (undef otherwise)
     my %sample2causal;
 
     ################
@@ -308,6 +308,192 @@ sub parseSamples {
     }
 }
 
+
+#################################################################
+
+# Parse candidateGenes metadata XLSX file(s): required columns are
+# "Gene", "pathologyID", and "Confidence score" (can be in any order
+# but they MUST exist).
+# There can be several candidateGenes files, comma-separated.
+# The second argument is the samples metadata file: causalGenes in
+# this file are added as candidate genes with score=5.
+# The optional third argument, if povided and non-empty, is the
+# pathologies metadata XLSX file; it is used to make sure every
+# pathologyID is defined in pathologies.xlsx (ie sanity-checking).
+#
+# Return a hashref:
+# - key is a pathologyID (used as cohort identifier)
+# - value is a hashref, with keys==Genes and value==confidenceScore
+#
+# If the metadata files have errors, log as many as possible and die.
+sub parseCandidateGenes {
+    my $subName = (caller(0))[3];
+    (@_ == 2) || (@_ == 3) || die "E: $subName needs two or three args";
+    my ($candidatesFiles, $samplesFile, $pathosFile) = @_;
+
+    my @candidateFiles = split(/,/, $candidatesFiles);
+
+    foreach my $cf (@candidateFiles) {
+	(-f $cf) || die "E in $subName: provided candidateGenes file $cf doesn't exist";
+    }
+    (-f $samplesFile) ||
+	die "E in $subName: provided samples file $samplesFile doesn't exist";
+    (! $pathosFile) || (-f $pathosFile) ||
+	die "E in $subName: optional pathologies file $pathosFile was provided but doesn't exist";
+
+
+    # %knownCandidateGenes: key==$cohort, value is a hashref whose keys 
+    # are gene names and values are the "Confidence score" from a $candidatesFile,
+    # or 5 if the gene is "Causal" for a $cohort patient in $samplesFile.
+    my %knownCandidateGenes = ();
+
+
+    ################
+    # parse $samplesFile and $pathosFile immediately
+    
+    # $sample2pathoR: hashref, key==sample id, value is this sample's pathologyID
+    my $sample2pathoR;
+    # $samples2causalR: hashref, key==sample id, value == causal gene (HGNC gene name)
+    my $sample2causalR;
+    # $pathologiesR: hashref, keys are valid pathologies (just ignore the hash values)
+    my $pathologiesR;
+    {
+	my @parsed;
+	if ($pathosFile) {
+	    @parsed = &parseSamples($samplesFile, $pathosFile);
+	    $pathologiesR = &parsePathologies($pathosFile);
+	}
+	else {
+	    @parsed = &parseSamples($samplesFile);
+	}
+	$sample2pathoR = $parsed[0];
+	$sample2causalR = $parsed[3];
+    }
+
+    ################
+    # parse candidateGenes files
+    
+    # we want to log all errors and only die at the end
+    my $errorsFound = 0;
+
+    foreach my $candidatesFile (@candidateFiles) {
+	my $workbook = Spreadsheet::XLSX->new("$candidatesFile");
+	(defined $workbook) ||
+	    die "E in $subName: no workbook";
+	($workbook->worksheet_count() == 1) ||
+	    die "E in $subName: expecting a single worksheet, got ".$workbook->worksheet_count()."\n";
+	my $worksheet = $workbook->worksheet(0);
+	my ($colMin, $colMax) = $worksheet->col_range();
+	my ($rowMin, $rowMax) = $worksheet->row_range();
+	# check the column titles and grab indexes of our columns of interest
+	my ($pathoCol, $geneCol,$scoreCol) = (-1,-1,-1);
+	foreach my $col ($colMin..$colMax) {
+	    my $cell = $worksheet->get_cell($rowMin, $col);
+	    # if column has no header just ignore it
+	    (defined $cell) || next;
+	    my $val = $cell->unformatted();
+	    if ($val eq "pathologyID") { $pathoCol = $col; }
+	    elsif ($val eq "Gene") { $geneCol = $col; }
+	    elsif ($val eq "Confidence score") { $scoreCol = $col; }
+	}
+	($pathoCol >= 0) ||
+	    die "E in $subName, parsing $candidatesFile: missing required column title: 'pathologyID'";
+	($geneCol >= 0) ||
+	    die "E in $subName, parsing $candidatesFile: missing required column title: 'Gene'";
+	($scoreCol >= 0) ||
+	    die "E in $subName, parsing $candidatesFile: missing required column title: 'Confidence score'";
+	
+	################
+	# parse data rows
+    	foreach my $row ($rowMin+1..$rowMax) {
+	    my $patho = $worksheet->get_cell($row, $pathoCol);
+	    my $gene = $worksheet->get_cell($row, $geneCol);
+	    my $score = $worksheet->get_cell($row, $scoreCol);
+
+	    ################ pathology
+	    if (! $patho) {
+		warn "E in $subName, parsing $candidatesFile row $row: every row MUST have a pathologyID";
+		$errorsFound++;
+		next;
+	    }
+	    $patho = $patho->unformatted();
+	    if ($pathosFile) {
+		if (! defined $pathologiesR->{$patho}) {
+		    warn "E in $subName, parsing $candidatesFile row $row: pathologyID $patho is not defined in the provided $pathosFile";
+		    $errorsFound++;
+		    next;
+		}
+	    }
+	    else {
+		# require alphanumeric strings
+		if ($patho !~ /^\w+$/) {
+		    warn "E in $subName, parsing $candidatesFile row $row: pathologyIDs must be alphanumeric strings, found \"$patho\"";
+		    $errorsFound++;
+		    next;
+		}
+	    }
+	    
+	    ################ gene
+	    if (! $gene) {
+		warn "E in $subName, parsing $candidatesFile row $row: every row MUST have a Gene";
+		$errorsFound++;
+		next;
+	    }
+	    $gene = $gene->unformatted();
+	    # these are HUGO gene names -> must be alphanum+dashes
+	    if ($gene !~ /^[\w-]+$/) {
+		warn "E in $subName, parsing $candidatesFile row $row: Gene must be alphanumeric (dashes allowed), found \"$gene\"";
+ 		$errorsFound++;
+		next;
+	    }
+
+	    ################ score
+	    if (! $score) {
+		warn "E in $subName, parsing $candidatesFile row $row: every row MUST have a Confidence score";
+		$errorsFound++;
+		next;
+	    }
+	    $score = $score->unformatted();
+	    # require alphanumeric strings
+	    if ($score !~ /^\w+$/) {
+		warn "E in $subName, parsing $candidatesFile row $row: Confidence score must be alphanumeric, found \"$score\"";
+		$errorsFound++;
+		next;
+	    }
+
+	    ################ looks AOK, save data
+	    (defined $knownCandidateGenes{$patho}) ||
+		($knownCandidateGenes{$patho} = {});
+	    if (defined $knownCandidateGenes{$patho}->{$gene}) {
+		warn "E in $subName, parsing $candidatesFile row $row: this $gene - $patho association was already seen elsewhere";
+		$errorsFound++;
+		next;
+	    }
+	    $knownCandidateGenes{$patho}->{$gene} = $score;
+	}
+    }
+    
+    ################
+    # add causalGenes to knownCandidateGenes with score 5
+    foreach my $sample (keys %$sample2causalR) {
+	my $patho = $sample2pathoR->{$sample};
+	my $causal = $sample2causalR->{$sample};
+	(defined $knownCandidateGenes{$patho}) || ($knownCandidateGenes{$patho} = {});
+	# $causal could/should be in candidatesFiles
+	($knownCandidateGenes{$patho}->{$causal}) ||
+	    warn "I in $subName: gene $causal is marked causal of $patho for $sample, you may want to add it to a candidateGenes file\n";
+	# in any case set score to 5
+	$knownCandidateGenes{$patho}->{$causal} = 5;
+    }
+    
+    ################
+    if ($errorsFound) {
+	die "E in $subName: encountered $errorsFound errors while parsing $candidatesFiles, please fix the file(s).";
+    }
+    else {
+	return(\%knownCandidateGenes);
+    }
+}
 
 
 # module loaded ok

@@ -17,10 +17,9 @@
 # For optimal performance $tmpDir should be on a RAMDISK (eg tmpfs).
 #
 # A new KNOWN_CANDIDATE_GENE column is inserted right after SYMBOL:
-# it holds the "Level" value parsed from  a $candidatesFile if SYMBOL is a known 
-# candidate gene for this cohort (as specified in $candidatesFile), 
-# 0 otherwise. Any $causalGene from $samplesFile is considered a
-# known candidate gene with Level=5.
+# it holds the "confidence score" parsed from a $candidatesFile
+# if SYMBOL is a known candidate or causal gene for this cohort, 0 otherwise.
+# Any $causalGene from $samplesFile is considered a score=5 candidate gene.
 #
 # The HV/HET/OTHER/HR columns are removed and used to produce the following
 # columns in each $cohort outfile, in this order and starting where HV was:
@@ -51,7 +50,7 @@ use POSIX qw(strftime);
 use Parallel::ForkManager;
 
 use lib "$RealBin";
-use grexome_metaParse qw(parsePathologies parseSamples);
+use grexome_metaParse qw(parsePathologies parseSamples parseCandidateGenes);
 
 
 # we use $0 in every stderr message but we really only want
@@ -126,8 +125,19 @@ warn "I $0: $now - starting to run\n";
 #########################################################
 # parse all provided metadata files
 
-# If $pathologies was provided we want to parse (and check) it now, it is used
-# to populate $compatibleR
+# $knownCandidateGenesR: hashref, key==$cohort, value is a hashref whose keys 
+# are gene names and values are the "Confidence score" from a $candidatesFile,
+# or 5 if the gene is "Causal" for a $cohort patient in $samplesFile.
+my $knownCandidateGenesR;
+if ($pathologies) {
+    $knownCandidateGenesR = &parseCandidateGenes($candidatesFiles, $samplesFile, $pathologies);
+}
+else {
+    $knownCandidateGenesR = &parseCandidateGenes($candidatesFiles, $samplesFile);
+}
+
+
+# If $pathologies was provided, populate $compatibleR
 # $compatibleR: hashref, key is a cohort name, value is a hashref
 # with keys == cohorts that are compatible with this cohort, value==1
 my $compatibleR;
@@ -137,65 +147,7 @@ if ($pathologies) {
 }
 # else $compatibleR stays undef
 
-# %knownCandidateGenes: key==$cohort, value is a hashref whose keys 
-# are gene names and values are the "Level" from a $candidatesFile,
-# or 5 if the gene is "Causal" for a $cohort patient in $samplesFile.
-# We use %knownCandidatesSeen (defined below) to sanity-check the lists: any gene 
-# name that is never seen will be reported to stderr (and probably a typo needs fixing).
-my %knownCandidateGenes = ();
-
-if ($candidatesFiles) {
-    foreach my $candidatesFile (split(/,/, $candidatesFiles)) {
-	(-f $candidatesFile) ||
-	    die "E $0: the supplied candidateGenes file $candidatesFile doesn't exist\n";
-	my $workbook = Spreadsheet::XLSX->new("$candidatesFile");
-	(defined $workbook) ||
-	    die "E $0: when parsing xlsx $candidatesFile\n";
-	($workbook->worksheet_count() == 1) || ($workbook->worksheet_count() == 2) ||
-	    die "E $0: parsing xlsx $candidatesFile: expecting one or two worksheets, got "
-	    .$workbook->worksheet_count()."\n";
-	my $worksheet = $workbook->worksheet(0);
-	my ($colMin, $colMax) = $worksheet->col_range();
-	my ($rowMin, $rowMax) = $worksheet->row_range();
-	# check the column titles and grab indexes of our columns of interest
-	my ($pathoCol, $geneCol,$levelCol) = (-1,-1,-1);
-	foreach my $col ($colMin..$colMax) {
-	    my $cell = $worksheet->get_cell($rowMin, $col);
-	    ($cell->value() eq "pathologyID") &&
-		($pathoCol = $col);
-	    ($cell->value() eq "Candidate gene") &&
-		($geneCol = $col);
-	    ($cell->value() eq "Level") &&
-		($levelCol = $col);
-	}
-	($pathoCol >= 0) ||
-	    die "E $0: parsing xlsx $candidatesFile: no col title is pathologyID\n";
-	($geneCol >= 0) ||
-	    die "E $0: parsing xlsx $candidatesFile: no col title is Candidate gene\n";
-	($levelCol >= 0) ||
-	    die "E $0: parsing xlsx $candidatesFile: no col title is Level\n";
-	
-	foreach my $row ($rowMin+1..$rowMax) {
-	    my $cohort = $worksheet->get_cell($row, $pathoCol)->unformatted();
-	    my $gene = $worksheet->get_cell($row, $geneCol)->unformatted();
-	    my $level = $worksheet->get_cell($row, $levelCol)->unformatted();
-
-	    # clean up $gene
-	    $gene =~ s/^\s+//;
-	    $gene =~ s/\s+$//;
-
-	    (defined $knownCandidateGenes{$cohort}) ||
-		($knownCandidateGenes{$cohort} = {});
-	    (defined $knownCandidateGenes{$cohort}->{$gene}) && 
-		die "E $0: parsing xlsx $candidatesFile: have 2 lines with same gene $gene and pathologyID $cohort\n";
-	    $knownCandidateGenes{$cohort}->{$gene} = $level;
-	}
-    }
-}
-
-#########################################################
-# parse useful info from samples metadata file
-
+# parse useful info from samples metadata file:
 # hashref, key==sample id, value is the $cohort this sample belongs to (ie pathologyID)
 my $sample2cohortR;
 # hashref, causal gene, key==sample id, value == HGNC gene name
@@ -213,26 +165,26 @@ my $sample2causalR;
     $sample2causalR = $parsed[3];
 }
 
-# cohort names
-my @cohorts = sort(values(%$sample2cohortR));
-
-# add causalGenes to knownCandidateGenes with level 5
-foreach my $sample (keys %$sample2causalR) {
-    my $cohort = $sample2cohortR->{$sample};
-    my $causal = $sample2causalR->{$sample};
-    (defined $knownCandidateGenes{$cohort}) || ($knownCandidateGenes{$cohort} = {});
-    $knownCandidateGenes{$cohort}->{$causal} = 5;
+# cohort names, sorted and non-redundant
+my @cohorts;
+{
+    my %seen;
+    foreach my $c (values (%$sample2cohortR)) {
+	$seen{$c} = 1;
+    }
+    @cohorts = sort(keys(%seen));
 }
 
 
-# for sanity-checking known candidate and causal genes
+# %knownCandidatesSeen for sanity-checking known candidate and causal genes:
+# any gene name that is never seen will be reported to stderr (probably a
+# typo needs fixing).
 my %knownCandidatesSeen;
-foreach my $c (keys(%knownCandidateGenes)) {
-    foreach my $gene (keys(%{$knownCandidateGenes{$c}})) {
+foreach my $c (keys(%$knownCandidateGenesR)) {
+    foreach my $gene (keys(%{$knownCandidateGenesR->{$c}})) {
 	$knownCandidatesSeen{$gene} = 0;
     }
 }
-
 
 #########################################################
 
@@ -369,7 +321,7 @@ while (!$lastBatch) {
     open(my $tmpSeenFH, "> $tmpSeenFile") || die "E $0: cannot open $tmpSeenFile for writing\n";
 
     # process this batch
-    &processBatch(\@lines,\%knownCandidateGenes,$sample2cohortR,\@cohorts,
+    &processBatch(\@lines,$knownCandidateGenesR,$sample2cohortR,\@cohorts,
 		  $sample2causalR,$compatibleR,$symbolCol,\%genoCols,\@tmpOutFHs,$tmpSeenFH);
 
     # done, close tmp FHs and create flag-file
@@ -579,8 +531,8 @@ sub processBatch {
 		if ($i == $symbolCol) {
 		    # prepend apostrophe-space to gene names to avoid excel corrupting everything
 		    $toPrint .= "\t\' $fields[$i]\t";
-		    if (($knownCandidateGenesR->{$cohort}) && (my $level = $knownCandidateGenesR->{$cohort}->{$fields[$i]})) {
-			$toPrint .= $level;
+		    if (($knownCandidateGenesR->{$cohort}) && (my $score = $knownCandidateGenesR->{$cohort}->{$fields[$i]})) {
+			$toPrint .= $score;
 			$candidatesSeen{$fields[$i]} = 1;
 		    }
 		    else {

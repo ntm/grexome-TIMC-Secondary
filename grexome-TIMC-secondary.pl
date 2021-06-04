@@ -19,7 +19,7 @@ use File::Temp qw(tempdir);
 use FindBin qw($RealBin);
 
 use lib "$RealBin";
-use grexome_metaParse qw(parsePathologies parseSamples);
+use grexome_metaParse qw(parsePathologies parseSamples parseCandidateGenes);
 
 
 # we use $0 in every stderr message but we really only want
@@ -150,15 +150,16 @@ if ($candidateGenes) {
 if ($pathologies) {
     &parsePathologies($pathologies);
     &parseSamples($samples, $pathologies);
+    if ($candidateGenes) {
+	&parseCandidateGenes($candidateGenes, $samples, $pathologies);
+    }
 }
 else {
     &parseSamples($samples);
+    if ($candidateGenes) {
+	&parseCandidateGenes($candidateGenes, $samples);
+    }
 }
-## TODO when parseCandidates is coded
-#if ($candidateGenes) {
-#    &parseCandidates($candidateGenes);
-#}
-
 
 # number of samples in $inFile, needed to set $min_hr (for filtering)
 my $numSamples = scalar(split(/\s+/, `zgrep --max-count=1 '#CHROM' $inFile`)) - 9;
