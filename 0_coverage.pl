@@ -3,7 +3,7 @@
 # 29/08/2019
 # NTM
 
-# Takes 4 args: a comma-separated list of $candidatesFiles xlsx,
+# Takes 5 args: a samples xlsx, a comma-separated list of $candidatesFiles xlsx,
 # a gzipped tsv $transciptsFile as produced in Transcripts_Data/,
 # a merged bgzipped $gvcf (must be  tabix-indexed), and an $outDir.
 # If $outDir doesn't exist it is created; if it exists any pre-existing
@@ -11,8 +11,8 @@
 # For each sample found in $gvcf and lacking a coverage*tsv
 # in $outDir, produce $outDir/coverage*.tsv with:
 # for each coding transcript in $transcriptsFile that is transcribed
-# from a candidate gene listed in a $candidatesFiles, print
-# one line per exon (limited to CDS parts of exons),
+# from a gene listed in a $candidatesFiles or causal in $samplesFile,
+# print one line per exon (limited to CDS parts of exons),
 # for each exon we report the percentage of its bases 
 # (going to +-10 into neighboring introns) that are covered 
 # at least 10x, 20x or 50x.
@@ -28,8 +28,11 @@
 use strict;
 use warnings;
 use File::Basename qw(basename);
+use FindBin qw($RealBin);
 use POSIX qw(strftime);
-use Spreadsheet::XLSX;
+
+use lib "$RealBin";
+use grexome_metaParse qw(parseCandidateGenes);
 
 # use tabix module (installed in /usr/local/lib64/), this requires bioperl
 use lib "/home/nthierry/Software/VariantEffectPredictor/ensembl-vep/";
@@ -42,14 +45,14 @@ $0 = basename($0);
 
 #########################################################
 
-(@ARGV == 4) ||
-    die "E $0: needs 4 args: a comma-separated list of candidatesFiles, a tsv.gz, a GVCF and an outDir\n";
-my ($candidatesFiles, $transcriptsFile, $gvcf, $outDir) = @ARGV;
+(@ARGV == 5) ||
+    die "E $0: needs 5 args: a samples file, a comma-separated list of candidatesFiles, a tsv.gz, a GVCF and an outDir\n";
+my ($samplesFile, $candidatesFiles, $transcriptsFile, $gvcf, $outDir) = @ARGV;
 
+(-f $samplesFile) || die "E $0: the supplied samples file doesn't exist\n";
 (-f $transcriptsFile) ||
     die "E $0: transcriptsFile $transcriptsFile doesn't exist or isn't a file\n";
-(-f $gvcf) ||
-    die "E $0: GVCF $gvcf doesn't exist or isn't a file\n";
+(-f $gvcf) || die "E $0: GVCF $gvcf doesn't exist or isn't a file\n";
 (-f "$gvcf.tbi") ||
     die "E $0: GVCF $gvcf exists but can't find its index file $gvcf.tbi, did you tabix-index the gvcf?\n";
 (-d $outDir) || mkdir($outDir) || die "E $0: cannot mkdir outDir $outDir\n";
@@ -64,35 +67,13 @@ warn "I $0: $now - starting to run\n";
 # but not seen yet, 2 if it's been seen
 my %candidateGenes = ();
 
-foreach my $candidatesFile (split(/,/, $candidatesFiles)) {
-    # code adapted from 6_extractCohorts.pl
-    (-f $candidatesFile) ||
-	die "E $0: the supplied candidateGenes file $candidatesFile doesn't exist\n";
-    my $workbook = Spreadsheet::XLSX->new("$candidatesFile");
-    (defined $workbook) ||
-	die "E $0: when parsing xlsx $candidatesFile\n";
-    ($workbook->worksheet_count() == 1) || ($workbook->worksheet_count() == 2) ||
-	die "E $0: parsing xlsx $candidatesFile: expecting one or two worksheets, got "
-	.$workbook->worksheet_count()."\n";
-    my $worksheet = $workbook->worksheet(0);
-    my ($colMin, $colMax) = $worksheet->col_range();
-    my ($rowMin, $rowMax) = $worksheet->row_range();
-    # check the column titles and grab indexes of our columns of interest
-    my ($geneCol) = (-1);
-    foreach my $col ($colMin..$colMax) {
-	my $cell = $worksheet->get_cell($rowMin, $col);
-	($cell->value() eq "Candidate gene") &&
-	    ($geneCol = $col);
-     }
-    ($geneCol >= 0) ||
-	die "E $0: parsing xlsx $candidatesFile: no col title is Candidate gene\n";
-    
-    foreach my $row ($rowMin+1..$rowMax) {
-	my $gene = $worksheet->get_cell($row, $geneCol)->unformatted();
-	# clean up $gene
-	$gene =~ s/^\s+//;
-	$gene =~ s/\s+$//;
 
+# $knownCandidateGenesR: hashref, key==$cohort, value is a hashref whose keys 
+# are gene names and values are the "Confidence score" from a $candidatesFile,
+# or 5 if the gene is "Causal" for a $cohort patient in $samplesFile.
+my $knownCandidateGenesR = &parseCandidateGenes($candidatesFiles, $samplesFile);
+foreach my $patho (keys(%$knownCandidateGenesR)) {
+    foreach my $gene (keys($knownCandidateGenesR->{$patho})) {
 	$candidateGenes{$gene} = 1;
     }
 }
