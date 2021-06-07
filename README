@@ -4,7 +4,7 @@ from a single multi-sample GVCF or VCF file to a set of analysis-ready TSVs.
 
 EXAMPLE USAGE:
 **************
-perl ../grexome-TIMC-Secondary/grexome-TIMC-secondary.pl --metadata=../Grexome_Metadata/samples.xlsx --pathologies=../Grexome_Metadata/pathologies.xlsx --candidateGenes=../Grexome_Metadata/candidateGenes.xlsx --infile=../GVCFs_Merged/grexomes_merged.g.vcf.gz --outDir=SecondaryAnalyses_TEST --config=../Grexome_Metadata/grexomeTIMCsec_config.pm  2> grexomeTIMCsec.log &
+perl ../grexome-TIMC-Secondary/grexome-TIMC-secondary.pl --samples=../Grexome_Metadata/samples.xlsx --pathologies=../Grexome_Metadata/pathologies.xlsx --candidateGenes=../Grexome_Metadata/candidateGenes.xlsx --infile=../GVCFs_Merged/grexomes_merged.g.vcf.gz --outDir=SecondaryAnalyses_TEST --config=../Grexome_Metadata/grexomeTIMCsec_config.pm  2> grexomeTIMCsec.log &
 
 This will create SecondaryAnalyses_TEST/ , copy the samples.xlsx, pathologies.xlsx and candidateGenes.xlsx files into it, and populate it with subdirs Cohorts/ Samples/ Transcripts/ and optionnally SubCohorts/ (if sub-cohorts are defined). The subdirectories provide three different viewpoints on the analysis results, corresponding to three use-cases: Cohorts/ for identifying candidate causal variants, Transcripts/ for identifying candidate causal genes, and Samples/ for analyzing each sample/patient. All results are presented in tsv-formatted text files (can be opened in libreoffice-calc or MS-excel). The formats and columns are documented in Documentation/grexome_userManual.pdf . Feedback on this document is particularly welcome.
 

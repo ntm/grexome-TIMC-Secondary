@@ -82,8 +82,8 @@ Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --pathologies : [optional] pathologies metadata xlsx file, with path
 --candidateGenes : [optional] known candidate genes in xlsx files, comma-separated, with paths
 --infile : bgzipped multi-sample GVCF or VCF file to parse
---outdir : subdir where resulting cohort files will be created, must not pre-exist
---config [$config] : your customized copy (with path) of the distributed *config.pm
+--outdir : subdir where results will be created, must not pre-exist
+--config [defaults to grexomeTIMCsec_config.pm alongside this script] : your customized copy (with path) of the distributed *config.pm
 --debug : activate debug mode => slower, keeps all intermediate files, produce individual logfiles
 --help : print this USAGE";
 
