@@ -584,13 +584,19 @@ sub processBatch {
 
 	    # other filters (eg strandDisc) would go here
 
-	    # OK data passed all filters, AF needs to be moved or added
+	    # OK data passed all filters, AF may need to be moved or added
 	    if ((defined $format{"AF"}) && (defined $thisData[$format{"AF"}])) {
-		# remove from previous position, wherever it was
-		splice(@thisData, $format{"AF"}, 1);
+		if ($format{"AF"} != 1) {
+		    # remove from previous position, and add back in second position
+		    splice(@thisData, $format{"AF"}, 1);
+		    splice(@thisData, 1, 0, $af);
+		}
+		# else AF was already in second position, noop
 	    }
-	    # add back in second position
-	    splice(@thisData, 1, 0, $af);
+	    else {
+		# AF wasn't present, add it in second position
+		splice(@thisData, 1, 0, $af);
+	    }
 
 	    $lineToPrint .= "\t".join(':',@thisData);
 
