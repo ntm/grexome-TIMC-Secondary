@@ -17,20 +17,24 @@
 # - phased genotypes x|y are replaced by unphased x/y;
 # - hemizygous calls x (strelka) or x/* or */x (gatk) are replaced by HV x/x;
 # - the new and useless GATK "weAreInAHomoDel" calls */* are replaced by ./.;
-# - the variant calls in data columns are replaced by ./. if a call-condition
+# - the variant calls in data columns are replaced by ./. if a QC call-condition
 #   is not met (see "heuristics"), or if previous call was '.' (the Strelka NOCALL);
 # - without --keepHR, lines where every sample is now ./. or 0/0 are skipped;
 # - with --keepHR, lines where every sample is now ./. are skipped;
+# - DP is added to FORMAT right before AD if it wasn't there (eg some strelka indels),
+#   and set to sumOfADs if DP didn't exist or was smaller than sumOfADs (ignoring the
+#   new GATK4 AD for the bogus '*' ALT);
 # - AF is moved (if it pre-exists) or added (otherwise) to FORMAT right after GT, 
 #   and every 0/x or x/x call gets for AF the fraction of variant reads (rounded
 #   to 2 decimals), HR and x/y calls get '.';
 # - fix blatantly wrong genotype calls, see "heuristics" below.
 # - ALTs that are not called in any sample (after fixing errors) are removed, and
 #   DATA values are adjusted accordingly: GT is fixed (new ALT indexes), AD/ADF/ADR and
-#   PL values for removed ALTs are discarded
+#   PL values for removed ALTs are discarded (but the corresponding reads are still
+#   counted in DP, see sumOfADs above);
 # - work around strelka "feature": indel positions can be preceded by an HR call
 #   that includes the first base of the indel (HR call at $pos or non-variant block
-#   with END=$pos followed by indel call at the same $pos).
+#   with END=$pos followed by indel call at the same $pos), this bogus HR call is removed.
 
 
 use strict;
@@ -62,7 +66,8 @@ my $batchSize = 500000;
 
 
 # heuristics for fixing low-quality or blatantly wrong genotype calls 
-# [$dp below represents max(DP,sumOfADs), except for non-variant blocks where it is MIN_DP]:
+# [$dp below represents the fixed DP ie max(DP,sumOfADs), except for non-variant
+#      blocks where it is MIN_DP]:
 # if $dp < $minDP , any call becomes NOCALL
 # if max(GQ,GQX) < $minGQ , any call becomes NOCALL
 # if AF < $minAF and call was REF/VAR or VAR/VAR, call becomes NOCALL
@@ -413,17 +418,8 @@ sub processBatch {
 	else {
 	    push(@lineToPrint, '.');
 	}
+
 	my $format = $data[8];
-	my $newFormat = $format;
-	# if AF isn't already right after GT we move it / create it there
-	if ($newFormat !~ /^GT:AF:/) {
-	    # remove it if it existed
-	    $newFormat =~ s/:AF:/:/;
-	    # in any case add it after GT
-	    ($newFormat =~ s/^GT:/GT:AF:/)  || 
-		die "E $0: cannot add AF after GT in format: $format\n";
-	}
-	push(@lineToPrint, $newFormat);
 	# %format: key is a FORMAT key (eg DP), value is the index of that key in $format
 	my %format;
 	{
@@ -436,6 +432,23 @@ sub processBatch {
 	(defined $format{"GT"}) || die "E $0: no GT key in FORMAT string for line:\n$line\n";
 	(defined $format{"GQ"}) || (defined $format{"GQX"}) ||die "E $0: no GQ or GQX key in FORMAT string for line:\n$line\n";
 	(defined $format{"AD"}) || (defined $format{"DP"}) || die "E $0: no AD or DP key in FORMAT string for line:\n$line\n";
+
+	my $newFormat = $format;
+	# if AF isn't already right after GT we move it / create it there
+	if ($newFormat !~ /^GT:AF:/) {
+	    # remove it if it existed
+	    $newFormat =~ s/:AF:/:/;
+	    # in any case add it after GT
+	    ($newFormat =~ s/^GT:/GT:AF:/)  || 
+		die "E $0: cannot add AF after GT in format: $format\n";
+	}
+	# if DP doesn't exist we add it right before AD (which we know exists, sanity-checked above)
+	if (! defined $format{"DP"}) {
+	    ($newFormat =~ s/:AD:/:DP:AD:/)  || 
+		die "E $0: cannot add DP before AD in format: $format\n";
+	}
+	
+	push(@lineToPrint, $newFormat);
 
 	# now deal with actual data fields
 	foreach my $i (9..$#data) {
@@ -471,11 +484,10 @@ sub processBatch {
 		next;
 	    }
 
-	    # clean up GTs -> obtain unphased, biallelic, sorted genotype
+	    # clean up GTs -> normalize to unphased, biallelic, sorted genotype
 	    $thisData[$format{"GT"}] = &cleanGT($thisData[$format{"GT"}], $starNum);
 
-	    # if '*' is in ALTs we want to ignore any reads attributed to it in DP and AD,
-	    # so our DP and AF are correct (and to avoid incorrectly "fixing" calls)
+	    # if '*' is in ALTs we want to ignore any (bogus) reads attributed to it in DP and AD
 	    # NOTE: we don't touch anything else (eg GQ, PL, SB, and GATK can't output ADF/ADR currently)
 	    if (($starNum != -1) && (defined $format{"AD"}) && (defined $thisData[$format{"AD"}]) &&
 		($thisData[$format{"AD"}]  =~ /^[\d,]+$/)) {
@@ -493,7 +505,10 @@ sub processBatch {
 		$thisData[$format{"AD"}] = join(',', @ADs);
 	    }
 
-	    # grab the depth (DP or sumOfADs, whichever is defined and higher, except use MIN_DP if in a non-var block)
+	    # find the "real" read depth at current position: max(DP, sumOfADs), or MIN_DP if in a non-var block
+	    # Along the way, fix DP to sumOfADs if it's smaller (variant caller bugs)
+	    # we will also populate DP with sumOfADs right before AD if DP didn't exist,
+	    # but we must do this later so we don't mess up the %format mappings
 	    my $thisDP = -1;
 	    if ((defined $format{"DP"}) && (defined $thisData[$format{"DP"}]) && ($thisData[$format{"DP"}] ne '.')) {
 		$thisDP = $thisData[$format{"DP"}];
@@ -504,30 +519,30 @@ sub processBatch {
 		    $sumOfADs += $ad;
 		}
 		if ($thisDP < $sumOfADs) {
-		    # if DP exists there's no sensible reason for it to be smaller than sumOfADs
-		    # (but we have seen it happen with GATK), fix it
 		    if ($thisDP > -1) {
+			# DP exists, there's no sensible reason for it to be smaller than sumOfADs
+			# (but we have seen it happen with GATK), fix it
 			$thisData[$format{"DP"}] = $sumOfADs;
 			$fixedDP++;
 			if ($verbose >= 2) {
 			    warn "I $0: fix DP in: $data[0]:$data[1] $data[3] > $data[4] sample ".($i-9)." DP=$thisDP sumOfADs=$sumOfADs\n";
 			}
 		    }
+		    # else we will create DP later, but in any case update $thisDP
 		    $thisDP = $sumOfADs;
 		}
 	    }
+	    # in a non-variant block we want to use MIN_DP rather than DP
 	    if ((defined $format{"MIN_DP"}) && (defined $thisData[$format{"MIN_DP"}]) && ($thisData[$format{"MIN_DP"}] ne '.')) {
 		$thisDP = $thisData[$format{"MIN_DP"}];
 	    }
-	    # if depth too low or undefined for this sample, change to NOCALL
+	    # OK we have the real depth, now filter to NOCALL if too low or undefined
 	    if ($thisDP < $filterParamsR->{"minDP"}) {
 		push(@lineToPrint, './.') ;
 		next;
 	    }
 
 	    # calculate AF, for fracVarReads filter
-	    # NOTE: with GATK I had some issues with DP=0 calls, causing illegal divisions
-	    # by zero when calculating AF, but that is now skipped above
 	    my $af;
 	    my ($geno1,$geno2) = split(/\//, $thisData[$format{"GT"}]);
 	    if ((defined $format{"AF"}) && (defined $thisData[$format{"AF"}])) {
@@ -580,7 +595,18 @@ sub processBatch {
 
 	    # other filters (eg strandDisc) could go here
 
-	    # OK data passed all filters, AF may need to be moved or added
+	    # OK data passed all filters, add/move fields (DP, AF) if needed
+	    if ((defined $format{"AD"}) && (defined $format{"AF"})) {
+		# sanity: we MUST introduce values new fields starting at the end!
+		# AF must be before AD if both are there, oterwise the successive splices below are buggy
+		($format{"AF"} < $format{"AD"}) ||
+		    die "E $0: AF comes after AD, code will break in this case, fix the code! Line is:\n$line\n";
+	    }
+	    if ((! defined $format{"DP"}) && (defined $thisData[$format{"AD"}])) {
+		# DP didn't exist but AD has some values, insert $thisDP right before AD
+		splice(@thisData, $format{"AD"}, 0, $thisDP);
+	    }
+	    # AF may need to be moved or added
 	    if ((defined $format{"AF"}) && (defined $thisData[$format{"AF"}])) {
 		if ($format{"AF"} != 1) {
 		    # remove from previous position, and add back in second position
