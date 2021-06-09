@@ -354,30 +354,32 @@ sub processBatch {
     # delay printing lines so we can decrement END= if needed
     # (to work-around strelka bug: indels can be preceded by HR calls
     # at the same POS or by non-variant blocks whose END= goes one too far)
-    my $prevToPrint = '';
+    # => our solution: delete the HR call at the same POS as a subsequent indel
+    my @prevToPrint = ();
     
     foreach my $line (@$linesR) {
 	# $keepLine: boolean, true if at least one non-'*' ALT is called for at 
-	# least one sample after filtering
+	# least one sample after cleaning and filtering
 	my $keepLine = 0;
 	my @data = split(/\t/, $line);
 	(@data >= 10) || die "E $0: no sample data in line?\n$line\n";
 
-	# BEFORE ANYTHING ELSE: deal with $prevToPrint
-	if ($prevToPrint) {
-	    if ($prevToPrint =~ /^$data[0]\t$data[1]\t[^\t]+\t\w\t\.\t/) {
-		# prevToPrint was HR call at same POS as $line, don't print prev -> NOOP
+	# BEFORE ANYTHING ELSE: deal with @prevToPrint
+	if (@prevToPrint) {
+	    if (($prevToPrint[0] eq $data[0]) && ($prevToPrint[1] == $data[1]) && 
+		(($prevToPrint[4] eq '.') || ($prevToPrint[4] eq '<NON_REF>'))) {
+		# prevToPrint was HR line at same POS as $line, don't print prev -> NOOP
 	    }
 	    else {
 		# if prev was a non-var block on same chrom ending at current POS, decrement END=
 		my $thisPos = $data[1];
 		my $prevEnd = $thisPos - 1;
-		$prevToPrint =~ s/^($data[0]\t.+)END=$thisPos;/$1END=$prevEnd;/;
+		$prevToPrint[7] =~ s/END=$thisPos;/END=$prevEnd;/;
 		# whether we substituted or not, print prev
-		print $outFH $prevToPrint;
+		print $outFH join("\t", @prevToPrint)."\n";
 	    }
 	    # in all cases clear prev
-	    $prevToPrint = '';
+	    @prevToPrint = ();
 	}
 	
 	# if not --keepHR and there is no ALT in line, skip immediately
@@ -394,23 +396,27 @@ sub processBatch {
 	}
 	# first 9 fields are copied except: QUAL is cleared, INFO is cleared except 
 	# if it contains END=, and AF is moved or added to FORMAT after GT
-	my $lineToPrint = join("\t",@data[0..4]);
+	my @lineToPrint = @data[0..4];
 	# clear QUAL, copy FILTER
-	$lineToPrint .= "\t.\t$data[6]";
+	push(@lineToPrint, '.', $data[6]);
 	# copy INFO if it contains END=, clear otherwise
 	if ($data[7] =~ /^END=/) {
-	    $lineToPrint .= "\t$data[7]";
+	    push(@lineToPrint, $data[7]);
 	}
 	else {
-	    $lineToPrint .= "\t.";
+	    push(@lineToPrint, '.');
 	}
 	my $format = $data[8];
 	my $newFormat = $format;
-	# if AF already there we remove it (then add it back right after GT)
-	($newFormat =~ s/:AF:/:/);
-	($newFormat =~ s/^GT:/GT:AF:/)  || 
-	    die "E $0: cannot add AF after GT in format: $format\n";
-	$lineToPrint .= "\t$newFormat";
+	# if AF isn't already right after GT we move it / create it there
+	if ($newFormat !~ /^GT:AF:/) {
+	    # remove it if it existed
+	    ($newFormat =~ s/:AF:/:/);
+	    # in any case add it after GT
+	    ($newFormat =~ s/^GT:/GT:AF:/)  || 
+		die "E $0: cannot add AF after GT in format: $format\n";
+	}
+	push(@lineToPrint, $newFormat);
 	# %format: key is a FORMAT key (eg DP), value is the index of that key in $format
 	my %format;
 	{
@@ -430,12 +436,12 @@ sub processBatch {
 	    my $thisData = $data[$i];
 	    # if genotype is already '.' or './.' == NOCALL, just use ./.
 	    if (($thisData =~ m~^\.$~) || ($thisData =~ m~^\.:~) || ($thisData =~ m~^\./\.~)) {
-		$lineToPrint .= "\t./." ;
+		push(@lineToPrint, './.') ;
 		next;
 	    }
 	    # also if call is */* or *|* , just replace with ./.
 	    if ($thisData =~ m~^$starNum[/|]$starNum:~) {
-		$lineToPrint .= "\t./." ;
+		push(@lineToPrint, './.') ;
 		next;
 	    }
 
@@ -454,7 +460,7 @@ sub processBatch {
 	    }
 	    if ($gq < $filterParamsR->{"minGQ"}) {
 		# GQ and GQX (if it exists) are both undef or too low, change to NOCALL
-		$lineToPrint .= "\t./.";
+		push(@lineToPrint, './.') ;
 		next;
 	    }
 
@@ -473,7 +479,7 @@ sub processBatch {
 		if ($geno2 == $starNum) {
 		    # */* shouldn't exist (replaced by ./. and next'd earlier)
 		    ($geno1 == $starNum) &&
-			die "E $0: WTF genotype */* shouln't exist anymore!\n$line\n$lineToPrint\n"; 
+			die "E $0: WTF genotype */* shouln't exist anymore!\n$line\n@lineToPrint\n"; 
 		    $geno2 = $geno1;
 		}
 		elsif ($geno1 == $starNum) {
@@ -525,7 +531,7 @@ sub processBatch {
 	    }
 	    # if depth too low or undefined for this sample, change to NOCALL
 	    if ($thisDP < $filterParamsR->{"minDP"}) {
-		$lineToPrint .= "\t./.";
+		push(@lineToPrint, './.') ;
 		next;
 	    }
 	    # with GATK I had some issues with DP=0 calls, causing illegal divisions
@@ -556,7 +562,7 @@ sub processBatch {
 
 	    if (($af ne '.') && ($af < $filterParamsR->{"minAF"})) {
 		# AF too low, change to NOCALL
-		$lineToPrint .= "\t./.";
+		push(@lineToPrint, './.') ;
 		next;
 	    }
 
@@ -598,21 +604,23 @@ sub processBatch {
 		splice(@thisData, 1, 0, $af);
 	    }
 
-	    $lineToPrint .= "\t".join(':',@thisData);
+	    push(@lineToPrint, join(':',@thisData));
 
 	    if ($keepHR || ($thisData[$format{"GT"}] ne '0/0')) {
 		$keepLine = 1;
 	    }
 	}
 	# done with $line, save for printing if $keepLine
-	($keepLine) && ($prevToPrint = "$lineToPrint\n");
+	($keepLine) && (@prevToPrint = @lineToPrint);
     }
     # print last line if needed
-    ($prevToPrint) && (print $outFH $prevToPrint);
-    # INFO with number of fixed calls in this batch, we don't care that this
-    # comes out of order to stderr
-    ($verbose) && (warn "I $0: fixed $fixedToHV calls from HET to HV\n");
-    ($verbose) && (warn "I $0: fixed $fixedToHET calls from HV to HET\n");
+    (@prevToPrint) && (print $outFH join("\t", @prevToPrint)."\n");
+    # INFO with number of fixed calls in this batch, we don't care that this comes
+    # out of order to stderr but don't log if we already printed each fixed call
+    if ($verbose==1) {
+	($fixedToHV) && (warn "I $0: fixed $fixedToHV calls from HET to HV\n");
+	($fixedToHET) && (warn "I $0: fixed $fixedToHET calls from HV to HET\n");
+    }
 }
 
 
