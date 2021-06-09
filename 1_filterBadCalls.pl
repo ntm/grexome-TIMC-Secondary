@@ -347,9 +347,10 @@ sub processBatch {
     (@_ == 6) || die "E $0: processBatch needs 6 args\n";
     my ($linesR,$outFH,$filterParamsR,$skippedColsR,$keepHR,$verbose) = @_;
 
-    # counters for number of blatant errors fixed to HV or HET
+    # counters for number of blatant errors fixed to HV or HET, and for fixed DPs
     my $fixedToHV = 0;
     my $fixedToHET = 0;
+    my $fixedDP = 0;
 
     # delay printing lines so we can decrement END= if needed
     # (to work-around strelka bug: indels can be preceded by HR calls
@@ -471,12 +472,11 @@ sub processBatch {
 	    }
 
 	    # clean up GTs -> obtain unphased, biallelic, sorted genotype
-	    # Strelka and GATK make some phased calls sometimes, homogenize as unphased
 	    $thisData[$format{"GT"}] = &cleanGT($thisData[$format{"GT"}], $starNum);
 
 	    # if '*' is in ALTs we want to ignore any reads attributed to it in DP and AD,
 	    # so our DP and AF are correct (and to avoid incorrectly "fixing" calls)
-	    # NOTE: we don't touch GQ, PL or SB
+	    # NOTE: we don't touch anything else (eg GQ, PL, SB, and GATK can't output ADF/ADR currently)
 	    if (($starNum != -1) && (defined $format{"AD"}) && (defined $thisData[$format{"AD"}]) &&
 		($thisData[$format{"AD"}]  =~ /^[\d,]+$/)) {
 		# '*' is in ALTs and AD is defined and has data
@@ -503,7 +503,18 @@ sub processBatch {
 		foreach my $ad (split(/,/,$thisData[$format{"AD"}])) {
 		    $sumOfADs += $ad;
 		}
-		($thisDP < $sumOfADs) && ($thisDP = $sumOfADs);
+		if ($thisDP < $sumOfADs) {
+		    # if DP exists there's no sensible reason for it to be smaller than sumOfADs
+		    # (but we have seen it happen with GATK), fix it
+		    if ($thisDP > -1) {
+			$thisData[$format{"DP"}] = $sumOfADs;
+			$fixedDP++;
+			if ($verbose >= 2) {
+			    warn "I $0: fix DP in: $data[0]:$data[1] $data[3] > $data[4] sample ".($i-9)." DP=$thisDP sumOfADs=$sumOfADs\n";
+			}
+		    }
+		    $thisDP = $sumOfADs;
+		}
 	    }
 	    if ((defined $format{"MIN_DP"}) && (defined $thisData[$format{"MIN_DP"}]) && ($thisData[$format{"MIN_DP"}] ne '.')) {
 		$thisDP = $thisData[$format{"MIN_DP"}];
@@ -588,9 +599,20 @@ sub processBatch {
 	    if ($keepHR || ($thisData[$format{"GT"}] ne '0/0')) {
 		$keepLine = 1;
 	    }
+
+	    # remember any called ALT allele
+	    ($geno1 > 0) && ($altsCalled[$geno1 - 1] = 1);
+	    ($geno2 > 0) && ($altsCalled[$geno2 - 1] = 1);
 	}
-	# done with $line, save for printing if $keepLine
-	($keepLine) && (@prevToPrint = @lineToPrint);
+	
+	# done parsing $line
+	if ($keepLine) {
+	    # remove any uncalled ALTs and fix DATA
+	    &removeUncalledALTs(\@lineToPrint, \@altsCalled);
+	    # save for printing
+	    @prevToPrint = @lineToPrint;
+	}
+	# else this line is discarded -> NOOP
     }
     # print last line if needed
     (@prevToPrint) && (print $outFH join("\t", @prevToPrint)."\n");
@@ -599,7 +621,8 @@ sub processBatch {
     if ($verbose == 1) {
 	($fixedToHV) && (warn "I $0: fixed $fixedToHV calls from HET to HV\n");
 	($fixedToHET) && (warn "I $0: fixed $fixedToHET calls from HV to HET\n");
-    }
+ 	($fixedDP) && (warn "I $0: fixed $fixedDP DP values to sumOfADs (was larger)\n");
+   }
 }
 
 ###############
@@ -637,6 +660,22 @@ sub cleanGT {
     }
     # OK, return clean GT
     return("$geno1/$geno2");
+}
+
+
+###############
+# removeUncalledALTs, args:
+# - arrayref, tab-splitted VCF line
+# - arrayref of ALT indexes that were called in at least one sample
+#
+# -> discard any uncalled ALTs from the ALT column, set to '.' if there are no more ALTs
+# -> adjust every GT (new ALT indexes)
+# -> discard AD/ADF/ADR and PL values for removed ALTs
+sub removeUncalledALTs {
+    (@_ == 2) ||die "E $0: removeUncalledALTs needs 2 args.\n";
+    my ($lineToPrintR, $altsCalledR) = @_;
+
+
 }
 
 
