@@ -387,15 +387,21 @@ sub processBatch {
 	# GATK4 produces useless lines where there are NO sequencing reads
 	# (where FORMAT is eg GT or GT:GQ:PL), skip them immediately:
 	# any line with supporting reads must have a DP or AD field
-	($data[8] =~ /:DP:/) || ($data[8] =~ /:AD:/) || next;
+	($data[8] =~ /:DP:/) || ($data[8] =~ /:AD:/) ||
+	    ($data[8] =~ /:DP$/) || ($data[8] =~ /:AD$/) || next;
+
+	# after parsing the line, $altsCalled[$i] will be true iff $alts[$i] is part of
+	# a called geno for at least one sample
+	my @alts = split(/,/,$data[4]);
+	my @altsCalled;
 	# grab alleleNum of ALT '*' if it's present
 	my $starNum = -1;
-	my @alts = split(/,/,$data[4]);
 	foreach my $alti (0..$#alts) {
 	    ($alts[$alti] eq '*') && ($starNum = $alti + 1) && last;
 	}
-	# first 9 fields are copied except: QUAL is cleared, INFO is cleared except 
+	# first 9 fields are copied as-is except: QUAL is cleared, INFO is cleared except 
 	# if it contains END=, and AF is moved or added to FORMAT after GT
+	# NOTE: ALT may be modified later (remove uncalled ALTs and normalize remaining ALTs)
 	my @lineToPrint = @data[0..4];
 	# clear QUAL, copy FILTER
 	push(@lineToPrint, '.', $data[6]);
@@ -411,7 +417,7 @@ sub processBatch {
 	# if AF isn't already right after GT we move it / create it there
 	if ($newFormat !~ /^GT:AF:/) {
 	    # remove it if it existed
-	    ($newFormat =~ s/:AF:/:/);
+	    $newFormat =~ s/:AF:/:/;
 	    # in any case add it after GT
 	    ($newFormat =~ s/^GT:/GT:AF:/)  || 
 		die "E $0: cannot add AF after GT in format: $format\n";
@@ -464,36 +470,9 @@ sub processBatch {
 		next;
 	    }
 
-	    # clean up GTs:
+	    # clean up GTs -> obtain unphased, biallelic, sorted genotype
 	    # Strelka and GATK make some phased calls sometimes, homogenize as unphased
-	    $thisData[$format{"GT"}] =~ s~\|~/~ ;
-	    # Strelka makes some hemizygous calls as 'x' (eg when the position
-	    # is in a HET deletion), makes sense but still, homogenize as HOMO
-	    $thisData[$format{"GT"}] =~ s~^(\d+)$~$1/$1~;
-	    # grab geno
-	    my ($geno1,$geno2) = split(/\//, $thisData[$format{"GT"}]);
-	    ((defined $geno1) && (defined $geno2)) ||
-		die "E $0: a sample's genotype cannot be split: ".$thisData[$format{"GT"}]."in:\n$line\n";
-	    # GATK hemizygous calls (eg under a HET DEL) appear as x/* or */x, fix to x/x
-	    if ($starNum != -1) {
-		if ($geno2 == $starNum) {
-		    # */* shouldn't exist (replaced by ./. and next'd earlier)
-		    ($geno1 == $starNum) &&
-			die "E $0: WTF genotype */* shouln't exist anymore!\n$line\n@lineToPrint\n"; 
-		    $geno2 = $geno1;
-		}
-		elsif ($geno1 == $starNum) {
-		    $geno1 = $geno2;
-		}
-	    }
-	    # make sure alleles are in sorted order
-	    if ($geno2 < $geno1) {
-		my $genot = $geno1;
-		$geno1 = $geno2;
-		$geno2 = $genot;
-	    }
-	    # OK save clean GT
-	    $thisData[$format{"GT"}] = "$geno1/$geno2";
+	    $thisData[$format{"GT"}] = &cleanGT($thisData[$format{"GT"}], $starNum);
 
 	    # if '*' is in ALTs we want to ignore any reads attributed to it in DP and AD,
 	    # so our DP and AF are correct (and to avoid incorrectly "fixing" calls)
@@ -534,12 +513,12 @@ sub processBatch {
 		push(@lineToPrint, './.') ;
 		next;
 	    }
-	    # with GATK I had some issues with DP=0 calls, causing illegal divisions
+
+	    # calculate AF, for fracVarReads filter
+	    # NOTE: with GATK I had some issues with DP=0 calls, causing illegal divisions
 	    # by zero when calculating AF, but that is now skipped above
-
-
-	    # calculate AF, for fracVarReads filter:
 	    my $af;
+	    my ($geno1,$geno2) = split(/\//, $thisData[$format{"GT"}]);
 	    if ((defined $format{"AF"}) && (defined $thisData[$format{"AF"}])) {
 		# AF was already there, just reuse
 		$af = $thisData[$format{"AF"}];
@@ -550,7 +529,7 @@ sub processBatch {
 		    die "E $0: GT is HET or HV but we don't have AD or AD data is blank in:\n$line\n";
 		}
 		my @ads = split(/,/, $thisData[$format{"AD"}]);
-		# $geno2 is always the index of the VAR (thanks to sorting above)
+		# $geno2 is always the index of the VAR (thanks to sorting in cleanGT)
 		my $fracVarReads = $ads[$geno2] / $thisDP ;
 		# round AF to nearest float with 2 decimals
 		$af = sprintf("%.2f",$fracVarReads);
@@ -588,7 +567,7 @@ sub processBatch {
 		}
 	    }
 
-	    # other filters (eg strandDisc) would go here
+	    # other filters (eg strandDisc) could go here
 
 	    # OK data passed all filters, AF may need to be moved or added
 	    if ((defined $format{"AF"}) && (defined $thisData[$format{"AF"}])) {
@@ -617,10 +596,47 @@ sub processBatch {
     (@prevToPrint) && (print $outFH join("\t", @prevToPrint)."\n");
     # INFO with number of fixed calls in this batch, we don't care that this comes
     # out of order to stderr but don't log if we already printed each fixed call
-    if ($verbose==1) {
+    if ($verbose == 1) {
 	($fixedToHV) && (warn "I $0: fixed $fixedToHV calls from HET to HV\n");
 	($fixedToHET) && (warn "I $0: fixed $fixedToHET calls from HV to HET\n");
     }
+}
+
+###############
+# clean up GTs:
+# args: a GT string, the alleleNum of the '*' allele (or -1 if it's not present)
+# returns a "cleaned up" version of the GT: unphased, biallelic, sorted
+sub cleanGT {
+    (@_ == 2) ||die "E $0: cleanGT needs 2 args.\n";
+    my ($gt, $starNum) = @_;
+    
+    # Strelka and GATK make some phased calls sometimes, homogenize as unphased
+    $gt =~ s~\|~/~ ;
+    # Strelka makes some hemizygous calls as 'x' (eg when the position
+    # is in a HET deletion), makes sense but still, homogenize as HOMO
+    $gt =~ s~^(\d+)$~$1/$1~;
+    # grab geno
+    my ($geno1,$geno2) = split(/\//, $gt);
+    ((defined $geno1) && (defined $geno2)) ||
+	die "E $0: a sample's genotype cannot be split: $gt\n";
+    # GATK hemizygous calls (eg under a HET DEL) appear as x/* or */x, fix to x/x
+    if ($geno2 == $starNum) {
+	# */* shouldn't exist (replaced by ./. and skipped before calling &cleanGT)
+	($geno1 == $starNum) &&
+	    die "E $0: don't call this sub with genotype */* , just skip these useless calls\n"; 
+	$geno2 = $geno1;
+    }
+    elsif ($geno1 == $starNum) {
+	$geno1 = $geno2;
+    }
+    # make sure alleles are in sorted order
+    if ($geno2 < $geno1) {
+	my $genot = $geno1;
+	$geno1 = $geno2;
+	$geno2 = $genot;
+    }
+    # OK, return clean GT
+    return("$geno1/$geno2");
 }
 
 
