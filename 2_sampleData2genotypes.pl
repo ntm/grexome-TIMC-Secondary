@@ -103,20 +103,18 @@ while(my $line = <STDIN>) {
 	$lineToPrintEnd .= "\t".shift(@data);
     }
 
-    # from FORMAT we need GT, AF and DP/DPI/AD
+    # from FORMAT we need GT, AF and DP (assumption: filterBadCalls.pl already ran
+    # and AF and DP with correct values if needed)
     my $format = shift(@data);
     # GT and AF should always be first, check it
     ($format =~ /^GT:AF:/) || die "E $0: GT:AF: aren't the first FORMAT keys in:\n$line\n";
-    # find DP, DPI and/or AD indexes
-    my ($dpCol,$dpiCol, $adCol) = (0,0,0);
+    # find DP index
+    my $dpCol = 0;
     my @format = split(/:/, $format);
     foreach my $i (2..$#format) {
-	($format[$i] eq "DP") && ($dpCol = $i);
-	($format[$i] eq "DPI") && ($dpiCol = $i);
-	($format[$i] eq "AD") && ($adCol = $i);
+	($format[$i] eq "DP") && ($dpCol = $i) && last;
     }
-    ($dpCol==0) && ($dpiCol==0) && ($adCol==0) && 
-	die "E $0: none of DP, DPI or AD in format:\n$line\n";
+    ($dpCol==0) && die "E $0: DP not found in format:\n$line\n";
     # print new FORMAT
     $lineToPrintEnd .= "\tGENOS";
 
@@ -145,21 +143,11 @@ while(my $line = <STDIN>) {
 
 	$geno2samples{$geno} .= $samples[$i];
 	if ($af ne '.') {
-	    # if we have an AF this is a HET or HV call
-	    # find DP/DPI/sumOfADs (whichever is defined and not '.' and biggest)
+	    # if we have an AF this is a HET or HV call, find DP
 	    my @thisData = split(/:/, $data[$i]);
 	    my $dp = 0;
 	    ($dpCol) && ($thisData[$dpCol]) && ($thisData[$dpCol] ne '.') && ($dp = $thisData[$dpCol]);
-	    ($dpiCol) && ($thisData[$dpiCol]) && ($thisData[$dpiCol] ne '.') && ($dp < $thisData[$dpiCol]) &&
-		($dp = $thisData[$dpiCol]);
-	    if (($adCol) && ($thisData[$adCol]) && ($thisData[$adCol] ne '.')) {
-		my $sumOfADs = 0;
-		foreach my $ad (split(/,/,$thisData[$adCol])) {
-		    $sumOfADs += $ad;
-		}
-		($dp < $sumOfADs) && ($dp = $sumOfADs);
-	    }
-	    ($dp) || die "E $0: AF is $af but couldn't find DP or DPI or sumOfADs in $data[$i]\n$line\n";
+	    ($dp) || die "E $0: AF is $af but couldn't find DP in $data[$i]\n$line\n";
 	    # add [DP:AF] after sample ID
 	    $geno2samples{$geno} .= "[$dp:$af]";
 	}
