@@ -21,13 +21,14 @@
 #   is not met (see "heuristics"), or if previous call was '.' (the Strelka NOCALL);
 # - without --keepHR, lines where every sample is now ./. or 0/0 are skipped;
 # - with --keepHR, lines where every sample is now ./. are skipped;
+# - the bogus read counts for the new '*' ALT used by GATK4 are substracted from DP and AD;
 # - DP is added to FORMAT right before AD if it wasn't there (eg some strelka indels),
 #   and set to sumOfADs if DP didn't exist or was smaller than sumOfADs (ignoring the
-#   new GATK4 AD for the bogus '*' ALT);
+#   new GATK4 AD for the '*' ALT, as indicated above);
 # - AF is moved (if it pre-exists) or added (otherwise) to FORMAT right after GT, 
-#   and every 0/x or x/x call gets for AF the fraction of variant reads (rounded
-#   to 2 decimals), HR and x/y calls get '.';
-# - fix blatantly wrong genotype calls, see "heuristics" below.
+#   and every 0/x or x/x call gets for AF the fraction of reads supporting the x ALT
+#   (rounded to 2 decimals), HR and x/y calls get '.';
+# - fix blatantly wrong genotype calls, see "heuristics" below;
 # - ALTs that are not called in any sample (after fixing errors) are removed, and
 #   DATA values are adjusted accordingly: GT is fixed (new ALT indexes), AD/ADF/ADR and
 #   PL values for removed ALTs are discarded (but the corresponding reads are still
