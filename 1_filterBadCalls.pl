@@ -115,18 +115,18 @@ my $verbose = 0;
 my $help = '';
 
 my $USAGE = "Parse a Strelka or GATK4 GVCF on stdin, print to stdout a similar GVCF or VCF where:
-- calls that fail basic quality filters are changed to NOCALL,
+- calls that fail basic QC tests are changed to NOCALL,
 - calls that are blatantly wrong are fixed,
 - ALTs that are never called are removed,
-- lines are only printed if at least one sample still has some genotype call (including HomoRefs with --keepHR, excluding HomoRefs without).
+- lines are only printed if at least one sample still has some genotype call (including HomoRefs with --keepHR).
 Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
---samplesFile string [no default] : samples metadata xlsx file, with path
---samplesOfInterest string [default = all samples in xlsx] : comma-separated list of sampleIDs of interest (other samples are ignored)
+--samplesFile [no default] : samples metadata xlsx file, with path
+--samplesOfInterest [default = all samples in xlsx] : comma-separated list of sampleIDs of interest (other samples are ignored)
 --keepHR : keep lines even if the only genotype call is homoref
---tmpdir string [default = $tmpDir] : subdir where tmp files will be created (on a RAMDISK if possible), it must not pre-exist (but it's 
-	 parent must exist) and it will be removed after execution
+--tmpdir [default = $tmpDir] : subdir where tmp files will be created (on a RAMDISK if possible), it must not pre-exist  
+	 (but it's parent must exist) and it will be removed after execution
 --jobs N [default = $numJobs] : number of parallel jobs=threads to run
---verbose N [default 0] : if > 0 increase verbosity on stderr
+--verbose N [default $verbose] : if > 0 increase verbosity on stderr
 --help : print this USAGE";
 
 # construct string with full command-line for adding to headers, must be
