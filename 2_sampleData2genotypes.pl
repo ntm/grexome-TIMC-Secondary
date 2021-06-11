@@ -3,7 +3,7 @@
 # 24/03/2018
 # NTM
 
-# Read on stdin a VCF file with one data column per sample.
+# Read on stdin a (G)VCF file with one data column per sample.
 # Replace all the sample data columns by genotype columns 
 # HV, HET, OTHER, HR.
 # Each column has eg: 
@@ -12,23 +12,16 @@
 # - all genotypes in HET column will be REF/VAR, eg 0/1, 0/2...
 # - all genotypes in HV column will by homovar, eg 1/1, 2/2 etc...
 # - all other genotypes (ie VAR1/VAR2) will appear in OTHER column.
+# For HV and HET genos, "sample" actually becomes: $sample[$dp:$af].
+#
+# <NON_REF> is removed from ALTs if it was present, apart from that
+# we don't touch the first 8 columns: we assume all ALTs are called
+# in at least one genotype, and the REF+ALTs are already normalized.
+# This is the case if the input GVCF went through filterBadCalls.pl .
 #
 # NOTE that FORMAT becomes "GENOS", so produced file is no longer
 # a VCF stricto sensu (spec requires first FORMAT key is GT).
-#
-# UPDATE 09/08/2019: remove ALTs that don't appear in a genotype
-# (and renumber remaining ALTs in the called genotypes). 
-# UPDATE 14/08/2019: also re-normalize the variants. I don't check for
-# collisions (ie if POS got increased by removing leading common bases, it
-# might end up at same coord as a subsequent line), but a collision can
-# only occur if two REFs overlapped in the input VCF... so the collision
-# was already there (even if not explicit with identical POS).
-# NOTE: If input variants were normalized, re-normalization should only occur
-# when we remove unused ALTs.
-# This is an initial cleanup of multiallelic sites: for example with 
-# grexomes_0050-0520, 48.4% of sites with 2 ALTs will become monoallelic.
-#
-# UPDATE 20/08/2019: for HV and HET genos, "sample" is now: $sample[$dp:$af]
+
 
 use strict;
 use warnings;
@@ -93,18 +86,15 @@ while(my $line = <STDIN>) {
 
     my @data = split(/\t/, $line);
     (@data >= 10) || die "E $0: no sample data in line?\n$line\n";
-    # first 5 fields are saved: we may need to modify POS, REF 
-    # and ALT when removing unused ALTs and re-normalizing variants
-    my ($chr,$pos,$varid,$ref,$alts) = splice(@data,0,5);
-    my @alts = split(/,/,$alts);
-    # next 3 are just copied
-    my $lineToPrintEnd = "";
-    foreach my $i (5..7) {
-	$lineToPrintEnd .= "\t".shift(@data);
+    # first 8 fields are copied, except we remove <NON_REF> from ALTs if it was present
+    $data[4] =~ s/,<NON_REF>//;
+    my $lineToPrint = shift(@data);
+    foreach my $i (1..7) {
+	$lineToPrint .= "\t".shift(@data);
     }
 
     # from FORMAT we need GT, AF and DP (assumption: filterBadCalls.pl already ran
-    # and AF and DP with correct values if needed)
+    # and created/updated AF and DP with correct values)
     my $format = shift(@data);
     # GT and AF should always be first, check it
     ($format =~ /^GT:AF:/) || die "E $0: GT:AF: aren't the first FORMAT keys in:\n$line\n";
@@ -116,31 +106,25 @@ while(my $line = <STDIN>) {
     }
     ($dpCol==0) && die "E $0: DP not found in format:\n$line\n";
     # print new FORMAT
-    $lineToPrintEnd .= "\tGENOS";
+    $lineToPrint .= "\tGENOS";
 
     # sanity check
     (@data == @samples) || 
 	die "E $0: we don't have same number of samples and data columns in:\n$line\n";
     # construct comma-separated list of samples for each called genotype
     my %geno2samples = ();
-    # remember seen alleles (for multiallelic cleanup):  $seenAlleles[$i]==1 if
-    # allele $i was seen ($i==0 for REF, >=1 for ALTs)
-    my @seenAlleles = (0)x(1 + @alts);
 
     foreach my $i (0..$#data) {
 	# add trailing ':' so we know GT is followed by : (eg for NOCALLS)
 	$data[$i] .= ':';
 	# ignore NOCALLs
 	($data[$i] =~ m~^\./\.:~) && next;
-	($data[$i] =~ m~^(\d+)/(\d+):([^:]+):~) || 
+	($data[$i] =~ m~^(\d+/\d+):([^:]+):~) || 
 	    die "E $0: cannot grab genotype and AF for sample $i in $data[$i] in line:\n$line\n";
-	my ($geno1,$geno2,$af) = ($1,$2,$3);
-	$seenAlleles[$geno1] = 1;
-	$seenAlleles[$geno2] = 1;
-	my $geno = "$geno1/$geno2";
+	my ($geno,$af) = ($1,$2);
+
 	if (defined $geno2samples{$geno}) { $geno2samples{$geno} .= ","; }
 	else { $geno2samples{$geno} = ""; }
-
 	$geno2samples{$geno} .= $samples[$i];
 	if ($af ne '.') {
 	    # if we have an AF this is a HET or HV call, find DP
@@ -155,115 +139,12 @@ while(my $line = <STDIN>) {
 
     # now print data for each genotype, removing data from %geno2samples as we go
     # format is: genotype1~sample1,sample2|genotype2~sample3|genotype3~sample4,sample5
-
-    # $old2new[$old] == $new if allele $old must become $new, 
-    #                == -1 if it's never present (for sanity),
-    #                undefined otherwise (no change needed)
-    my @old2new;
-    {
-	my $skipped = 0;
-	# start at 1 because we always keep REF
-	foreach my $i (1..$#seenAlleles) {
-	    if (! $seenAlleles[$i]) {
-		$old2new[$i] = -1;
-		$skipped++;
-	    }
-	    elsif ($skipped) {
-		$old2new[$i] = $i - $skipped;
-	    }
-	}
-    }
-    # build new ALTs
-    my @newAlts = ();
-    foreach my $i (0..$#alts) {
-	if ((!defined $old2new[$i+1]) || ($old2new[$i+1] != -1)) {
-	    # the normalization algo below assumes @newAlts don't include <NON_REF> or *,
-	    # this should always be true since <NON_REF> should never be a call, and hemizygous
-	    # calls with * have been fixed to HOMO calls by 1_filterBadCalls.pl.
-	    # Check it anyways.
-	    ($alts[$i] eq '*') &&
-		die "E $0: we have a call for *, should have been fixed to HOMO upstream:\n$line\n";
-	    ($alts[$i] eq '<NON_REF>') &&
-		die "E $0: we have a call for NON_REF, it's meaningless!\n$line\n";
-	    push(@newAlts,$alts[$i]);
-	}
-    }
-
-    # normalize new ALTs:
-    # 1. if length >= 2 for REF and all ALTS, and if REF and all ALTs have 
-    #    common ending bases, remove them (keeping at least 1 base everywhere).
-    while ($ref =~ /\w(\w)$/) {
-	# ref has at least 2 chars
-	my $lastRef = $1;
-	my $removeLast = 1;
-	foreach my $alt (@newAlts) {
-	    if ($alt !~ /\w$lastRef$/) {
-		# this alt is length one or doesn't end with $lastRef
-		$removeLast = 0;
-		last;
-	    }
-	}
-	if ($removeLast) {
-	    # OK remove last base from REF and all @alts
-	    ($ref =~ s/$lastRef$//) || 
-		die "E $0: WTF can't remove $lastRef from end of ref $ref\n";
-	    foreach my $i (0..$#newAlts) {
-		($newAlts[$i] =~ s/$lastRef$//) || 
-		    die "E $0: WTF can't remove $lastRef from end of newAlt $i == $newAlts[$i]\n";
-	    }
-	}
-	else {
-	    # can't remove $lastRef, get out of while loop
-	    last;
-	}
-    }
-    # 2. if length >= 2 for REF and all ALTS, and if REF and all ALTs have 
-    #    common starting bases, remove them (keeping at least 1 base everywhere)
-    #    and adjust POS.
-    while ($ref =~ /^(\w)\w/) {
-	# ref has at least 2 chars
-	my $firstRef = $1;
-	my $removeFirst = 1;
-	foreach my $alt (@newAlts) {
-	    if ($alt !~ /^$firstRef\w/) {
-		# this alt is length one or doesn't start with $firstRef
-		$removeFirst = 0;
-		last;
-	    }
-	}
-	if ($removeFirst) {
-	    # OK remove first base from REF and all @alts
-	    ($ref =~ s/^$firstRef//) || 
-		die "E $0: WTF can't remove $firstRef from start of ref $ref\n";
-	    foreach my $i (0..$#newAlts) {
-		($newAlts[$i] =~ s/^$firstRef//) || 
-		    die "E $0: WTF can't remove $firstRef from start of alt $i == $newAlts[$i]\n";
-	    }
-	    # increment POS
-	    $pos++;
-	}
-	else {
-	    # can't remove $firstRef, get out of while loop
-	    last;
-	}
-    }
-
-    # build line to print with fixed POS,REF,ALTs
-    my $lineToPrint = "$chr\t$pos\t$varid\t$ref\t".join(',',@newAlts)."$lineToPrintEnd";
-
     # HV
     $lineToPrint .= "\t";
     foreach my $geno (sort GENOSORT keys %geno2samples) {
 	($geno eq '0/0') && next; # skip HR
 	($geno =~ m~^(\d+)/\1$~) || next;
-	my $allele = $1;
-	my $newGeno = $geno;
-	if (defined $old2new[$allele]) {
-	    ($old2new[$allele] == -1) &&
-		die "E $0: allele $allele is present in a geno $geno but it was never seen!\n$line\n";
-	    $newGeno = $old2new[$allele]."/".$old2new[$allele];
-	}
-	$lineToPrint .= "$newGeno~".$geno2samples{$geno}."|";
+	$lineToPrint .= "$geno~".$geno2samples{$geno}."|";
 	delete($geno2samples{$geno});
     }
     # remove last | if needed (not needed if there are no HVs)
@@ -273,15 +154,8 @@ while(my $line = <STDIN>) {
     $lineToPrint .= "\t";
     foreach my $geno (sort GENOSORT keys %geno2samples) {
 	($geno eq '0/0') && next; # skip HR
-	($geno =~ m~^0/(\d+)$~) || next;
-	my $allele = $1;
-	my $newGeno = $geno;
-	if (defined $old2new[$allele]) {
-	    ($old2new[$allele] == -1) &&
-		die "E $0: allele $allele is present in a geno $geno but it was never seen!\n$line\n";
-	    $newGeno = "0/".$old2new[$allele];
-	}
-	$lineToPrint .= "$newGeno~".$geno2samples{$geno}."|";
+	($geno =~ m~^0/\d+$~) || next;
+	$lineToPrint .= "$geno~".$geno2samples{$geno}."|";
 	delete($geno2samples{$geno});
     }
     # remove last | if there was at least one HET geno
@@ -291,21 +165,8 @@ while(my $line = <STDIN>) {
     $lineToPrint .= "\t";
     foreach my $geno (sort GENOSORT keys %geno2samples) {
 	($geno eq '0/0') && next; # skip HR
-	($geno =~ m~^(\d+)/(\d+)$~) || die "E $0: cannot parse geno $geno in line:\n$line\n";
-	my ($allele1,$allele2) = ($1,$2);
-	my $newGeno = $geno;
-	if (defined $old2new[$allele1]) {
-	    ($old2new[$allele1] == -1) &&
-		die "E $0: allele $allele1 is present in a geno $geno but it was never seen!\n$line\n";
-	    $newGeno = $old2new[$allele1]."/$allele2";
-	}
-	if (defined $old2new[$allele2]) {
-	    ($old2new[$allele2] == -1) &&
-		die "E $0: allele $allele2 is present in a geno $geno but it was never seen!\n$line\n";
-	    ($newGeno =~ s~/$allele2$~/$old2new[$allele2]~) ||
-		die "E $0: cannot subst allele2 $allele2 in geno $geno, newGeno $newGeno, line:\n$line\n";
-	}
-	$lineToPrint .= "$newGeno~".$geno2samples{$geno}."|";
+	($geno =~ m~^\d+/\d+$~) || die "E $0: cannot parse geno $geno in line:\n$line\n";
+	$lineToPrint .= "$geno~".$geno2samples{$geno}."|";
 	delete($geno2samples{$geno});
     }
     # remove last | if needed
