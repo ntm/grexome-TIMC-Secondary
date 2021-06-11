@@ -33,10 +33,23 @@
 #   DATA values are adjusted accordingly: GT is fixed (new ALT indexes), AD/ADF/ADR and
 #   PL values for removed ALTs are discarded (but the corresponding reads are still
 #   counted in DP, see sumOfADs above);
+# - REF + remaining ALTs are normalized (but not left-aligned): 
+#   * remove bases present at the end of REF and all ALTs;
+#   * remove bases present at the start of REF and all ALTs, and increase POS accordingly
 # - work around strelka "feature": indel positions can be preceded by an HR call
 #   that includes the first base of the indel (HR call at $pos or non-variant block
 #   with END=$pos followed by indel call at the same $pos), this bogus HR call is removed.
-
+#
+###########
+# NOTES on normalization of variants:
+# - this script does NOT left-align variants
+# - it also doesn't try to merge lines with overlapping REFs or identical POS values,
+#   even if this results from our renormalization (where POS can increase): if this
+#   occurs it means the clash was already present, even if it wasn't explicit.
+# - similarly, it is possible to obtain out-of-order POS lines (again, only if the
+#   input GVCF is broken IMO, but this does happen).
+# Downstream tools need to be aware of this. 4_mergeGVCFs.pl is, and tries to do
+# the right thing.
 
 use strict;
 use warnings;
@@ -634,7 +647,7 @@ sub processBatch {
 	
 	# done parsing $line
 	if ($keepLine) {
-	    # remove any uncalled ALTs and fix DATA
+	    # remove any uncalled ALTs and fix DATA accordingly
 	    &removeUncalledALTs(\@lineToPrint, \@altsCalled);
 	    # save for printing
 	    @prevToPrint = @lineToPrint;
@@ -695,14 +708,111 @@ sub cleanGT {
 # - arrayref, tab-splitted VCF line
 # - arrayref of ALT indexes that were called in at least one sample
 #
-# -> discard any uncalled ALTs from the ALT column, set to '.' if there are no more ALTs
+# -> discard any uncalled ALTs from the ALT column (except <NON_REF>, which we
+#    always keep if it's present), set to '.' if there are no more ALTs
 # -> adjust every GT (new ALT indexes)
 # -> discard AD/ADF/ADR and PL values for removed ALTs
 sub removeUncalledALTs {
     (@_ == 2) ||die "E $0: removeUncalledALTs needs 2 args.\n";
-    my ($lineToPrintR, $altsCalledR) = @_;
+    my ($lineR, $altsCalledR) = @_;
 
+    my @alts = split(/,/,$lineR->[4]);
+    my $newAlts = "";
+    # $old2new[$i] is the new alleleNum of allele $i (for adjusting GT)
+    # REF==0 stays 0
+    my @old2new = (0);
+    my $nextAllNum = 1;
+    foreach my $i (0..$#$altsCalledR) {
+	($altsCalledR->[$i]) || next;
+	$newAlts .= "$alts[$i],";
+	$old2new[$i+1] = $nextAllNum++;
+    }
+    if ($alts[$#alts] eq '<NON_REF>') {
+	($old2new[$#alts+1]) &&
+	    die "E $0 in removeUncalledALTs: it seems NON_REF was called? impossible!\n".join("\t",@$lineR)."\n";
+	$newAlts .= '<NON_REF>';
+	$old2new[$#alts+1] = $nextAllNum++;
+    }
+    elsif ($newAlts) {
+	# remove trailing comma
+	chop($newAlts);
+    }
+    else {
+	$newAlts = '.';
+    }
 
+    # if ALTs didn't change, return immediately
+    ($lineR->[4] eq $newAlts) && (return());
+    # otherwise, start working
+    $lineR->[4] = $newAlts;
+
+    # %format: key is a FORMAT key (eg DP), value is the index of that key in FORMAT
+    my %format;
+    {
+	my @format = split(/:/, $lineR->[8]);
+	foreach my $i (0..$#format) {
+	    $format{$format[$i]} = $i ;
+	}
+    }
+
+    # data
+    foreach my $i (9..$#$lineR) {
+	my @thisData = split(/:/, $lineR->[$i]) ;
+	# GT
+	$thisData[0] =~ s~^(\d+)/(\d+)$~$old2new[$1]/$old2new[$2]~;
+	# AD, ADF, ADR
+	foreach my $fkey ("AD", "ADF", "ADR") {
+	    if (($format{$fkey}) && ($thisData[$format{$fkey}])) {
+		my @ad = split(/,/, $thisData[$format{$fkey}]);
+		my $adNew = $ad[0]; # always keep AD* for REF
+		foreach my $alNum (1..$#old2new) {
+		    (defined $old2new[$alNum]) && ($adNew .= ",$ad[$alNum]");
+		}
+		$thisData[$format{$fkey}] = $adNew;
+	    }
+	}
+	# PL
+	if (($format{"PL"}) && ($thisData[$format{"PL"}])) {
+	    # The VCF spec says the PL for x/y genotype is at index x + y*(y+1)/2
+	    my @PLs = split(/,/, $thisData[$format{"PL"}]);
+	    my @newPLs;
+	    # $badPLs for Strelka bug where sometimes PL doesn't have correct number of values
+	    my $badPLs = 0;
+	    foreach my $x (0..$#old2new) {
+		(defined $old2new[$x]) || next;
+		foreach my $y ($x..$#old2new) {
+		    (defined $old2new[$y]) || next;
+		    # alleles $x and $y still exist, grab PL value and save it where it belongs
+		    my $plSource = $x + $y * ($y+1) / 2;
+		    my $plDest = $old2new[$x] + $old2new[$y] * ($old2new[$y]+1) / 2;
+		    # $PLs[$plSource] should always exist according to spec, but Strelka has
+		    # a bug where sometimes values are missing, and we can't know which 
+		    # genotype the existing PLs were for...
+		    # IOW in these cases the PL string really can't be interpreted!
+		    # so we flag it here and then replace the whole PL value with comma-separated '.'
+		    if (defined $PLs[$plSource]) {
+			$newPLs[$plDest] = $PLs[$plSource];
+		    }
+		    else {
+			$newPLs[$plDest] = '.';
+			$badPLs = 1;
+		    }
+		}
+	    }
+	    if ($badPLs) {
+		# wrong number of PL values in Strelka file, replace all values with '.'
+		$thisData[$format{"PL"}] = '.';
+		$thisData[$format{"PL"}] .= ",." x $#newPLs ; # we put one '.' already, need $# more
+	    }
+	    else {
+		$thisData[$format{"PL"}] = join(',', @newPLs);
+	    }
+	}
+	# save updated data
+	$lineR->[$i] = join(':', @thisData);
+    }
+
+    # ALL DONE, @$lineR has been updated
 }
 
 
