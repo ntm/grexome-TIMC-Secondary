@@ -649,6 +649,8 @@ sub processBatch {
 	if ($keepLine) {
 	    # remove any uncalled ALTs and fix DATA accordingly
 	    &removeUncalledALTs(\@lineToPrint, \@altsCalled);
+	    # normalize REF + remaining ALTs
+	    &normalizeVariants(\@lineToPrint);
 	    # save for printing
 	    @prevToPrint = @lineToPrint;
 	}
@@ -712,6 +714,8 @@ sub cleanGT {
 #    always keep if it's present), set to '.' if there are no more ALTs
 # -> adjust every GT (new ALT indexes)
 # -> discard AD/ADF/ADR and PL values for removed ALTs
+#
+# Modifies the VCF line in-place and doesn't return anything.
 sub removeUncalledALTs {
     (@_ == 2) ||die "E $0: removeUncalledALTs needs 2 args.\n";
     my ($lineR, $altsCalledR) = @_;
@@ -742,7 +746,7 @@ sub removeUncalledALTs {
     }
 
     # if ALTs didn't change, return immediately
-    ($lineR->[4] eq $newAlts) && (return());
+    ($lineR->[4] eq $newAlts) && return();
     # otherwise, start working
     $lineR->[4] = $newAlts;
 
@@ -813,6 +817,117 @@ sub removeUncalledALTs {
     }
 
     # ALL DONE, @$lineR has been updated
+}
+
+
+###############
+# normalizeVariants, arg:
+# - arrayref, tab-splitted VCF line
+#
+# Perform basic normalization (without left-alignment) of REF+ALTs:
+#  * remove bases present at the end of REF and all ALTs;
+#  * remove bases present at the start of REF and all ALTs, and increase POS accordingly
+#
+# Modifies the VCF line in-place and doesn't return anything.
+sub normalizeVariants {
+    (@_ == 1) ||die "E $0: normalizeVariants needs 1 arg.\n";
+    my ($lineR) = @_;
+
+    my $ref = $lineR->[3];
+    # most REFs are a single base => cannot be normalized -> test first
+    (length($ref) >= 2) || return();
+
+    my @alts = split(/,/,$lineR->[4]);
+    # never normalize <NON_REF> or * : if they are here, store their indexes
+    # in @alts and splice them out (trick: start from the end)
+    my ($nonrefi,$stari) = (-1,-1);
+    foreach my $i (reverse(0..$#alts)) {
+	if ($alts[$i] eq '<NON_REF>') {
+	    $nonrefi = $i;
+	    splice(@alts,$i,1);
+	}
+	elsif ($alts[$i] eq '*') {
+	    $stari = $i;
+	    splice(@alts,$i,1);
+	}
+    }
+
+    # 1. if length >= 2 for REF and all ALTS, and if REF and all ALTs have 
+    #    common ending bases, remove them (keeping at least 1 base everywhere).
+    while ($ref =~ /\w(\w)$/) {
+	# ref has at least 2 chars
+	my $lastRef = $1;
+	my $removeLast = 1;
+	foreach my $alt (@alts) {
+	    if ($alt !~ /\w$lastRef$/) {
+		# this alt is length one or doesn't end with $lastRef
+		$removeLast = 0;
+		last;
+	    }
+	}
+	if ($removeLast) {
+	    # OK remove last base from REF and all @alts
+	    ($ref =~ s/$lastRef$//) || 
+		die "E $0: WTF can't remove $lastRef from end of $ref\n";
+	    foreach my $i (0..$#alts) {
+		($alts[$i] =~ s/$lastRef$//) || 
+		    die "E $0: WTF can't remove $lastRef from end of alt $i == $alts[$i]\n";
+	    }
+	}
+	else {
+	    # can't remove $lastRef, get out of while loop
+	    last;
+	}
+    }
+
+    # 2. if length >= 2 for REF and all ALTS, and if REF and all ALTs have 
+    #    common starting bases, remove them (keeping at least 1 base everywhere)
+    #    and adjust POS.
+    while ($ref =~ /^(\w)\w/) {
+	my $firstRef = $1;
+	my $removeFirst = 1;
+	foreach my $alt (@alts) {
+	    if ($alt !~ /^$firstRef\w/) {
+		$removeFirst = 0;
+		last;
+	    }
+	}
+	if ($removeFirst) {
+	    ($ref =~ s/^$firstRef//) || 
+		die "E $0: WTF can't remove $firstRef from start of $ref\n";
+	    foreach my $i (0..$#alts) {
+		($alts[$i] =~ s/^$firstRef//) || 
+		    die "E $0: WTF can't remove $firstRef from start of alt $i == $alts[$i]\n";
+	    }
+	    $lineR->[1]++;
+	}
+	else {
+	    last;
+	}
+    }
+
+    # place <NON_REF> and/or * back where they belong: need to splice
+    # in correct order, smallest index first
+    if ($stari != -1) {
+	if ($nonrefi == -1) {
+	    splice(@alts, $stari, 0, '*');
+	}
+	elsif ($nonrefi > $stari) {
+	    splice(@alts, $stari, 0, '*');
+	    splice(@alts, $nonrefi, 0, '<NON_REF>');
+	}
+	else {
+	    # nonref needs to be spliced back in first, then *
+	    splice(@alts, $nonrefi, 0, '<NON_REF>');
+	    splice(@alts, $stari, 0, '*');
+	}
+    }
+    elsif ($nonrefi != -1) {
+	splice(@alts, $nonrefi, 0, '<NON_REF>');
+    }
+
+    $lineR->[3] = $ref;
+    $lineR->[4] = join(',',@alts);
 }
 
 
