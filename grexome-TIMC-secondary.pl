@@ -108,6 +108,9 @@ GetOptions ("samples=s" => \$samples,
 ($inFile =~ /\.gz$/) || die "E $0: the supplied infile doesn't seem bgzipped\n";
 
 # immediately import $config, so we die if file is broken
+# if $config doesn't have a path component, prepend ./ to avoid loading the dist version
+# (in case the dist was copied into current dir and customized but not renamed)
+($config =~ m~/~) || ($config = "./$config");
 (-f $config) ||  die "E $0: the supplied config.pm doesn't exist: $config\n";
 require($config);
 grexomeTIMCsec_config->import(qw(refGenome vepCacheFile vepPluginDataPath fastTmpPath), 
