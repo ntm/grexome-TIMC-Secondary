@@ -46,7 +46,7 @@ Every subroutine in grexomeTIMCsec_config.pm is self-documented and will need to
 
 DEPENDENCIES:
 *************
-We try to keep external dependencies to a minimum. The only required perl modules are listed below. Most are standard core modules and should already be available on your system, a few will probably need to be installed from your distribution's standard repositories (e.g. "sudo yum install perl-Parallel-ForkManager" on RHEL7).
+We try to keep external dependencies to a minimum. The only required perl modules are listed below. Most are standard core modules and should already be available on your system, a few will probably need to be installed from your distribution's standard repositories (e.g. "sudo yum install perl-Parallel-ForkManager perl-Spreadsheet-XLSX" on RHEL7).
 Standard core modules: Exporter, File::Basename, File::Copy, File::Temp, FindBin, Getopt::Long, POSIX, Storable.
 Other modules: Parallel::ForkManager, Spreadsheet::XLSX.
 
