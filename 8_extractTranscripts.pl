@@ -130,7 +130,7 @@ if ($pathologies) {
 # else $compatibleR stays undef
 
 my $now = strftime("%F %T", localtime);
-warn "I $0: $now - starting to run\n";
+warn "I $now: $0 - starting to run\n";
 
 
 #########################################################
@@ -205,7 +205,7 @@ while (my $inFile = readdir(INDIR)) {
     }
 
     $now = strftime("%F %T", localtime);
-    warn "I $0: $now - starting on $cohort\n";
+    warn "I $now: $0 - starting on $cohort\n";
 
     open(INFILE, "$inDir/$inFile") ||
 	die "E $0: cannot open infile $inDir/$inFile\n";
@@ -428,7 +428,7 @@ while (my $inFile = readdir(INDIR)) {
 	}
     }
     $now = strftime("%F %T", localtime);
-    warn "I $0: $now - Finished parsing $cohort infile\n";
+    warn "I $now: $0 - Finished parsing $cohort infile\n";
     close(INFILE);
 }
 closedir(INDIR);
@@ -621,4 +621,4 @@ foreach my $transcript (@transcripts) {
 }
 
 $now = strftime("%F %T", localtime);
-warn "I $0: $now - ALL DONE, completed successfully!\n";
+warn "I $now: $0 - ALL DONE, completed successfully!\n";

@@ -40,7 +40,7 @@ opendir(INDIR, $inDir) ||
 mkdir($outDir) || die "E $0: cannot mkdir outDir $outDir\n";
 
 my $now = strftime("%F %T", localtime);
-warn "I $0: $now - starting to run\n";
+warn "I $now: $0 - starting to run\n";
 
 
 #########################################################
@@ -99,5 +99,5 @@ while (my $inFile = readdir(INDIR)) {
 closedir(INDIR);
 
 $now = strftime("%F %T", localtime);
-warn "I $0: $now - ALL DONE, completed successfully!\n";
+warn "I $now: $0 - ALL DONE, completed successfully!\n";
 

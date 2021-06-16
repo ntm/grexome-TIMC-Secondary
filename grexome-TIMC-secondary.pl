@@ -171,7 +171,7 @@ my $numSamples = scalar(split(/\s+/, `zgrep --max-count=1 '#CHROM' $inFile`)) - 
 #############################################
 
 my $now = strftime("%F %T", localtime);
-warn "I $0: $now - starting to run\n";
+warn "I $now: $0 - starting to run\n";
 
 # all intermediate results / tmp working files are created in $tmpdir,
 # a randomly-named subdir of &fastTmpPath() to avoid clashes
@@ -336,4 +336,4 @@ else {
 ($debug) || rmdir($tmpdir) || die "E $0: all done but can't rmdir(tmpdir), why?\n";
 
 $now = strftime("%F %T", localtime);
-warn "I $0: $now - ALL DONE, completed successfully!\n";
+warn "I $now: $0 - ALL DONE, completed successfully!\n";

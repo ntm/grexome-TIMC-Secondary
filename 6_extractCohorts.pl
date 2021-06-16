@@ -147,7 +147,7 @@ else {
 }
 
 my $now = strftime("%F %T", localtime);
-warn "I $0: $now - starting to run\n";
+warn "I $now: $0 - starting to run\n";
 
 
 #########################################################
@@ -415,8 +415,8 @@ foreach my $gene (keys(%knownCandidatesSeen)) {
 
 $now = strftime("%F %T", localtime);
 rmdir($tmpDir) || 
-    die "E $0: $now - all done but cannot rmdir tmpDir $tmpDir, why? $!\n";
-warn "I $0: $now - ALL DONE, completed successfully!\n";
+    die "E $now: $0 - all done but cannot rmdir tmpDir $tmpDir, why? $!\n";
+warn "I $now: $0 - ALL DONE, completed successfully!\n";
 
 
 
@@ -667,7 +667,7 @@ sub eatTmpFiles {
 
 	    my $now = strftime("%F %T", localtime);
 	    # progress log: one INFO message every 10 batches
-	    ($nextBatch % 10) || warn("I $0: $now - done processing batch $nextBatch\n");
+	    ($nextBatch % 10) || warn("I $now: $0 - done processing batch $nextBatch\n");
 	    $nextBatch++;
 	    next;
 	}

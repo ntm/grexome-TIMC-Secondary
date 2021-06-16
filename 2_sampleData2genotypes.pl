@@ -33,7 +33,7 @@ use POSIX qw(strftime);
 $0 = basename($0);
 
 my $now = strftime("%F %T", localtime);
-warn "I $0: $now - starting to run\n";
+warn "I $now: $0 - starting to run\n";
 
 
 # parse header, just copy it except for FORMAT descriptions,
@@ -187,7 +187,7 @@ while(my $line = <STDIN>) {
 }
 
 $now = strftime("%F %T", localtime);
-warn "I $0: $now - ALL DONE, completed successfully!\n";
+warn "I $now: $0 - ALL DONE, completed successfully!\n";
 
 
 #######################################

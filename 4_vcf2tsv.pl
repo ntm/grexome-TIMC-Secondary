@@ -31,7 +31,7 @@ use POSIX qw(strftime);
 $0 = basename($0);
 
 my $now = strftime("%F %T", localtime);
-warn "I $0: $now - starting to run\n";
+warn "I $now: $0 - starting to run\n";
 
 # stuff we grab from INFO:
 # CSQ==VEP, but we only want some VEP fields
@@ -247,4 +247,4 @@ while (my $line =<STDIN>) {
 }
 
 $now = strftime("%F %T", localtime);
-warn "I $0: $now - ALL DONE, completed successfully!\n";
+warn "I $now: $0 - ALL DONE, completed successfully!\n";

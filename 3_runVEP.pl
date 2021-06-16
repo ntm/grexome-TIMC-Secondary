@@ -107,7 +107,7 @@ else {
 mkdir($tmpDir) || die "E $0: cannot create tmpDir $tmpDir\n";
 
 my $now = strftime("%F %T", localtime);
-warn "I $0: $now - starting to run\n";
+warn "I $now: $0 - starting to run\n";
 
 #########################################################################
 # construct the full VEP command-line
@@ -281,7 +281,7 @@ close(VCFCACHE);
 
 
 $now = strftime("%F %T", localtime);
-warn "I $0: $now - finished parsing stdin and splitting it into $tmpDir files\n";
+warn "I $now: $0 - finished parsing stdin and splitting it into $tmpDir files\n";
 
 
 ##########################################################################
@@ -291,7 +291,7 @@ my $vcfFromVep = "$tmpDir/vcfFromVep.vcf.gz";
 system("gunzip -c $vcf4vep | $vepCommand | gzip -c --fast > $vcfFromVep") ;
 
 $now = strftime("%F %T", localtime);
-warn "I $0: $now - finished running VEP on the new variants\n";
+warn "I $now: $0 - finished running VEP on the new variants\n";
 
 ##########################################################################
 # merge $vcfFromVep and $vcfFromCache, printing resulting VCF to stdout;
@@ -428,4 +428,4 @@ rmdir($tmpDir) || die "E $0: cannot rmdir tmpdir $tmpDir\n";
 
 
 $now = strftime("%F %T", localtime);
-warn "I $0: $now - ALL DONE, completed successfully!\n";
+warn "I $now: $0 - ALL DONE, completed successfully!\n";

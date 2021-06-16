@@ -78,7 +78,7 @@ mkdir($outDir) ||
     die "E $0: cannot mkdir outDir $outDir\n";
 
 my $now = strftime("%F %T", localtime);
-warn "I $0: $now - starting to run\n";
+warn "I $now: $0 - starting to run\n";
 
 
 #############################################
@@ -123,11 +123,11 @@ while (my $inFile = readdir(INDIR)) {
     
     $com .= " | perl $reorderBin ";
     $com .= " > $outDir/$outFile";
-    my $now = strftime("%F %T", localtime);
-    warn "I $0: $now - starting $com\n";
+    # my $now = strftime("%F %T", localtime);
+    # warn "I $now: $0 - starting $com\n";
     system($com);
-    $now = strftime("%F %T", localtime);
-    warn "I $0: $now - Finished $com\n";
+    # $now = strftime("%F %T", localtime);
+    # warn "I $now: $0 - Finished $com\n";
     $pm->finish;
 }
 closedir(INDIR);
@@ -135,4 +135,4 @@ closedir(INDIR);
 $pm->wait_all_children;
 
 $now = strftime("%F %T", localtime);
-warn "I $0: $now - ALL DONE, completed successfully!\n";
+warn "I $now: $0 - ALL DONE, completed successfully!\n";
