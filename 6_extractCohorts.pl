@@ -321,8 +321,9 @@ my $timestampAdaptive = time();
 
 while (!$lastBatch) {
     $batchNum++;
-    if (($batchSizeAdaptive) && ($batchNum % ($jobs-1) == 0)) {
+    if (($batchSizeAdaptive) && ($batchNum % ($jobs-1) == 0) && ($batchNum >= $jobs)) {
 	# jobs-1 because we want #workerThreads, excluding the eatTmpFiles job
+	# $batchNum >= $jobs so we don't adjust on first batch of workers
 	my $newTime = time();
 	my $elapsed = $newTime - $timestampAdaptive;
 	if ($elapsed < $batchTimeLow) {
