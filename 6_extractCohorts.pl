@@ -61,23 +61,32 @@ $0 = basename($0);
 #############################################
 ## hard-coded stuff that shouldn't change much
 
-# max number of lines to read in a single batch. Each batch is then
-# processed by a worker thread. This is a performance tuning param,
-# leaving to default should be fine
-my $batchSize = 20000;
+# adaptive strategy parameters for $batchSize: without --batchSize, $batchSize will
+# be adjusted in order to process ($jobs-1) batches in [$batchTimeLow,$batchTimeHigh] seconds
+my $batchSizeAdaptive = 1;
+# aim for between 2m and 10m for ($jobs-1) batches
+my ($batchTimeLow, $batchTimeHigh) = (120,600);
 
 
 #############################################
 ## options / params from the command-line
-
-# number of jobs
-my $numJobs = 16;
 
 # samples, pathologies and candidateGenes XLSX files, empty defaults
 my ($samplesFile, $pathologies, $candidatesFiles) = ("","","");
 
 # outDir and tmpDir, also no defaults
 my ($outDir, $tmpDir);
+
+# number of jobs
+my $jobs = 16;
+
+# max number of lines to read in a single batch. Each batch is then
+# processed by a worker thread. This is a performance tuning param,
+# higher values shold be faster but increase RAM requirements.
+# We have used values between 10k and 100k.
+# Providing it with --batchSize hard-sets $batchSize, could be useful if you lack RAM.
+# Without --batchSize we start with a low value and use an adaptive strategy
+my $batchSize;
 
 # help: if true just print $USAGE and exit
 my $help = '';
@@ -90,7 +99,10 @@ Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --candidateGenes string [optional] : comma-separated list of xlsx files holding known candidate genes, with paths
 --outdir string : subdir where resulting cohort files will be created, must not pre-exist
 --tmpdir string : subdir where tmp files will be created (on a RAMDISK if possible), must not pre-exist and will be removed after execution
---jobs [$numJobs] : number of parallel jobs=threads to run
+--jobs [$jobs] : number of parallel jobs=threads to run
+--batchSize [adaptive] : size of each batch, lower decreases RAM requirements and performance,
+ 	    defaults to an optimized adaptive strategy, you shouldn\'t need to specify this except
+	    if you are running out of RAM (suggested reasonable values: between 10000 and 100000)
 --help : print this USAGE";
 
 GetOptions ("samples=s" => \$samplesFile,
@@ -98,7 +110,8 @@ GetOptions ("samples=s" => \$samplesFile,
 	    "candidateGenes=s" => \$candidatesFiles,
 	    "outdir=s" => \$outDir,
 	    "tmpdir=s" => \$tmpDir,
-	    "jobs=i" => \$numJobs,
+	    "jobs=i" => \$jobs,
+	    "batchSize=i" => \$batchSize,
 	    "help" => \$help)
     or die("E $0: Error in command line arguments\n$USAGE\n");
 
@@ -117,6 +130,21 @@ mkdir($outDir) || die "E $0: cannot mkdir outDir $outDir\n";
 (-e $tmpDir) && 
     die "E $0: found argument $tmpDir but it already exists, remove it or choose another name.\n";
 mkdir($tmpDir) || die "E $0: cannot mkdir tmpDir $tmpDir\n";
+
+if ($jobs <= 2) {
+    #  need one thread for eatTmpFiles and at least one worker thread
+    warn "W $0: you set jobs=$jobs but we need at least 2 jobs, setting jobs=2 and proceeding\n";
+    $jobs = 2;
+}
+
+if ($batchSize) {
+    # disable adaptive strategy
+    $batchSizeAdaptive = 0;
+}
+else {
+    # default inital value
+    $batchSize = 20000;
+}
 
 my $now = strftime("%F %T", localtime);
 warn "I $0: $now - starting to run\n";
@@ -268,7 +296,7 @@ foreach my $cohorti (0..$#cohorts) {
 # Parse data lines in batches of $batchSize lines, in parallel
 
 # create fork manager
-my $pm = new Parallel::ForkManager($numJobs);
+my $pm = new Parallel::ForkManager($jobs);
 
 # need a tmp file for listing the known candidates
 my $tmpFileCandidatesSeen = "$tmpDir/allCandidates.seen";
@@ -288,9 +316,30 @@ if (! $pm->start) {
 my $lastBatch = 0;
 # number of the current batch
 my $batchNum = 0;
+# timestamp for batchSizeAdaptive strategy
+my $timestampAdaptive = time();
 
 while (!$lastBatch) {
     $batchNum++;
+    if (($batchSizeAdaptive) && ($batchNum % ($jobs-1) == 0)) {
+	# jobs-1 because we want #workerThreads, excluding the eatTmpFiles job
+	my $newTime = time();
+	my $elapsed = $newTime - $timestampAdaptive;
+	if ($elapsed < $batchTimeLow) {
+	    # increase batchSize by factor (1.2 * $btLow / $elapsed)
+	    $batchSize = int(1.2 * $batchSize * $batchTimeLow / $elapsed);
+	    $now = strftime("%F %T", localtime);
+	    warn "I $now: $0 - adjusting batchSize up to $batchSize\n";
+	}
+	elsif ($elapsed > $batchTimeHigh) {
+	    # decrease batchSize by factor $btHigh / (1.2 * $elapsed) 
+	    $batchSize = int($batchSize * $batchTimeHigh / $elapsed / 1.2);
+	    $now = strftime("%F %T", localtime);
+	    warn "I $now: $0 - adjusting batchSize down to $batchSize\n";
+	}
+	$timestampAdaptive = $newTime;
+    }
+
     my @lines = ();
     foreach my $i (1..$batchSize) {
 	if (my $line = <STDIN>) {
