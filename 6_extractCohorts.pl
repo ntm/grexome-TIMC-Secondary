@@ -451,6 +451,16 @@ sub processBatch {
 	# $symbol doesn't depend on cohorts
 	my $symbol = $fields[$symbolCol];
 
+	# we can immediately mark $symbol as seen if it's a candidate gene for any cohort
+	if (! $candidatesSeen{$symbol}) {
+	    foreach my $cohort (@$cohortsR) {
+		if (($knownCandidateGenesR->{$cohort}) && (defined $knownCandidateGenesR->{$cohort}->{$symbol})) {
+		    $candidatesSeen{$symbol} = 1;
+		    last;
+		}
+	    }
+	}
+	
 	# array of references (to sampleList arrays), one per cohort, same order
 	# as in $cohortsR:
 	# each element of @cohort2samplelists is a ref to a sampleLists array, ie
@@ -583,7 +593,6 @@ sub processBatch {
 		    $toPrint .= "\t\' $fields[$i]\t";
 		    if (($knownCandidateGenesR->{$cohort}) && (my $score = $knownCandidateGenesR->{$cohort}->{$fields[$i]})) {
 			$toPrint .= $score;
-			$candidatesSeen{$fields[$i]} = 1;
 		    }
 		    else {
 			# if not a known candidate use zero
