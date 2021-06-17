@@ -148,6 +148,9 @@ if ($candidateGenes) {
     $candidateGenes = join(',', @candNew);
 }
 
+my $now = strftime("%F %T", localtime);
+warn "I $now: $0 - starting to run\n";
+
 # sanity-check all provided metadata files: just parse and ignore the results,
 # we'll die if anything is wrong
 if ($pathologies) {
@@ -169,9 +172,6 @@ my $numSamples = scalar(split(/\s+/, `zgrep --max-count=1 '#CHROM' $inFile`)) - 
 
 
 #############################################
-
-my $now = strftime("%F %T", localtime);
-warn "I $now: $0 - starting to run\n";
 
 # all intermediate results / tmp working files are created in $tmpdir,
 # a randomly-named subdir of &fastTmpPath() to avoid clashes
