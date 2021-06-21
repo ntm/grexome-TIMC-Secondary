@@ -330,13 +330,13 @@ while (!$lastBatch) {
 	    # increase batchSize by factor (1.2 * $btLow / $elapsed)
 	    $batchSize = int(1.2 * $batchSize * $batchTimeLow / $elapsed);
 	    $now = strftime("%F %T", localtime);
-	    warn "I $now: $0 - adjusting batchSize up to $batchSize\n";
+	    warn "I $now: $0 - batchNum=$batchNum, adjusting batchSize up to $batchSize\n";
 	}
 	elsif ($elapsed > $batchTimeHigh) {
 	    # decrease batchSize by factor $btHigh / (1.2 * $elapsed) 
 	    $batchSize = int($batchSize * $batchTimeHigh / $elapsed / 1.2);
 	    $now = strftime("%F %T", localtime);
-	    warn "I $now: $0 - adjusting batchSize down to $batchSize\n";
+	    warn "I $now: $0 - batchNum=$batchNum, adjusting batchSize down to $batchSize\n";
 	}
 	$timestampAdaptive = $newTime;
     }
