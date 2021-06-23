@@ -17,9 +17,9 @@
 # For optimal performance $tmpDir should be on a RAMDISK (eg tmpfs).
 #
 # A new KNOWN_CANDIDATE_GENE column is inserted right after SYMBOL:
-# it holds the "confidence score" parsed from a $candidatesFile
-# if SYMBOL is a known candidate or causal gene for this cohort, 0 otherwise.
-# Any $causalGene from $samplesFile is considered a score=5 candidate gene.
+# it holds a comma-separated list of "$pathologyID:$score" strings, listing
+# each pathologyID for which SYMBOL is a known candidate or causal gene with
+# confidence score $score, as produced by &parsePathologies().
 #
 # The HV/HET/OTHER/HR columns are removed and used to produce the following
 # columns in each $cohort outfile, in this order and starting where HV was:
@@ -153,15 +153,38 @@ warn "I $now: $0 - starting to run\n";
 #########################################################
 # parse all provided metadata files
 
-# $knownCandidateGenesR: hashref, key==$cohort, value is a hashref whose keys 
-# are gene names and values are the "Confidence score" from a $candidatesFile,
-# or 5 if the gene is "Causal" for a $cohort patient in $samplesFile.
-my $knownCandidateGenesR;
-if ($pathologies) {
-    $knownCandidateGenesR = &parseCandidateGenes($candidatesFiles, $samplesFile, $pathologies);
-}
-else {
-    $knownCandidateGenesR = &parseCandidateGenes($candidatesFiles, $samplesFile);
+# %knownCandidateGenes: key==$gene, value is a comma-separated list
+# of "$patho:$score" pairs
+my %knownCandidateGenes;
+
+# %knownCandidatesSeen for sanity-checking known candidate and causal genes:
+# any gene name that is never seen will be reported to stderr (probably a
+# typo needs fixing).
+my %knownCandidatesSeen;
+
+{
+    # $parseCandidateGenes actually returns a hashref, key==$cohort, value is
+    # a hashref whose keys are gene names and values are the "Confidence scores"
+    my $knownCandsR;
+    if ($pathologies) {
+	$knownCandsR = &parseCandidateGenes($candidatesFiles, $samplesFile, $pathologies);
+    }
+    else {
+	$knownCandsR = &parseCandidateGenes($candidatesFiles, $samplesFile);
+    }
+
+    foreach my $c (keys(%$knownCandsR)) {
+	foreach my $gene (keys(%{$knownCandsR->{$c}})) {
+	    my $score = $knownCandsR->{$c}->{$gene};
+	    if ($knownCandidateGenes{$gene}) {
+		$knownCandidateGenes{$gene} .= ",$c:$score";
+	    }
+	    else {
+		$knownCandidateGenes{$gene} = "$c:$score";
+	    }
+	    $knownCandidatesSeen{$gene} = 0;
+	}
+    }
 }
 
 
@@ -201,17 +224,6 @@ my @cohorts;
 	$seen{$c} = 1;
     }
     @cohorts = sort(keys(%seen));
-}
-
-
-# %knownCandidatesSeen for sanity-checking known candidate and causal genes:
-# any gene name that is never seen will be reported to stderr (probably a
-# typo needs fixing).
-my %knownCandidatesSeen;
-foreach my $c (keys(%$knownCandidateGenesR)) {
-    foreach my $gene (keys(%{$knownCandidateGenesR->{$c}})) {
-	$knownCandidatesSeen{$gene} = 0;
-    }
 }
 
 #########################################################
@@ -371,7 +383,7 @@ while (!$lastBatch) {
     open(my $tmpSeenFH, "> $tmpSeenFile") || die "E $0: cannot open $tmpSeenFile for writing\n";
 
     # process this batch
-    &processBatch(\@lines,$knownCandidateGenesR,$sample2cohortR,\@cohorts,
+    &processBatch(\@lines,\%knownCandidateGenes,$sample2cohortR,\@cohorts,
 		  $sample2causalR,$compatibleR,$symbolCol,\%genoCols,\@tmpOutFHs,$tmpSeenFH);
 
     # done, close tmp FHs and create flag-file
@@ -452,15 +464,8 @@ sub processBatch {
 	my $symbol = $fields[$symbolCol];
 
 	# we can immediately mark $symbol as seen if it's a candidate gene for any cohort
-	if (! $candidatesSeen{$symbol}) {
-	    foreach my $cohort (@$cohortsR) {
-		if (($knownCandidateGenesR->{$cohort}) && (defined $knownCandidateGenesR->{$cohort}->{$symbol})) {
-		    $candidatesSeen{$symbol} = 1;
-		    last;
-		}
-	    }
-	}
-	
+	($knownCandidateGenesR->{$symbol}) && ($candidatesSeen{$symbol} = 1);
+    	
 	# array of references (to sampleList arrays), one per cohort, same order
 	# as in $cohortsR:
 	# each element of @cohort2samplelists is a ref to a sampleLists array, ie
@@ -591,13 +596,13 @@ sub processBatch {
 		if ($i == $symbolCol) {
 		    # prepend apostrophe-space to gene names to avoid excel corrupting everything
 		    $toPrint .= "\t\' $fields[$i]\t";
-		    if (($knownCandidateGenesR->{$cohort}) && (my $score = $knownCandidateGenesR->{$cohort}->{$fields[$i]})) {
-			$toPrint .= $score;
+
+		    # KNOWN_CAND column:
+		    if ($knownCandidateGenesR->{$fields[$i]}) {
+			$toPrint .= $knownCandidateGenesR->{$fields[$i]};
 		    }
-		    else {
-			# if not a known candidate use zero
-			$toPrint .= "0";
-		    }
+		    # else: not a known candidate for any patho, leave empty
+		    
 		    # print all cohort-specific COUNTs
 		    $toPrint .= "\t".join("\t",@{$cohort2SLcounts[$cohorti]});
 		    # also print OTHERGENO and HR counts
