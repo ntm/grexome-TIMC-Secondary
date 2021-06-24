@@ -404,7 +404,7 @@ foreach my $k (keys(%$cacheUpdate)) {
 	# annotation for key $k has been added to $cacheFile while we were running,
 	# make sure it's consistent
 	($cache->{$k} eq $cacheUpdate->{$k}) ||
-	    die "E $0: cacheFile entry for $k was added while we were running, and disagrees with our entry:\n".
+	    warn "W $0: cacheFile entry for $k was added while we were running and disagrees with our entry, we keep the cached version:\n".
 	    $cache->{$k}."\n".$cacheUpdate->{$k}."\n";
     }
     else {
