@@ -410,6 +410,11 @@ sub parseCandidateGenes {
 	    my $gene = $worksheet->get_cell($row, $geneCol);
 	    my $score = $worksheet->get_cell($row, $scoreCol);
 
+	    # blank lines are allowed, silently skip them
+	    if ((! $patho) && (! $gene) && (! $score)) {
+		next;
+	    }
+	    
 	    ################ pathology
 	    if (! $patho) {
 		warn "E in $subName, parsing $candidatesFile row $row: every row MUST have a pathologyID";
