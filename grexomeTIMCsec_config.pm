@@ -145,9 +145,9 @@ sub gtexFavoriteTissues {
 # key==path+file defining a subCohort (filename must start with subCohort_ and end with .txt),
 # value==pathology (must match the pathologyID column of the pathologies metadata xlsx).
 sub subCohorts {
-    my %subCohorts = ("/home/nthierry/VariantCalling/GrexomeFauve/Grexome_Metadata/4-SubCohorts/subCohort_FV.txt" => "Azoo",
-		      "/home/nthierry/VariantCalling/GrexomeFauve/Grexome_Metadata/4-SubCohorts/subCohort_London.txt" => "Azoo",
-		      "/home/nthierry/VariantCalling/GrexomeFauve/Grexome_Metadata/4-SubCohorts/subCohort_AzooZouari.txt" => "Azoo");
+    my %subCohorts = ("/home/nthierry/VariantCalling/GrexomeFauve/Grexome_Metadata/4-SubCohorts/subCohort_FV.txt" => "NOA",
+		      "/home/nthierry/VariantCalling/GrexomeFauve/Grexome_Metadata/4-SubCohorts/subCohort_London.txt" => "NOA",
+		      "/home/nthierry/VariantCalling/GrexomeFauve/Grexome_Metadata/4-SubCohorts/subCohort_AzooZouari.txt" => "NOA");
     return(\%subCohorts);
 }
 
