@@ -243,7 +243,8 @@ else {
 # STEP 7: filter variants and reorder columns, clean up unfiltered CohortFiles
 # set min_hr to 20% of $numSamples
 my $min_hr = int($numSamples * 0.2);
-$com = "perl $RealBin/7_filterAndReorderAll.pl --indir $tmpdir/Cohorts/ --outdir $tmpdir/Cohorts_Filtered/ --pick --min_hr=$min_hr ";
+#$com = "perl $RealBin/7_filterAndReorderAll.pl --indir $tmpdir/Cohorts/ --outdir $tmpdir/Cohorts_Filtered/ --pick --min_hr=$min_hr ";
+$com = "perl $RealBin/7_filterAndReorderAll.pl --indir $tmpdir/Cohorts/ --outdir $tmpdir/Cohorts_Filtered/ --min_hr=$min_hr ";
 if ($debug) {
     $com .= "2> $outDir/step7.err";
 }
