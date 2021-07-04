@@ -44,7 +44,7 @@ warn "I $now: $0 - starting to run\n";
 while (my $inFile = readdir(INDIR)) {
     ($inFile =~ /^\./) && next;
     my $cohort;
-    if ($inFile =~ (/^(\w+)\.filtered\.\S+\.csv$/)) {
+    if (($inFile =~ (/^(\w+)\.filtered\.\S+\.csv$/)) || ($inFile =~ (/^(\w+)\.filtered\.csv$/))) {
 	$cohort = $1;
     }
     else {

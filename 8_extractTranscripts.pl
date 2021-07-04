@@ -196,7 +196,7 @@ my %cohort2header;
 while (my $inFile = readdir(INDIR)) {
     ($inFile =~ /^\./) && next;
     my $cohort;
-    if ($inFile =~ (/^(\w+)\.filtered\.pick\.csv$/)) {
+    if (($inFile =~ (/^(\w+)\.filtered\.pick\.csv$/)) || ($inFile =~ (/^(\w+)\.filtered\.csv$/)))   {
 	$cohort = $1;
     }
     else {
