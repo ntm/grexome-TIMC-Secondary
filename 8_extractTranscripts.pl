@@ -11,8 +11,8 @@
 # - $pathologies (optional) is the pathologies metadata file.
 #
 # We expect that cohort files were filtered to consider only rare variants 
-# (max_af_*) in picked transcripts, that aren't seen in too many CTRLs 
-# (max_ctrl_*) and that are well genotyped in our dataset (min_hr).
+# (max_af_*) that aren't seen in too many CTRLs (max_ctrl_*) and that are
+# well genotyped in our dataset (min_hr).
 #
 # We then produce one TSV for each cohort.
 # In each TSV we print one line for each transcript (=="Feature"), with:
@@ -67,7 +67,7 @@ $0 = basename($0);
 ## hard-coded stuff that shouldn't change much
 
 # columns we want to keep, in this order:
-my @keptColumns = qw(SYMBOL KNOWN_CANDIDATE_GENE Feature Gene RefSeq BIOTYPE);
+my @keptColumns = qw(SYMBOL KNOWN_CANDIDATE_GENE Feature PICK CANONICAL Gene RefSeq BIOTYPE);
 # in addition we insert the new COUNTSAMPLES* columns right after the last @keptColumns
 # and immediately followed by the HV_HIGH et al colums, and we then copy all 
 # the GTEX_* columns (in the same order as in infile)
@@ -577,7 +577,7 @@ foreach my $transcript (@transcripts) {
 	}
     }
 
-    # now finish building %toPrint, adding the lists of samples and GTEX data
+    # now finish building $toPrint, adding the lists of samples and GTEX data
     foreach my $cohort (keys(%toPrint)) {
 	my $toPrint = $toPrint{$cohort};
 	# the 6 cohort samplelists
