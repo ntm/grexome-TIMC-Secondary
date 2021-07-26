@@ -34,7 +34,7 @@ sub parsePathologies {
     (@_ == 1) || die "E: $subName needs one arg";
     my ($pathosFile) = @_;
 
-    (-f $pathosFile) || die "E in $subName: provided file $pathosFile doesn't exist";
+    (-f $pathosFile) || die "E in $subName: provided file $pathosFile doesn't exist\n";
 
     # ref to %compatible will be returned, as defined above
     my %compatible = ();
@@ -45,7 +45,7 @@ sub parsePathologies {
     
     my $workbook = Spreadsheet::XLSX->new("$pathosFile");
     (defined $workbook) ||
-	die "E in $subName: no workbook";
+	die "E in $subName: no workbook\n";
     ($workbook->worksheet_count() == 1) ||
 	die "E in $subName: expecting a single worksheet, got ".$workbook->worksheet_count()."\n";
     my $worksheet = $workbook->worksheet(0);
@@ -62,9 +62,9 @@ sub parsePathologies {
 	elsif ($val eq "compatibility groups") { $compatCol = $col; }
     }
     ($pathoCol >= 0) ||
-	die "E in $subName: missing required column title: 'pathologyID'";
+	die "E in $subName: missing required column title: 'pathologyID'\n";
     ($compatCol >= 0) ||
-	die "E in $subName: missing required column title: 'compatibility groups'";
+	die "E in $subName: missing required column title: 'compatibility groups'\n";
 
     # when parsing data rows, log any errors and only die at the end
     my $errorsFound = 0;
@@ -76,12 +76,12 @@ sub parsePathologies {
 	$patho = $patho->unformatted();
 	# require alphanumeric strings
 	if ($patho !~ /^\w+$/) {
-	    warn "E in $subName: pathologyIDs must be alphanumeric strings, found \"$patho\" in row $row";
+	    warn "E in $subName: pathologyIDs must be alphanumeric strings, found \"$patho\" in row ",$row+1,"\n";
 	    $errorsFound++;
 	    next;
 	}
 	if (defined $compatible{$patho}) {
-	    warn "E in $subName: there are 2 lines with same pathologyID $patho";
+	    warn "E in $subName: there are 2 lines with same pathologyID $patho\n";
 	    $errorsFound++;
 	    next;
 	}
@@ -96,7 +96,7 @@ sub parsePathologies {
 	my $cgErrors = 0;
 	foreach my $cg (@CGs) {
 	    if ($cg !~ /^\w+$/) {
-		warn "E in $subName: compat group identifiers must be alphanumeric strings, found $cg for $patho";
+		warn "E in $subName: compat group identifiers must be alphanumeric strings, found $cg for $patho\n";
 		$cgErrors++;
 		next;
 	    }
@@ -150,9 +150,9 @@ sub parseSamples {
     my ($samplesFile, $pathosFile) = @_;
 
     (-f $samplesFile) ||
-	die "E in $subName: provided samples file $samplesFile doesn't exist";
+	die "E in $subName: provided samples file $samplesFile doesn't exist\n";
     (! $pathosFile) || (-f $pathosFile) ||
-	die "E in $subName: optional pathologies file $pathosFile was provided but doesn't exist";
+	die "E in $subName: optional pathologies file $pathosFile was provided but doesn't exist\n";
 
     # sample2patho: key is sampleID, value is pathologyID
     my %sample2patho;
@@ -174,7 +174,7 @@ sub parseSamples {
     # parse headers
     my $workbook = Spreadsheet::XLSX->new("$samplesFile");
     (defined $workbook) ||
-	die "E in $subName: no workbook";
+	die "E in $subName: no workbook\n";
     ($workbook->worksheet_count() == 1) ||
 	die "E in $subName: expecting a single worksheet, got ".$workbook->worksheet_count()."\n";
     my $worksheet = $workbook->worksheet(0);
@@ -194,15 +194,15 @@ sub parseSamples {
 	elsif ($val eq "Causal gene") { $causalCol = $col; }
     }
     ($sampleCol >= 0) ||
-	die "E in $subName: missing required column title: 'sampleID'";
+	die "E in $subName: missing required column title: 'sampleID'\n";
     ($pathoCol >= 0) ||
-	die "E in $subName: missing required column title: 'pathologyID'";
+	die "E in $subName: missing required column title: 'pathologyID'\n";
     ($specimenCol >= 0) ||
-	die "E in $subName: missing required column title: 'specimenID'";
+	die "E in $subName: missing required column title: 'specimenID'\n";
     ($patientCol >= 0) ||
-	die "E in $subName: missing required column title: 'patientID'";
+	die "E in $subName: missing required column title: 'patientID'\n";
     ($causalCol >= 0) ||
-	die "E in $subName: missing required column title: 'Causal gene'";
+	die "E in $subName: missing required column title: 'Causal gene'\n";
 
     ################
     # parse data rows
@@ -213,7 +213,7 @@ sub parseSamples {
     foreach my $row ($rowMin+1..$rowMax) {
 	my $sample = $worksheet->get_cell($row, $sampleCol);
 	if (! $sample) {
-	    warn "E in $subName, row $row: every row MUST have a sampleID (use 0 for obsolete samples)";
+	    warn "E in $subName, row ",$row+1,": every row MUST have a sampleID (use 0 for obsolete samples)\n";
 	    $errorsFound++;
 	    next;
 	}
@@ -221,7 +221,7 @@ sub parseSamples {
 	# skip "0" lines == obsolete samples
 	($sample eq "0") && next;
 	if (defined $sample2patho{$sample}) {
-	    warn "E in $subName: found 2 lines with same sampleID $sample";
+	    warn "E in $subName: found 2 lines with same sampleID $sample\n";
 	    $errorsFound++;
 	    next;
 	}
@@ -229,14 +229,14 @@ sub parseSamples {
 	################ sample2patho
 	my $patho = $worksheet->get_cell($row, $pathoCol);
 	if (! $patho) {
-	    warn "E in $subName, row $row: every row MUST have a pathologyID";
+	    warn "E in $subName, row ",$row+1,": every row MUST have a pathologyID\n";
 	    $errorsFound++;
 	    next;
 	}
 	$patho = $patho->unformatted();
 	if ($pathosFile) {
 	    if (! defined $pathologiesR->{$patho}) {
-		warn "E in $subName, row $row: pathologyID $patho is not defined in the provided $pathosFile";
+		warn "E in $subName, row ",$row+1,": pathologyID $patho is not defined in the provided $pathosFile\n";
 		$errorsFound++;
 		next;
 	    }
@@ -244,7 +244,7 @@ sub parseSamples {
 	else {
 	    # require alphanumeric strings
 	    if ($patho !~ /^\w+$/) {
-		warn "E in $subName, row $row: pathologyIDs must be alphanumeric strings, found \"$patho\"";
+		warn "E in $subName, row ",$row+1,": pathologyIDs must be alphanumeric strings, found \"$patho\"\n";
 		$errorsFound++;
 		next;
 	    }
@@ -254,14 +254,14 @@ sub parseSamples {
 	################ sample2specimen
 	my $specimen = $worksheet->get_cell($row, $specimenCol);
 	if (! $specimen) {
-	    warn "E in $subName, row $row: every row MUST have a specimenID";
+	    warn "E in $subName, row ",$row+1,": every row MUST have a specimenID\n";
 	    $errorsFound++;
 	    next;
 	}
 	$specimen = $specimen->unformatted();
 	# require alphanumeric or dashes (really don't want spaces or shell metachars)
 	if ($specimen !~ /^[\w-]+$/) {
-	    warn "E in $subName, row $row: specimenIDs must be alphanumeric (dashes allowed), found \"$specimen\"";
+	    warn "E in $subName, row ",$row+1,": specimenIDs must be alphanumeric (dashes allowed), found \"$specimen\"\n";
 	    $errorsFound++;
 	    next;
 	}
@@ -275,7 +275,7 @@ sub parseSamples {
 	    # require alphanum (or underscores as always) or dashes, this could probably
 	    # be relaxed
 	    if ($patient !~ /^[\w-]+$/) {
-		warn "E in $subName, row $row: patientIDs must be alphanumeric (dashes allowed), found \"$patient\"";
+		warn "E in $subName, row ",$row+1,": patientIDs must be alphanumeric (dashes allowed), found \"$patient\"\n";
 		$errorsFound++;
 		next;
 	    }
@@ -291,7 +291,7 @@ sub parseSamples {
 	    $causal = $causal->unformatted();
 	    # these are HUGO gene names -> must be alphanum+dashes
 	    if ($causal !~ /^[\w-]+$/) {
-		warn "E in $subName, row $row: causalGene must be alphanumeric (dashes allowed), found \"$causal\"";
+		warn "E in $subName, row ",$row+1,": causalGene must be alphanumeric (dashes allowed), found \"$causal\"\n";
  		$errorsFound++;
 		next;
 	    }
@@ -334,12 +334,12 @@ sub parseCandidateGenes {
     my @candidateFiles = split(/,/, $candidatesFiles);
 
     foreach my $cf (@candidateFiles) {
-	(-f $cf) || die "E in $subName: provided candidateGenes file $cf doesn't exist";
+	(-f $cf) || die "E in $subName: provided candidateGenes file $cf doesn't exist\n";
     }
     (-f $samplesFile) ||
-	die "E in $subName: provided samples file $samplesFile doesn't exist";
+	die "E in $subName: provided samples file $samplesFile doesn't exist\n";
     (! $pathosFile) || (-f $pathosFile) ||
-	die "E in $subName: optional pathologies file $pathosFile was provided but doesn't exist";
+	die "E in $subName: optional pathologies file $pathosFile was provided but doesn't exist\n";
 
 
     # %knownCandidateGenes: key==$cohort, value is a hashref whose keys 
@@ -379,7 +379,7 @@ sub parseCandidateGenes {
     foreach my $candidatesFile (@candidateFiles) {
 	my $workbook = Spreadsheet::XLSX->new("$candidatesFile");
 	(defined $workbook) ||
-	    die "E in $subName: no workbook";
+	    die "E in $subName: no workbook\n";
 	($workbook->worksheet_count() == 1) ||
 	    die "E in $subName: expecting a single worksheet, got ".$workbook->worksheet_count()."\n";
 	my $worksheet = $workbook->worksheet(0);
@@ -397,11 +397,11 @@ sub parseCandidateGenes {
 	    elsif ($val eq "Confidence score") { $scoreCol = $col; }
 	}
 	($pathoCol >= 0) ||
-	    die "E in $subName, parsing $candidatesFile: missing required column title: 'pathologyID'";
+	    die "E in $subName, parsing $candidatesFile: missing required column title: 'pathologyID'\n";
 	($geneCol >= 0) ||
-	    die "E in $subName, parsing $candidatesFile: missing required column title: 'Gene'";
+	    die "E in $subName, parsing $candidatesFile: missing required column title: 'Gene'\n";
 	($scoreCol >= 0) ||
-	    die "E in $subName, parsing $candidatesFile: missing required column title: 'Confidence score'";
+	    die "E in $subName, parsing $candidatesFile: missing required column title: 'Confidence score'\n";
 	
 	################
 	# parse data rows
@@ -417,14 +417,14 @@ sub parseCandidateGenes {
 	    
 	    ################ pathology
 	    if (! $patho) {
-		warn "E in $subName, parsing $candidatesFile row $row: every row MUST have a pathologyID";
+		warn "E in $subName, parsing $candidatesFile row ",$row+1,": every row MUST have a pathologyID\n";
 		$errorsFound++;
 		next;
 	    }
 	    $patho = $patho->unformatted();
 	    if ($pathosFile) {
 		if (! defined $pathologiesR->{$patho}) {
-		    warn "E in $subName, parsing $candidatesFile row $row: pathologyID $patho is not defined in the provided $pathosFile";
+		    warn "E in $subName, parsing $candidatesFile row ",$row+1,": pathologyID $patho is not defined in the provided $pathosFile\n";
 		    $errorsFound++;
 		    next;
 		}
@@ -432,7 +432,7 @@ sub parseCandidateGenes {
 	    else {
 		# require alphanumeric strings
 		if ($patho !~ /^\w+$/) {
-		    warn "E in $subName, parsing $candidatesFile row $row: pathologyIDs must be alphanumeric strings, found \"$patho\"";
+		    warn "E in $subName, parsing $candidatesFile row ",$row+1,": pathologyIDs must be alphanumeric strings, found \"$patho\"\n";
 		    $errorsFound++;
 		    next;
 		}
@@ -440,28 +440,28 @@ sub parseCandidateGenes {
 	    
 	    ################ gene
 	    if (! $gene) {
-		warn "E in $subName, parsing $candidatesFile row $row: every row MUST have a Gene";
+		warn "E in $subName, parsing $candidatesFile row ",$row+1,": every row MUST have a Gene\n";
 		$errorsFound++;
 		next;
 	    }
 	    $gene = $gene->unformatted();
 	    # these are HUGO gene names -> must be alphanum+dashes
 	    if ($gene !~ /^[\w-]+$/) {
-		warn "E in $subName, parsing $candidatesFile row $row: Gene must be alphanumeric (dashes allowed), found \"$gene\"";
+		warn "E in $subName, parsing $candidatesFile row ",$row+1,": Gene must be alphanumeric (dashes allowed), found \"$gene\"\n";
  		$errorsFound++;
 		next;
 	    }
 
 	    ################ score
 	    if (! $score) {
-		warn "E in $subName, parsing $candidatesFile row $row: every row MUST have a Confidence score";
+		warn "E in $subName, parsing $candidatesFile row ",$row+1,": every row MUST have a Confidence score\n";
 		$errorsFound++;
 		next;
 	    }
 	    $score = $score->unformatted();
 	    # require alphanumeric strings
 	    if ($score !~ /^\w+$/) {
-		warn "E in $subName, parsing $candidatesFile row $row: Confidence score must be alphanumeric, found \"$score\"";
+		warn "E in $subName, parsing $candidatesFile row ",$row+1,": Confidence score must be alphanumeric, found \"$score\"\n";
 		$errorsFound++;
 		next;
 	    }
@@ -470,7 +470,7 @@ sub parseCandidateGenes {
 	    (defined $knownCandidateGenes{$patho}) ||
 		($knownCandidateGenes{$patho} = {});
 	    if (defined $knownCandidateGenes{$patho}->{$gene}) {
-		warn "E in $subName, parsing $candidatesFile row $row: this $gene - $patho association was already seen elsewhere";
+		warn "E in $subName, parsing $candidatesFile row ",$row+1,": this $gene - $patho association was already seen elsewhere\n";
 		$errorsFound++;
 		next;
 	    }
@@ -493,7 +493,7 @@ sub parseCandidateGenes {
     
     ################
     if ($errorsFound) {
-	die "E in $subName: encountered $errorsFound errors while parsing $candidatesFiles, please fix the file(s).";
+	die "E in $subName: encountered $errorsFound errors while parsing $candidatesFiles, please fix the file(s).\n";
     }
     else {
 	return(\%knownCandidateGenes);
