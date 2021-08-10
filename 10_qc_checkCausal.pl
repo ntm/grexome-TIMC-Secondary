@@ -63,7 +63,7 @@ opendir(INDIR, $inDir) ||
     die "E $0: cannot opendir inDir $inDir\n";
 
 my $now = strftime("%F %T", localtime);
-print "I $now: $0 - starting to run\n";
+warn "I $now: $0 - starting to run\n";
 
 
 #########################################################
@@ -193,4 +193,4 @@ if (@noVar) {
 }
 
 $now = strftime("%F %T", localtime);
-print "I $now: $0 - ALL DONE, completed successfully!\n";
+warn "I $now: $0 - ALL DONE, completed successfully!\n";
