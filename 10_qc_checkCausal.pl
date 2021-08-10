@@ -3,10 +3,8 @@
 # 25/06/2021
 # NTM
 
-# QC script to catch regressions in the pipeline:
-# look for severe biallelic variants affecting each "causal gene"
-# from the samples metadata file.
-#
+# QC script: look for severe biallelic variants affecting each
+# "causal gene" from the samples metadata file.
 
 
 use strict;
@@ -39,7 +37,7 @@ my $help = '';
 
 
 my $USAGE = "\nFor each sample that has a causal gene in the metadata XLSX, examine the SAMPLES 
-results CSV files in indir and report if and how the causal gene is hit.
+results CSV files in indir and report if and how the causal gene's PICKed transcript is hit.
 Print our findings to stdout.
 Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --samplesFile : samples metadata xlsx file, with path
@@ -114,12 +112,12 @@ foreach my $inFile (sort(readdir(INDIR))) {
 
     my $causal = $sample2causalR->{$sample};
 
-    # find lines affecting $causal in $inFile, see if they are biallelic MODHIGH+
+    # find lines affecting a PICKed transcript of gene $causal in $inFile
     open(INFILE, "$inDir/$inFile") ||
 	die "E $0: cannot open inFile $inDir/$inFile\n";
 
     # indexes of columns of interest
-    my ($symbolCol, $biallelCol) = (-1,-1);
+    my ($symbolCol, $biallelCol, $pickCol) = (-1,-1,-1);
     # header: grab column indexes of interest
     my $header = <INFILE>;
     chomp($header);
@@ -127,17 +125,21 @@ foreach my $inFile (sort(readdir(INDIR))) {
     foreach my $i (0..$#header) {
 	($header[$i] eq 'SYMBOL') && ($symbolCol = $i);
 	($header[$i] eq 'BIALLELIC') && ($biallelCol = $i);
-	($biallelCol > -1) && ($symbolCol > -1) && last;
+	($header[$i] eq 'PICK') && ($pickCol = $i);
+	($biallelCol > -1) && ($symbolCol > -1) && ($pickCol > -1) && last;
     }
     (($biallelCol > -1) && ($symbolCol > -1)) || 
 	die "E $0: cannot find required column headers in $inFile:\n$header\n";
 
-    # find lines affecting $causal in $inFile, if no lines $foundCausal stays false
+    # find lines affecting a PICKed transcript of $causal in $inFile, if no
+    # lines $foundCausal stays false
     my $foundCausal = 0;
     while (my $line = <INFILE>) {
 	chomp($line);
 	my @line = split(/\t/,$line);
 	($line[$symbolCol] eq "' $causal") || next;
+	($line[$pickCol] eq "1") || next;
+
 	if ($line[$biallelCol] eq 'HIGH') {
 	    $nbCausalH++;
 	}
@@ -145,17 +147,17 @@ foreach my $inFile (sort(readdir(INDIR))) {
 	    $nbCausalMH++;
 	}
 	elsif ($line[$biallelCol] eq 'NO') {
-	    push(@noBA, "grep $causal $inDir/$inFile");
+	    push(@noBA, "grep -P ' $causal\\t' $inDir/$inFile");
 	}
 	else {
-	    push(@noMH, "grep $causal $inDir/$inFile");
+	    push(@noMH, "grep -P ' $causal\\t' $inDir/$inFile");
 	}
 	$foundCausal = 1;
 	last;
     }
     close(INFILE);
     ($foundCausal) ||
-	push(@noVar, "grep $causal $inDir/$inFile");
+	push(@noVar, "grep -P ' $causal\\t' $inDir/$inFile");
 }
 
 closedir(INDIR);
@@ -166,7 +168,7 @@ closedir(INDIR);
 
 print "Total number of samples in metadata: $nbSamples\n";
 print "Samples with a causal gene in metadata: $nbCausal\n\n";
-print "Examining the samples CSV files in $inDir, we found:\n";
+print "Examining the samples CSV files in $inDir (PICKed transcripts only), we found:\n";
 print "samples whose causal gene is BIALLELIC HIGH: $nbCausalH\n";
 print "samples whose causal gene is BIALLELIC MODHIGH: $nbCausalMH\n";
 print "samples whose causal gene is BIALLELIC MODERATE or LOW: ".scalar(@noMH)."\n";
