@@ -38,6 +38,13 @@ my $numJobsGunzip = 6;
 my $numJobs1 = 20;
 my $numJobs6 = 16;
 
+# name(+path if needed) of gzip-like binary, we like bgzip (multi-threaded)
+my $bgzip = "bgzip";
+(`which $bgzip` =~ /$bgzip/) ||
+    die "E $0: the bgzip executable $bgzip can't be found\n";
+# full command. If you don't have bgzip you could use gzip but without --threads
+$bgzip = "$bgzip -cd --threads $numJobsGunzip ";
+
 
 #############################################
 ## options / params from the command-line
@@ -188,7 +195,7 @@ my $tmpdir = tempdir(DIR => &fastTmpPath());
 # STEPS 1-6, piped into each other except in debug mode
 
 # decompress infile and step 1
-my $com = "bgzip -cd -@".$numJobsGunzip." $inFile | perl $RealBin/1_filterBadCalls.pl --samplesFile=$samples --tmpdir=$tmpdir/FilterTmp/ --jobs $numJobs1 ";
+my $com = "$bgzip $inFile | perl $RealBin/1_filterBadCalls.pl --samplesFile=$samples --tmpdir=$tmpdir/FilterTmp/ --jobs $numJobs1 ";
 if ($debug) {
     # specific logfile from step and save its output
     $com .= "2> $outDir/step1.err > $outDir/step1.out";
@@ -337,6 +344,17 @@ if ($doSubCs) {
 else {
     warn "I $0: no existing sub-cohort, step9-subCohorts skipped\n";
 }
+
+######################
+# QC: report coverage of known causal genes by (severe) variants
+
+# QC report will be printed to $qc_causal file
+my $qc_causal = "$outDir/qc_causal.out";
+
+$com = "perl $RealBin/10_qc_checkCausal.pl --samplesFile=$samples --indir=$outDir/Samples/ ";
+$com .= "> $qc_causal";
+system($com) && die "E $0: step10-qc_causal failed: $?";
+
 
 ######################
 # all done, clean up tmpdir
