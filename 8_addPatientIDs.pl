@@ -53,6 +53,14 @@ my $sample2patientR;
     $sample2patientR = $parsed[2];
 }
 
+# precompile the regexps we will use to search for each sample,
+# in this way RAM usage drops from +50G to 21M !!
+# key==sampleID, value is a precompiled regexp 
+my %sample2re;
+foreach my $sample (keys %$sample2patientR) {
+    $sample2re{$sample} = qr/$sample([\[,\s|])/;
+}
+
 #########################################################
 # read infiles
 
@@ -87,7 +95,7 @@ while (my $inFile = readdir(INDIR)) {
         $line .= ',';
 	# chuck norris style: brutal but it works...
 	foreach my $sample (keys %$sample2patientR) {
-	    $line =~ s/$sample([\[,\s|])/$sample($sample2patientR->{$sample})$1/g ;
+	    $line =~ s/$sample2re{$sample}/$sample($sample2patientR->{$sample})$1/g ;
 	}
 	# remove the trailing ,
 	($line =~ s/,$//) || die "E $0: cannot remove trailing , in:\n$line\n";
