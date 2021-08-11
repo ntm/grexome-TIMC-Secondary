@@ -9,7 +9,7 @@
 # - $inDir must contain cohort or sample TSVs (possibly gzipped) as 
 #   produced by extractCohorts.pl or extractSamples.pl;
 # - $outDir doesn't exist, it will be created and filled with one TSV
-#   per infile (never gzipped), adding .filtered or .filtered.pick to 
+#   per infile (never gzipped), adding .filtered or .filtered.canon to 
 #   the filename.
 
 use strict;
@@ -47,8 +47,8 @@ my ($inDir, $outDir);
 # number of parallel jobs to run
 my $jobs = 8;
 
-# if true, restrict to PICKed transcripts
-my $pick = '';
+# if true, restrict to CANONICAL transcripts
+my $canon = '';
 
 # min number of HR calls at a position to consider it,
 # default 100 works well for us with a heterogeneous cohort of 500
@@ -63,7 +63,7 @@ my $min_hr = 100;
 GetOptions ("indir=s" => \$inDir,
 	    "outdir=s" => \$outDir,
 	    "jobs=i" => \$jobs,
-	    "pick" => \$pick,
+	    "canonical" => \$canon,
 	    "min_hr=i" => \$min_hr)
     or die("E $0: Error in command line arguments\n");
 
@@ -103,7 +103,7 @@ while (my $inFile = readdir(INDIR)) {
 
     my $outFile = $fileStart ;
     ($outFile =~ /\.filtered/) || ($outFile .= ".filtered");
-    ($pick) && ($outFile .= ".pick");
+    ($canon) && ($outFile .= ".canon");
     $outFile .= ".csv";
 
     # using some hard-coded filter params here, add them as options if
@@ -112,7 +112,7 @@ while (my $inFile = readdir(INDIR)) {
     # using defaults for AFs 
     # $com .= " --max_af_gnomad 0.01 --max_af_1kg 0.03 --max_af_esp 0.05"
     $com .= " --min_hr $min_hr";
-    ($pick) && ($com .= " --pick");
+    ($canon) && ($com .= " --canonical");
 
     if ($gz) {
 	$com = "gunzip -c $inDir/$inFile | $com ";
