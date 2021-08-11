@@ -130,6 +130,7 @@ my $vepPlugins = "";
     # comma-separated list of fields to retrieve from dbNSFP, there are MANY
     # possibilities, check the README in $dbNsfpPath
     my $dbNsfpFields = "MutationTaster_pred,REVEL_rankscore,CADD_raw_rankscore";
+    # add MetaRNN_pred: T(olerated) or D(amaging)
     $plugins .= " --plugin dbNSFP,$dbNsfpPath/dbNSFP4.0a.gz,$dbNsfpFields ";
 
     # dbscSNV (splicing), data is with dbNSFP (same authors), specify 
@@ -147,7 +148,7 @@ $vepCommand .= " --offline --format vcf --vcf" ;
 # $vepCommand .= " --merged" ;
 $vepCommand .= " --force_overwrite --no_stats" ;
 $vepCommand .= " --allele_number"; # for knowing which CSQ annotates which ALT
-$vepCommand .= " --canonical --biotype --xref_refseq --flag_pick_allele_gene";
+$vepCommand .= " --canonical --biotype --xref_refseq";
 # instead of --everything we select relevant options (eg not --regulatory)
 $vepCommand .= " --sift b --polyphen b --symbol --numbers --total_length" ;
 $vepCommand .= " --gene_phenotype --af --af_1kg --af_esp --af_gnomad";
