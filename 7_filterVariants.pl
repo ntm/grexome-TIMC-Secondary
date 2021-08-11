@@ -28,7 +28,7 @@ my $min_hr = 100; # COUNT_HR >= $x
 my $no_mod = ''; # if enabled, filter out MODIFIER impacts
 my $no_low = ''; # if enabled, filter out LOW impacts
 
-my $pick = ''; # if enabled, only keep lines with PICK
+my $canon = ''; # if enabled, only keep lines with CANONICAL==YES
 # could add a filter on BIOTYPE values (eg protein_coding,
 # processed_transcript, retained_intron, nonsense_mediated_decay)
 # Not implementing now.
@@ -42,7 +42,7 @@ GetOptions ("max_ctrl_hv=i" => \$max_ctrl_hv,
 	    "min_hr=i" => \$min_hr,
 	    "no_mod" => \$no_mod,
 	    "no_low" => \$no_low,
-	    "pick" => \$pick,
+	    "canonical" => \$canon,
 	    "max_af_gnomad=f" => \$max_af_gnomad,
 	    "max_af_1kg=f" => \$max_af_1kg,
 	    "max_af_esp=f" => \$max_af_esp)
@@ -54,7 +54,7 @@ my $filterString = "max_ctrl_hv=$max_ctrl_hv max_ctrl_het=$max_ctrl_het";
 ($min_hr) && ($filterString .= " min_hr=$min_hr");
 ($no_mod) && ($filterString .= " no_mod");
 ($no_low) && ($filterString .= " no_low");
-($pick) && ($filterString .= " pick");
+($canon) && ($filterString .= " canonical");
 $filterString .= " max_af_gnomad=$max_af_gnomad max_af_1kg=$max_af_1kg max_af_esp=$max_af_esp";
 
 
@@ -86,7 +86,7 @@ while(my $line = <STDIN>) {
     chomp($line);
     my @fields = split(/\t/, $line, -1);
     # apply all filters
-    if (($pick) && (! $fields[$title2index{"PICK"}])) {
+    if (($canon) && ($fields[$title2index{"CANONICAL"}] ne 'YES')) {
 	next;
     }
     if ($fields[$title2index{"COUNT_NEGCTRL_HV"}] > $max_ctrl_hv) {
