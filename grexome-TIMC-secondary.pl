@@ -71,9 +71,9 @@ my $outDir;
 # you can also copy it elsewhere and customize it, then use --config
 my $config = "$RealBin/grexomeTIMCsec_config.pm";
 
-# if $pick is true, results only concern PICKed transcripts,
+# if $canon is true, results only concern CANONICAL transcripts,
 # otherwise every ensembl transcript is considered
-my $pick = '';
+my $canon = '';
 
 # debug: if true:
 # - run each step one after the other (no pipes)
@@ -95,7 +95,7 @@ Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --infile : bgzipped multi-sample GVCF or VCF file to parse
 --outdir : subdir where results will be created, must not pre-exist
 --config [defaults to grexomeTIMCsec_config.pm alongside this script] : your customized copy (with path) of the distributed *config.pm
---pick : restrict results to PICKed (~ canonical) transcripts
+--canonical : restrict results to canonical transcripts
 --debug : activate debug mode => slower, keeps all intermediate files, produce individual logfiles
 --help : print this USAGE";
 
@@ -105,7 +105,7 @@ GetOptions ("samples=s" => \$samples,
 	    "infile=s" => \$inFile,
 	    "outdir=s" => \$outDir,
 	    "config=s" => \$config,
-	    "pick" => \$pick,
+	    "canonical" => \$canon,
  	    "debug" => \$debug,
 	    "help" => \$help)
     or die("E $0: Error in command line arguments\n$USAGE\n");
@@ -257,7 +257,7 @@ else {
 # set min_hr to 20% of $numSamples
 my $min_hr = int($numSamples * 0.2);
 $com = "perl $RealBin/7_filterAndReorderAll.pl --indir $tmpdir/Cohorts/ --outdir $tmpdir/Cohorts_Filtered/ --min_hr=$min_hr ";
-($pick) && ($com .= "--pick ");
+($canon) && ($com .= "--canonical ");
 if ($debug) {
     $com .= "2> $outDir/step7.err";
 }
