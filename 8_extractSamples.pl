@@ -93,7 +93,7 @@ while (my $inFile = readdir(INDIR)) {
     ($inFile =~ /^\./) && next;
     my ($cohort,$fileEnd,$gz);
     if ($inFile =~ (/^([^\.]+)\.(.*csv)$/)) {
-	# $fileEnd allows for .filtered , .pick etc...
+	# $fileEnd allows for .filtered , .canon etc...
 	($cohort,$fileEnd) = ($1,$2);
     }
     elsif ($inFile =~ (/^([^\.]+)\.(.*csv)\.gz$/)) {
