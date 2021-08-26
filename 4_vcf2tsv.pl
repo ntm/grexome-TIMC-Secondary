@@ -150,8 +150,6 @@ while (my $line =<STDIN>) {
 	    $csqTmp[$i] =~ s~/~\\~g ;
 	    $thisCsq{$vepNames[$i]} = $csqTmp[$i] ;
 	}
-	# HGVSp has %3D for = in synonymous variants, substitute
-	($thisCsq{"HGVSp"}) && ($thisCsq{"HGVSp"} =~ s/%3D$/=/);
 
 	# upgrade splice_region_variant from LOW to MODHIGH if:
 	# (ada_score > 0.6) AND (rf_score > 0.6)
