@@ -58,7 +58,7 @@ my $min_hr = 100;
 # occasionally use non-defaults:
 ## $max_ctrl_hv,$max_ctrl_het,$min_cohort_hv,
 ## $no_mod, $no_low
-## $max_af_gnomad,$max_af_1kg,$max_af_esp
+## $max_af_gnomad,$max_af_1kg
 
 GetOptions ("indir=s" => \$inDir,
 	    "outdir=s" => \$outDir,
@@ -110,7 +110,7 @@ while (my $inFile = readdir(INDIR)) {
     # they need to be customized
     my $com = "perl $filterBin --max_ctrl_hv 3 --max_ctrl_het 10 --no_mod";
     # using defaults for AFs 
-    # $com .= " --max_af_gnomad 0.01 --max_af_1kg 0.03 --max_af_esp 0.05"
+    # $com .= " --max_af_gnomad 0.01 --max_af_1kg 0.03"
     $com .= " --min_hr $min_hr";
     ($canon) && ($com .= " --canonical");
 

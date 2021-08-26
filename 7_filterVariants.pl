@@ -35,7 +35,6 @@ my $canon = ''; # if enabled, only keep lines with CANONICAL==YES
 
 my $max_af_gnomad = 0.01; # gnomAD_AF <= $x
 my $max_af_1kg = 0.03; # AF <= $x, this is 1KG phase 3
-my $max_af_esp = 0.05; # AA_AF and EA_AF <= $x, this is ESP
 GetOptions ("max_ctrl_hv=i" => \$max_ctrl_hv,
 	    "max_ctrl_het=i" => \$max_ctrl_het,
 	    "min_cohort_hv=i" => \$min_cohort_hv,
@@ -44,8 +43,7 @@ GetOptions ("max_ctrl_hv=i" => \$max_ctrl_hv,
 	    "no_low" => \$no_low,
 	    "canonical" => \$canon,
 	    "max_af_gnomad=f" => \$max_af_gnomad,
-	    "max_af_1kg=f" => \$max_af_1kg,
-	    "max_af_esp=f" => \$max_af_esp)
+	    "max_af_1kg=f" => \$max_af_1kg)
     or die("E $0: Error in command line arguments\n");
 
 # build string of all filter values, for logging
@@ -55,7 +53,7 @@ my $filterString = "max_ctrl_hv=$max_ctrl_hv max_ctrl_het=$max_ctrl_het";
 ($no_mod) && ($filterString .= " no_mod");
 ($no_low) && ($filterString .= " no_low");
 ($canon) && ($filterString .= " canonical");
-$filterString .= " max_af_gnomad=$max_af_gnomad max_af_1kg=$max_af_1kg max_af_esp=$max_af_esp";
+$filterString .= " max_af_gnomad=$max_af_gnomad max_af_1kg=$max_af_1kg";
 
 
 # copy header, adding a final column with all filter values
@@ -121,22 +119,6 @@ while(my $line = <STDIN>) {
 	my $keep = 0;
 	foreach my $af (split(/&/, $fields[$title2index{"AF"}])) {
 	    ($af <= $max_af_1kg) && ($keep = 1);
-	}
-	($keep) || next;
-    }
-    if ($fields[$title2index{"AA_AF"}]) {
-	#again several &-separated values
-	my $keep = 0;
-	foreach my $esp (split(/&/, $fields[$title2index{"AA_AF"}])) {
-	    ($esp <= $max_af_esp) && ($keep = 1);
-	}
-	($keep) || next;
-    }
-    if ($fields[$title2index{"EA_AF"}]) {
-	#again several &-separated values
-	my $keep = 0;
-	foreach my $esp (split(/&/, $fields[$title2index{"EA_AF"}])) {
-	    ($esp <= $max_af_esp) && ($keep = 1);
 	}
 	($keep) || next;
     }
