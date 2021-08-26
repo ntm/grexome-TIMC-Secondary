@@ -51,10 +51,10 @@ my $cacheFile;
 my $genome;
 
 # dir containing subdirs with the data required by the VEP plugins 
-# we use (eg dbNSFP/ or CADD/)
+# we use (eg dbNSFP/)
 my $dataDir;
 
-# tmp dir, preferably on a RAM or SSD disk 
+# tmp dir, preferably on a RAMdisk or at least SSD
 my $tmpDir;
 
 # help: if true just print $USAGE and exit
@@ -62,11 +62,11 @@ my $help = '';
 
 
 my $USAGE = "\nRead on stdin a VCF file, write to stdout a similar VCF file with added VEP annotations.\n
-Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
---cacheFile string [no default] : filename with path where this script stores its cachefile
---genome string [no default] : ref genome fasta, with path
---dataDir string [no default] : dir containing subdirs with the data required by the VEP plugins we use (eg dbNSFP)
---tmpDir string [no default] : tmp dir, must not pre-exist, will be removed after running
+Arguments (all can be abbreviated to shortest unambiguous prefixes):
+--cacheFile string : filename with path where this script stores its cachefile
+--genome string : ref genome fasta, with path
+--dataDir string : dir containing subdirs with the data required by the VEP plugins we use (eg dbNSFP)
+--tmpDir string : tmp dir, must not pre-exist, will be removed after running
 --help : print this USAGE";
 
 GetOptions ("cacheFile=s" => \$cacheFile,
