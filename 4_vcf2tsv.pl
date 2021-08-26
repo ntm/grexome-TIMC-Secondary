@@ -45,20 +45,21 @@ warn "I $now: $0 - starting to run\n";
 # HGVSc|HGVSp|cDNA_position|CDS_position|Protein_position|Amino_acids|Codons|
 # Existing_variation|ALLELE_NUM|DISTANCE|STRAND|FLAGS|VARIANT_CLASS|SYMBOL_SOURCE|
 # HGNC_ID|CANONICAL|RefSeq|GENE_PHENO|SIFT|PolyPhen|
-# HGVS_OFFSET|AF|AFR_AF|AMR_AF|EAS_AF|EUR_AF|SAS_AF|AA_AF|EA_AF|gnomAD_AF|gnomAD_AFR_AF|
+# HGVS_OFFSET|AF|AFR_AF|AMR_AF|EAS_AF|EUR_AF|SAS_AF|gnomAD_AF|gnomAD_AFR_AF|
 # gnomAD_AMR_AF|gnomAD_ASJ_AF|gnomAD_EAS_AF|gnomAD_FIN_AF|gnomAD_NFE_AF|gnomAD_OTH_AF|
 # gnomAD_SAS_AF|CLIN_SIG|SOMATIC|PHENO|PUBMED|
 # CADD_raw_rankscore|MutationTaster_pred|REVEL_rankscore|
 # ada_score|rf_score
 my @goodVeps = ("SYMBOL","Gene","IMPACT","Consequence","Feature","CANONICAL",
-		"BIOTYPE","RefSeq","ALLELE_NUM","EXON","INTRON",
+		"BIOTYPE","VARIANT_CLASS","RefSeq","MANE_SELECT","MANE_PLUS_CLINICAL",
+		"ALLELE_NUM","EXON","INTRON",
 		"HGVSc","HGVSp","cDNA_position","CDS_position","Protein_position",
 		"SIFT","PolyPhen",
 		"CADD_raw_rankscore","MutationTaster_pred","REVEL_rankscore",
+		"MetaRNN_rankscore","MetaRNN_pred",
 		"ada_score","rf_score",
-		"gnomAD_AF","AF","AA_AF","EA_AF",
-		"Existing_variation","CLIN_SIG","SOMATIC","PHENO",
-		"GENE_PHENO","PUBMED");
+		"gnomAD_AF","AF",
+		"Existing_variation","CLIN_SIG","SOMATIC","PHENO","PUBMED");
 
 # VCF headers: ignore them but grab the:
 # - VEP CSQ field names and store them in @vepNames;

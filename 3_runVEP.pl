@@ -116,13 +116,10 @@ warn "I $now: $0 - starting to run\n";
 # associated datafiles (with paths)
 my $vepPlugins = "";
 {
-    my $plugins = "";
-
-    # CADD - might not be needed if dbNSFP is good (it provides CADD 
-    # among many other things), commenting out for now
+    # CADD - no longer needed, dbNSFP provides it (among many other things)
     #my $caddPath = "$dataDir/CADD/";
     # (-d $caddPath) || die "E $0: CADD datadir doesn't exist: $caddPath\n";
-    #$plugins .= " --plugin CADD,$caddPath/whole_genome_SNVs.tsv.gz,$caddPath/InDels.tsv.gz ";
+    #$vepPlugins .= " --plugin CADD,$caddPath/whole_genome_SNVs.tsv.gz,$caddPath/InDels.tsv.gz";
 
     # dbNSFP
     my $dbNsfpPath = "$dataDir/dbNSFP/";
@@ -130,14 +127,13 @@ my $vepPlugins = "";
     # comma-separated list of fields to retrieve from dbNSFP, there are MANY
     # possibilities, check the README in $dbNsfpPath
     my $dbNsfpFields = "MutationTaster_pred,REVEL_rankscore,CADD_raw_rankscore";
-    # add MetaRNN_pred: T(olerated) or D(amaging)
-    $plugins .= " --plugin dbNSFP,$dbNsfpPath/dbNSFP4.0a.gz,$dbNsfpFields ";
+    # MetaRNN: both MetaRNN_rankscore and MetaRNN_pred: T(olerated) or D(amaging)
+    $dbNsfpFields .= ",MetaRNN_rankscore,MetaRNN_pred";
+    $vepPlugins .= " --plugin dbNSFP,$dbNsfpPath/dbNSFP4.2a.gz,$dbNsfpFields";
 
     # dbscSNV (splicing), data is with dbNSFP (same authors), specify 
     # assembly GRCh38 as second param because the plugin can't figure it out
-    $plugins .= " --plugin dbscSNV,$dbNsfpPath/dbscSNV1.1_GRCh38.txt.gz,GRCh38 ";
-
-    $vepPlugins = $plugins;
+    $vepPlugins .= " --plugin dbscSNV,$dbNsfpPath/dbscSNV1.1_GRCh38.txt.gz,GRCh38";
 }
 
 
@@ -148,13 +144,17 @@ $vepCommand .= " --offline --format vcf --vcf" ;
 # $vepCommand .= " --merged" ;
 $vepCommand .= " --force_overwrite --no_stats" ;
 $vepCommand .= " --allele_number"; # for knowing which CSQ annotates which ALT
-$vepCommand .= " --canonical --biotype --xref_refseq";
-# instead of --everything we select relevant options (eg not --regulatory)
-$vepCommand .= " --sift b --polyphen b --symbol --numbers --total_length" ;
-$vepCommand .= " --gene_phenotype --af --af_1kg --af_esp --af_gnomad";
-$vepCommand .= " --pubmed --variant_class --check_existing ";
+$vepCommand .= " --canonical --biotype --xref_refseq --symbol --mane";
+$vepCommand .= " --numbers --total_length  --variant_class" ;
+$vepCommand .= " --sift b --polyphen b";
+# --af is 1KG-phase3 global AF, --af_1kg is per continent AFs
+$vepCommand .= " --af --af_1kg --af_gnomad";
+$vepCommand .= " --pubmed --check_existing";
+# Don't URI escape HGVS strings
+$vepCommand .= " --no_escape";
 # commenting out "--domains", it's a bit massive and in non-deterministic order
-# and I don't think anyone looks at it
+# and we don't curently look at it
+## other possibilities to consider: --regulatory --tsl --appris 
 $vepCommand .= " --fasta $genome --hgvs";
 # plugins:
 $vepCommand .= $vepPlugins;
