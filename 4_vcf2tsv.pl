@@ -40,23 +40,23 @@ warn "I $now: $0 - starting to run\n";
 # Some of these are hard-coded in the "missense" and "splice"
 # upgrade-to-MODHIGH code, make sure they get fixed there as
 # well if they change names.
-# Current available annotations (11/07/2019) are:
+# Current available annotations (26/08/2021) are:
 # Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|EXON|INTRON|
 # HGVSc|HGVSp|cDNA_position|CDS_position|Protein_position|Amino_acids|Codons|
 # Existing_variation|ALLELE_NUM|DISTANCE|STRAND|FLAGS|VARIANT_CLASS|SYMBOL_SOURCE|
-# HGNC_ID|CANONICAL|RefSeq|GENE_PHENO|SIFT|PolyPhen|
-# HGVS_OFFSET|AF|AFR_AF|AMR_AF|EAS_AF|EUR_AF|SAS_AF|gnomAD_AF|gnomAD_AFR_AF|
-# gnomAD_AMR_AF|gnomAD_ASJ_AF|gnomAD_EAS_AF|gnomAD_FIN_AF|gnomAD_NFE_AF|gnomAD_OTH_AF|
-# gnomAD_SAS_AF|CLIN_SIG|SOMATIC|PHENO|PUBMED|
-# CADD_raw_rankscore|MutationTaster_pred|REVEL_rankscore|
+# HGNC_ID|CANONICAL|MANE_SELECT|MANE_PLUS_CLINICAL|RefSeq|SIFT|PolyPhen|HGVS_OFFSET|
+# AF|AFR_AF|AMR_AF|EAS_AF|EUR_AF|SAS_AF|gnomAD_AF|gnomAD_AFR_AF|gnomAD_AMR_AF|
+# gnomAD_ASJ_AF|gnomAD_EAS_AF|gnomAD_FIN_AF|gnomAD_NFE_AF|gnomAD_OTH_AF|gnomAD_SAS_AF|
+# CLIN_SIG|SOMATIC|PHENO|PUBMED|
+# CADD_raw_rankscore|MetaRNN_pred|MetaRNN_rankscore|MutationTaster_pred|REVEL_rankscore|
 # ada_score|rf_score
 my @goodVeps = ("SYMBOL","Gene","IMPACT","Consequence","Feature","CANONICAL",
 		"BIOTYPE","VARIANT_CLASS","RefSeq","MANE_SELECT","MANE_PLUS_CLINICAL",
 		"ALLELE_NUM","EXON","INTRON",
 		"HGVSc","HGVSp","cDNA_position","CDS_position","Protein_position",
 		"SIFT","PolyPhen",
-		"CADD_raw_rankscore","MutationTaster_pred","REVEL_rankscore",
-		"MetaRNN_rankscore","MetaRNN_pred",
+		"MetaRNN_pred","MetaRNN_rankscore","CADD_raw_rankscore",
+		"MutationTaster_pred","REVEL_rankscore",
 		"ada_score","rf_score",
 		"gnomAD_AF","AF",
 		"Existing_variation","CLIN_SIG","SOMATIC","PHENO","PUBMED");
@@ -154,6 +154,8 @@ while (my $line =<STDIN>) {
 
 	# upgrade splice_region_variant from LOW to MODHIGH if:
 	# (ada_score > 0.6) AND (rf_score > 0.6)
+	# TODO: CADD v1.6 (AKA CADD-Splice) is supposedly great for splice-affecting variants,
+	# need to use CADD_raw_rankscore here
 	if (($thisCsq{"IMPACT"} eq "LOW") && ($thisCsq{"Consequence"}) &&
 	    ($thisCsq{"Consequence"} =~ /splice_region_variant/)) {
 	    # NOTE: VEP consequence column can have several &-separated consequences,
@@ -167,12 +169,13 @@ while (my $line =<STDIN>) {
 	# upgrade putatively deleterious missense variants:
 	if (($thisCsq{"IMPACT"} eq "MODERATE") && ($thisCsq{"Consequence"}) &&
 	    ($thisCsq{"Consequence"} =~ /missense_variant/)) {
-	    # upgrade to MODHIGH if at least 3 criteria are passed, among the following:
+	    # upgrade to MODHIGH if at least 4 criteria are passed, among the following:
 	    # - SIFT -> deleterious
 	    # - Polyphen -> probably_damaging
 	    # - CADD_raw_rankscore >= 0.7
 	    # - MutationTaster_pred contains at least one A or D
 	    # - REVEL_rankscore >= 0.7
+	    # - MetaRNN_pred -> D(amaging)
 	    my $passed = 0;
 	    if (($thisCsq{"SIFT"}) && ($thisCsq{"SIFT"} =~ /deleterious\(/)) {
 		# deleterious\( so we don't get deleterious_low_confidence
@@ -190,8 +193,11 @@ while (my $line =<STDIN>) {
 	    if (($thisCsq{"REVEL_rankscore"}) && ($thisCsq{"REVEL_rankscore"} >= 0.7)) {
 		$passed++;
 	    }
+	    if (($thisCsq{"MetaRNN_pred"}) && ($thisCsq{"MetaRNN_pred"} =~ /D/)) {
+		$passed++;
+	    }
 
-	    if ($passed >= 3) {
+	    if ($passed >= 4) {
 		$thisCsq{"IMPACT"} = "MODHIGH";
 	    }
 	}
