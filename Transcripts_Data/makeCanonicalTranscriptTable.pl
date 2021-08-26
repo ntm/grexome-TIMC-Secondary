@@ -10,6 +10,7 @@
 # Print to stdout a tab-delimited file with columns:
 # "TRANSCRIPT\tGENE\tCHROM\tSTRAND\tCDS_START\tCDS_END\tEXON_STARTS\tEXON_ENDS\n"
 # containing one line per canonical transcript, 
+# GENE is the ENSG id if we can't find a gene name,
 # STRAND is + or -,
 # by convention if transcript is non-coding CDS_START==CDS_END==1,
 # EXON_* columns contain comma-separated lists of coordinates, sorted
@@ -87,7 +88,8 @@ while (my $line = <>) {
     if (! defined($trans2printFirst{$transcript})) {
 	# GENE
 	($fields[8] =~ /gene_name "([^"]+)";/) ||
-	    die "E: cannot grab gene_name from line:\n$line\n";
+	    ($fields[8] =~ /gene_id "([^"]+)";/) ||
+	    die "E: cannot grab gene_name or gene_id from line:\n$line\n";
 	my $gene = $1;
 	# CHROM
 	my $chr = $fields[0];
