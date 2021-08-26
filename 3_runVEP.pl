@@ -398,8 +398,10 @@ open(CACHELOCK, ">>$cacheFile") ||
     die "E $0: I want to update cacheFile but I can't open it for locking\n";
 flock(CACHELOCK, LOCK_EX) || die "E $0: cannot get lock on cachefile\n";
 
-$cache = &retrieve($cacheFile) ||
-    die "E $0: I can't retrieve cache from fresh copy of cachefile $cacheFile\n";
+if (-f $cacheFile) {
+    $cache = &retrieve($cacheFile) ||
+	die "E $0: I can't retrieve cache from fresh copy of cachefile $cacheFile\n";
+}
 foreach my $k (keys(%$cacheUpdate)) {
     if (defined($cache->{$k})) {
 	# annotation for key $k has been added to $cacheFile while we were running,
