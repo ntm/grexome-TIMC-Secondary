@@ -398,7 +398,7 @@ open(CACHELOCK, ">>$cacheFile") ||
     die "E $0: I want to update cacheFile but I can't open it for locking\n";
 flock(CACHELOCK, LOCK_EX) || die "E $0: cannot get lock on cachefile\n";
 
-if (-f $cacheFile) {
+if (! -z $cacheFile) {
     $cache = &retrieve($cacheFile) ||
 	die "E $0: I can't retrieve cache from fresh copy of cachefile $cacheFile\n";
 }
