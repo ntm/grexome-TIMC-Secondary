@@ -169,35 +169,48 @@ while (my $line =<STDIN>) {
 	# upgrade putatively deleterious missense variants:
 	if (($thisCsq{"IMPACT"} eq "MODERATE") && ($thisCsq{"Consequence"}) &&
 	    ($thisCsq{"Consequence"} =~ /missense_variant/)) {
-	    # upgrade to MODHIGH if at least 4 criteria are passed, among the following:
+	    # upgrade to MODHIGH if at least $minPassedFrac criteria are passed,
+	    # among the following:
 	    # - SIFT -> deleterious
 	    # - Polyphen -> probably_damaging
 	    # - CADD_raw_rankscore >= 0.7
-	    # - MutationTaster_pred contains at least one A or D
+	    # - MutationTaster_pred -> contains at least one A or D
 	    # - REVEL_rankscore >= 0.7
-	    # - MetaRNN_pred -> D(amaging)
+	    # - MetaRNN_pred -> contains at least one D(amaging)
+	    # 
+	    # NOTE: sometimes we don't have any prediction for some predictors,
+	    # due to dbNSFP using older transcripts and/or bugs in VEP or VEP plugins...
+	    # $minPassedFrac allows to upgrade variants in those cases
+	    my $minPassedFrac = 0.6;
 	    my $passed = 0;
-	    if (($thisCsq{"SIFT"}) && ($thisCsq{"SIFT"} =~ /deleterious\(/)) {
+	    my $totalPreds = 0;
+	    if ($thisCsq{"SIFT"}) {
+		$totalPreds++;
 		# deleterious\( so we don't get deleterious_low_confidence
-		$passed++;
+		($thisCsq{"SIFT"} =~ /deleterious\(/) && ($passed++);
 	    }
-	    if (($thisCsq{"PolyPhen"}) && ($thisCsq{"PolyPhen"} =~ /probably_damaging/)) {
-		$passed++;
+	    if ($thisCsq{"PolyPhen"}) {
+		$totalPreds++;
+		($thisCsq{"PolyPhen"} =~ /probably_damaging/) && ($passed++);
 	    }
-	    if (($thisCsq{"CADD_raw_rankscore"}) && ($thisCsq{"CADD_raw_rankscore"} >= 0.7)) {
-		$passed++;
+	    if ($thisCsq{"CADD_raw_rankscore"}) {
+		$totalPreds++;
+		($thisCsq{"CADD_raw_rankscore"} >= 0.7) && ($passed++);
 	    }
-	    if (($thisCsq{"MutationTaster_pred"}) && ($thisCsq{"MutationTaster_pred"} =~ /[AD]/)) {
-		$passed++;
+	    if ($thisCsq{"MutationTaster_pred"}) {
+		$totalPreds++;
+		($thisCsq{"MutationTaster_pred"} =~ /[AD]/) && ($passed++);
 	    }
-	    if (($thisCsq{"REVEL_rankscore"}) && ($thisCsq{"REVEL_rankscore"} >= 0.7)) {
-		$passed++;
+	    if ($thisCsq{"REVEL_rankscore"}) {
+		$totalPreds++;
+		($thisCsq{"REVEL_rankscore"} >= 0.7) && ($passed++);
 	    }
-	    if (($thisCsq{"MetaRNN_pred"}) && ($thisCsq{"MetaRNN_pred"} =~ /D/)) {
-		$passed++;
+	    if ($thisCsq{"MetaRNN_pred"}) {
+		$totalPreds++;
+		($thisCsq{"MetaRNN_pred"} =~ /D/) && ($passed++);
 	    }
 
-	    if ($passed >= 4) {
+	    if ($passed / $totalPreds >= $minPassedFrac) {
 		$thisCsq{"IMPACT"} = "MODHIGH";
 	    }
 	}
