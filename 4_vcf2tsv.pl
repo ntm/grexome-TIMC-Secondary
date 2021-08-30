@@ -154,8 +154,10 @@ while (my $line =<STDIN>) {
 
 	# upgrade splice_region_variant from LOW to MODHIGH if:
 	# (ada_score > 0.6) AND (rf_score > 0.6)
-	# TODO: CADD v1.6 (AKA CADD-Splice) is supposedly great for splice-affecting variants,
-	# need to use CADD_raw_rankscore here
+	# TODO: CADD v1.6 (AKA CADD-Splice) is supposedly good for splice-affecting variants,
+	# I want to use CADD_raw_rankscore here. Unfortunately currently the dbNSFP VEP
+	# plugin doesn't report CADD_raw_rankscore for splicing variants, despite the score
+	# being present in the dbNSFP gz file
 	if (($thisCsq{"IMPACT"} eq "LOW") && ($thisCsq{"Consequence"}) &&
 	    ($thisCsq{"Consequence"} =~ /splice_region_variant/)) {
 	    # NOTE: VEP consequence column can have several &-separated consequences,
