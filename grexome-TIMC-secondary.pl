@@ -82,6 +82,9 @@ my $canon = '';
 # - produce individual logfiles for each step
 my $debug = '';
 
+# $debugVep: activate --debug specifically for 3_runVep.pl
+my $debugVep = '';
+
 # help: if true just print $USAGE and exit
 my $help = '';
 
@@ -98,6 +101,7 @@ Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --config [defaults to grexomeTIMCsec_config.pm alongside this script] : your customized copy (with path) of the distributed *config.pm
 --canonical : restrict results to canonical transcripts
 --debug : activate debug mode => slower, keeps all intermediate files, produce individual logfiles
+--debugVep : activate debug mode specifically for VEP => compare VEP annotations between runs
 --help : print this USAGE";
 
 GetOptions ("samples=s" => \$samples,
@@ -108,6 +112,7 @@ GetOptions ("samples=s" => \$samples,
 	    "config=s" => \$config,
 	    "canonical" => \$canon,
  	    "debug" => \$debug,
+ 	    "debugVep" => \$debugVep,
 	    "help" => \$help)
     or die("E $0: Error in command line arguments\n$USAGE\n");
 
@@ -228,6 +233,7 @@ if ($debug) {
 
 # step 3
 $com .= " | perl $RealBin/3_runVEP.pl --cacheFile=".&vepCacheFile()." --genome=".&refGenome()." --dataDir=".&vepPluginDataPath()." --tmpDir=$tmpdir/runVepTmpDir/ ";
+($debugVep) && ($com .= "--debug ");
 if ($debug) {
     $com .= "2> $outDir/step3.err > $outDir/step3.out";
     system($com) && die "E $0: debug mode on, step3 failed: $?";
