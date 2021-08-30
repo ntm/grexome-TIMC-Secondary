@@ -192,9 +192,9 @@ open(VEPTEST, "> $vcf4vepTest") ||
 # $cache is a hashref. key=="chr:pos:ref:alt", value==CSQ
 my $cache = {};
 # grab previously cached data except in debug mode
-if ((!$debug) && (-f $cacheFile)) {
+if ((!$debug) && (-f $cacheFile) && (! -z $cacheFile)) {
     $cache = &lock_retrieve($cacheFile) ||
-	die "E $0: cachefile $cacheFile exists but I can't retrieve hash from it.\n";
+	die "E $0: cachefile $cacheFile exists and is not empty but I can't retrieve hash from it.\n";
 }
 # $cacheUpdate is a hashref, similar to $cache but holding info
 # that wasn't found in $cache; key=="chr:pos:ref:alt", value==CSQ
@@ -424,6 +424,10 @@ if (! $debug) {
     &store($cache, $cacheFile) || 
 	die "E $0: produced/updated cache but cannot store to cachefile $cacheFile\n";
 }
+
+# remove file if it exists but is empty (can happen in debug mode with 
+# no pre-existing cachefile)
+(-z $cacheFile) && unlink($cacheFile);
 
 # ok, release lock
 flock(CACHELOCK, LOCK_UN);
