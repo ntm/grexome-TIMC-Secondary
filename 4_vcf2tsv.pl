@@ -212,7 +212,8 @@ while (my $line =<STDIN>) {
 		($thisCsq{"MetaRNN_pred"} =~ /D/) && ($passed++);
 	    }
 
-	    if ($passed / $totalPreds >= $minPassedFrac) {
+	    if (($totalPreds) && ($passed / $totalPreds >= $minPassedFrac)) {
+		# $totalPreds==0 can only happen due to bugs in VEP, but it does
 		$thisCsq{"IMPACT"} = "MODHIGH";
 	    }
 	}
