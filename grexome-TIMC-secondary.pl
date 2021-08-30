@@ -360,7 +360,9 @@ else {
 }
 
 ######################
-# STEP10 - append $caller to all final filenames
+# STEP10 - clean up and QC
+
+# APPENDVC: append $caller (if it was auto-detected) to all final filenames
 if ($caller) {
     open (FILES, "find $outDir/ -name \'*csv\' |") ||
 	die "E $0: step10-appendVC cannot find final csv files with find\n";
@@ -374,11 +376,24 @@ if ($caller) {
 	rename($f,$new) ||
 	    die "E $0: step10-appendVC cannot rename $f $new\n";
     }
+    close(FILES);
 }
 
-######################
-# STEP10 - QC: report coverage of known causal genes by (severe) variants
 
+# REMOVEEMPTY: remove files with no data lines (eg if infile concerned only some samples)
+open (FILES, "find $outDir/ -name \'*csv\' |") ||
+    die "E $0: step10-removeEmpty cannot find final csv files with find\n";
+while (my $f = <FILES>) {
+    chomp($f);
+    my $wc = `wc -l $f`;
+    # there's always 1 header line
+    ($wc > 1) || unlink($f) ||
+	die "E $0: step10-removeEmpty cannot unlink $f: $!\n";
+}
+close(FILES);
+
+
+# QC_CHECKCAUSAL: report coverage of known causal genes by (severe) variants
 # QC report will be printed to $qc_causal file
 my $qc_causal = "$outDir/qc_causal.out";
 
