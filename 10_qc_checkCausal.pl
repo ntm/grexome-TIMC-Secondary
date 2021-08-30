@@ -162,9 +162,10 @@ foreach my $inFile (sort(readdir(INDIR))) {
 
 closedir(INDIR);
 
-# sanity: every sample from metadata should have been seen
+# sanity: every sample from metadata should have been seen, assuming
+# we didn't analyze a subcohort/incomplete infile
 (keys(%$sample2cohortR)) &&
-    (print "W: some samples from metadata have no samples.csv files! ".join(" ",sort(keys(%$sample2cohortR)))."\n\n");
+    (print "W: ".scalar(keys(%$sample2cohortR))." samples from metadata have no samples.csv files\n");
 
 print "Total number of samples in metadata: $nbSamples\n";
 print "Samples with a causal gene in metadata: $nbCausal\n\n";
