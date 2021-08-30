@@ -57,6 +57,10 @@ my $dataDir;
 # tmp dir, preferably on a RAMdisk or at least SSD
 my $tmpDir;
 
+# debug: if true don't use any annotations from our cacheFile, just compare
+# the VEP annotations with those in the cache and report any diffs to stderr
+my $debug = '';
+
 # help: if true just print $USAGE and exit
 my $help = '';
 
@@ -67,12 +71,14 @@ Arguments (all can be abbreviated to shortest unambiguous prefixes):
 --genome string : ref genome fasta, with path
 --dataDir string : dir containing subdirs with the data required by the VEP plugins we use (eg dbNSFP)
 --tmpDir string : tmp dir, must not pre-exist, will be removed after running
+--debug : don't use the cacheFile, just report discrepancies between it and VEP
 --help : print this USAGE";
 
 GetOptions ("cacheFile=s" => \$cacheFile,
 	    "genome=s" => \$genome,
 	    "dataDir=s" => \$dataDir,
 	    "tmpDir=s" => \$tmpDir,
+	    "debug" => \$debug,
 	    "help" => \$help)
     or die("E $0: Error in command line arguments\n$USAGE\n");
 
@@ -185,8 +191,8 @@ open(VEPTEST, "> $vcf4vepTest") ||
 
 # $cache is a hashref. key=="chr:pos:ref:alt", value==CSQ
 my $cache = {};
-# grab previously cached data
-if (-f $cacheFile) {
+# grab previously cached data except in debug mode
+if ((!$debug) && (-f $cacheFile)) {
     $cache = &lock_retrieve($cacheFile) ||
 	die "E $0: cachefile $cacheFile exists but I can't retrieve hash from it.\n";
 }
@@ -404,8 +410,8 @@ if (! -z $cacheFile) {
 }
 foreach my $k (keys(%$cacheUpdate)) {
     if (defined($cache->{$k})) {
-	# annotation for key $k has been added to $cacheFile while we were running,
-	# make sure it's consistent
+	# annotation for key $k has been added to $cacheFile while we were running
+	# (or was already there if $debug), make sure it's consistent
 	($cache->{$k} eq $cacheUpdate->{$k}) ||
 	    warn "W $0: cacheFile entry for $k was added while we were running and disagrees with our entry, we keep the cached version:\n".
 	    $cache->{$k}."\n".$cacheUpdate->{$k}."\n";
@@ -414,8 +420,10 @@ foreach my $k (keys(%$cacheUpdate)) {
 	$cache->{$k} = $cacheUpdate->{$k};
     }
 }
-&store($cache, $cacheFile) || 
-    die "E $0: produced/updated cache but cannot store to cachefile $cacheFile\n";
+if (! $debug) {
+    &store($cache, $cacheFile) || 
+	die "E $0: produced/updated cache but cannot store to cachefile $cacheFile\n";
+}
 
 # ok, release lock
 flock(CACHELOCK, LOCK_UN);
