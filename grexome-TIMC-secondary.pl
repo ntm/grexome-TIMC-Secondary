@@ -385,7 +385,7 @@ open (FILES, "find $outDir/ -name \'*csv\' |") ||
     die "E $0: step10-removeEmpty cannot find final csv files with find\n";
 while (my $f = <FILES>) {
     chomp($f);
-    my $wc = `wc -l $f`;
+    my $wc = `cat $f | wc -l`;
     # there's always 1 header line
     ($wc > 1) || unlink($f) ||
 	die "E $0: step10-removeEmpty cannot unlink $f: $!\n";
