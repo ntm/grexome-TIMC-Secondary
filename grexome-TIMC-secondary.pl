@@ -85,9 +85,10 @@ my $debug = '';
 # help: if true just print $USAGE and exit
 my $help = '';
 
-my $USAGE = "Parse a GVCF or VCF, run the complete grexome-TIMC secondary analysis pipeline, and produce results (+ logs and copies of the metadata) in the provided outDir (which must not exist).
+my $USAGE = "Parse a GVCF or VCF, run the complete grexome-TIMC secondary analysis pipeline, 
+and produce results (+ logs and copies of the metadata) in the provided outDir (which must not exist).
 Each step of the pipeline is a stand-alone self-documented script, this is just a wrapper.
-Every install-specific param (eg paths to required data) should be in grexomeTIMCsec_config.pm.
+Every install-specific param (eg paths to shared data) should be in grexomeTIMCsec_config.pm.
 Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --samples : samples metadata xlsx file, with path
 --pathologies : [optional] pathologies metadata xlsx file, with path
@@ -182,6 +183,19 @@ else {
 
 # number of samples in $inFile, needed to set $min_hr (for filtering)
 my $numSamples = scalar(split(/\s+/, `zgrep --max-count=1 '#CHROM' $inFile`)) - 9;
+
+# variant-caller string/name, will be added to all final filenames
+my $caller;
+# try to find the caller name in $inFile
+foreach my $c ("Strelka", "GATK", "ElPrep") {
+    if ($inFile =~ /$c/) {
+	$caller = $c;
+	warn "I $0: variant-caller id $caller will be appended to all filenames\n";
+	last;
+    }
+}
+($caller) ||
+    warn "W $0: variant-caller could not be auto-detected, filenames won't be tagged\n";
 
 
 #############################################
@@ -346,7 +360,24 @@ else {
 }
 
 ######################
-# QC: report coverage of known causal genes by (severe) variants
+# STEP10 - append $caller to all final filenames
+if ($caller) {
+    open (FILES, "find $outDir/ -name \'*csv\' |") ||
+	die "E $0: step10-appendVC cannot find final csv files with find\n";
+    while (my $f = <FILES>) {
+	chomp($f);
+	my $new = $f; 
+	($new =~ s/\.csv$/.$caller.csv/) || 
+	    die "E $0: step10-appendVC cannot add $caller as suffix to $new\n";
+	(-e $new) && 
+	    die "E $0: step10-appendVC want to rename to new $new but it already exists?!\n";
+	rename($f,$new) ||
+	    die "E $0: step10-appendVC cannot rename $f $new\n";
+    }
+}
+
+######################
+# STEP10 - QC: report coverage of known causal genes by (severe) variants
 
 # QC report will be printed to $qc_causal file
 my $qc_causal = "$outDir/qc_causal.out";
