@@ -147,17 +147,17 @@ foreach my $inFile (sort(readdir(INDIR))) {
 	    $nbCausalMH++;
 	}
 	elsif ($line[$biallelCol] eq 'NO') {
-	    push(@noBA, "grep -P ' $causal\\t' $inDir/$inFile");
+	    push(@noBA, "grep -P ' $causal\\t' $inFile");
 	}
 	else {
-	    push(@noMH, "grep -P ' $causal\\t' $inDir/$inFile");
+	    push(@noMH, "grep -P ' $causal\\t' $inFile");
 	}
 	$foundCausal = 1;
 	last;
     }
     close(INFILE);
     ($foundCausal) ||
-	push(@noVar, "grep -P ' $causal\\t' $inDir/$inFile");
+	push(@noVar, "grep -P ' $causal\\t' $inFile");
 }
 
 closedir(INDIR);
@@ -179,18 +179,21 @@ print"\n";
 
 if (@noMH) {
     print "To investigate the samples whose causal gene is BIALLELIC MODERATE or LOW:\n";
+    print "cd $inDir\n";
     print join("\n", @noMH);
     print "\n\n";
 }
 
 if (@noBA) {
     print "To investigate samples whose causal gene is only hit by MONOALLELIC:\n";
+    print "cd $inDir\n";
     print join("\n", @noBA);
     print "\n\n";
 }
 
 if (@noVar) {
     print "To confirm samples whose causal gene has NO VARIANT:\n";
+    print "cd $inDir\n";
     print join("\n", @noVar);
     print "\n\n";
 }
