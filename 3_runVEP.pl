@@ -142,6 +142,9 @@ my $vepPlugins = "";
     $vepPlugins .= " --plugin dbscSNV,$dbNsfpPath/dbscSNV1.1_GRCh38.txt.gz,GRCh38";
 }
 
+# --no_stats results in buggy VEP output (VEP git issue 1034), so we produce stats
+# in $vepStats and remove the file when done
+my $vepStats = "$tmpDir/vepStats.html";
 
 # VEP command, reading on stdin and printing to stdout
 my $vepCommand = $vepBin;
@@ -149,7 +152,7 @@ $vepCommand .= " --offline --format vcf --vcf" ;
 # cache to use: refseq, merged, or ensembl (default)
 # $vepCommand .= " --merged" ;
 $vepCommand .= " --force_overwrite";
-$vepCommand .= " --stats_file /dev/null"; # --no_stats results in buggy VEP output (VEP git issue 1034)
+$vepCommand .= " --stats_file $vepStats";
 $vepCommand .= " --allele_number"; # for knowing which CSQ annotates which ALT
 $vepCommand .= " --canonical --biotype --xref_refseq --symbol --mane";
 $vepCommand .= " --numbers --total_length  --variant_class" ;
@@ -232,7 +235,7 @@ while (my $line = <VEPTEST_OUT>) {
 		# version mismatch, clean up and die
 		close(VCF4VEP);
 		close(VCFCACHE);
-		unlink($vcf4vep,$vcfFromCache,$vcf4vepTest);
+		unlink($vcf4vep,$vcfFromCache,$vcf4vepTest,$vepStats);
 		rmdir($tmpDir) || warn "W $0: VEP version mismatch but can't rmdir tmpDir $tmpDir\n";
 		die "E: $0 - cached VEP version and ##VEP line from VCF are different:\n$cacheLine\n$lineClean\n".
 		    "if you updated your VEP cache this script's cachefile is now stale, you need to rm $cacheFile".
@@ -440,6 +443,7 @@ close(CACHELOCK);
 unlink($vcf4vep) || die "E $0: cannot unlink tmpfile vcf4vep $vcf4vep\n";
 unlink($vcfFromCache) || die "E $0: cannot unlink tmpfile vcfFromCache $vcfFromCache\n";
 unlink($vcfFromVep) || die "E $0: cannot unlink tmpfile vcfFromVep $vcfFromVep\n";
+unlink($vepStats) || die "E $0: cannot unlink vepStats file $vepStats\n";
 rmdir($tmpDir) || die "E $0: cannot rmdir tmpdir $tmpDir\n";
 
 
