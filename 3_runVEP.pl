@@ -148,7 +148,8 @@ my $vepCommand = $vepBin;
 $vepCommand .= " --offline --format vcf --vcf" ;
 # cache to use: refseq, merged, or ensembl (default)
 # $vepCommand .= " --merged" ;
-$vepCommand .= " --force_overwrite";# --no_stats" ;
+$vepCommand .= " --force_overwrite";
+$vepCommand .= " --stats_file /dev/null"; # --no_stats results in buggy VEP output (VEP git issue 1034)
 $vepCommand .= " --allele_number"; # for knowing which CSQ annotates which ALT
 $vepCommand .= " --canonical --biotype --xref_refseq --symbol --mane";
 $vepCommand .= " --numbers --total_length  --variant_class" ;
