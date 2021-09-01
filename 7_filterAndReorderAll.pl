@@ -67,11 +67,15 @@ GetOptions ("indir=s" => \$inDir,
 	    "min_hr=i" => \$min_hr)
     or die("E $0: Error in command line arguments\n");
 
+($inDir) ||
+    die "E $0: you must provide an indir containing files to filter and reorder\n";
 (-d $inDir) ||
     die "E $0: inDir $inDir doesn't exist or isn't a directory\n";
 opendir(INDIR, $inDir) ||
     die "E $0: cannot opendir inDir $inDir\n";
 
+($outDir) ||
+    die "E $0: you must provide a non-existing outdir\n";
 (-e $outDir) && 
     die "E $0: found argument $outDir but it already exists, remove it or choose another name.\n";
 mkdir($outDir) ||
@@ -109,6 +113,7 @@ while (my $inFile = readdir(INDIR)) {
     # using some hard-coded filter params here, add them as options if
     # they need to be customized
     my $com = "perl $filterBin --max_ctrl_hv 3 --max_ctrl_het 10 --no_mod";
+    $com .= " --max_af_gnomad 0.01 --max_af_1kg 0.03";
     $com .= " --min_hr $min_hr";
     ($canon) && ($com .= " --canonical");
 

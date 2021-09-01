@@ -19,22 +19,23 @@ use Getopt::Long;
 $0 = basename($0);
 
 
-# default values for args
-my $max_ctrl_hv = 3; # COUNT_NEGCTRL_HV <= $x
-my $max_ctrl_het = 10; # COUNT_NEGCTRL_HET <= $x
-my $min_cohort_hv = 0; # COUNT_$cohort_HV >= $x
-my $min_hr = 100; # COUNT_HR >= $x
+# arguments for filtering: no default values, all filters disabled by default
+my $max_ctrl_hv; # COUNT_NEGCTRL_HV <= $x
+my $max_ctrl_het; # COUNT_NEGCTRL_HET <= $x
+my $min_cohort_hv; # COUNT_$cohort_HV >= $x
+my $min_hr; # COUNT_HR >= $x
 
 my $no_mod = ''; # if enabled, filter out MODIFIER impacts
 my $no_low = ''; # if enabled, filter out LOW impacts
-
 my $canon = ''; # if enabled, only keep lines with CANONICAL==YES
+
 # could add a filter on BIOTYPE values (eg protein_coding,
 # processed_transcript, retained_intron, nonsense_mediated_decay)
 # Not implementing now.
 
-my $max_af_gnomad = 0.01; # gnomAD_AF <= $x
-my $max_af_1kg = 0.03; # AF <= $x, this is 1KG phase 3
+my $max_af_gnomad; # gnomAD_AF <= $x
+my $max_af_1kg; # AF <= $x, this is 1KG phase 3
+
 GetOptions ("max_ctrl_hv=i" => \$max_ctrl_hv,
 	    "max_ctrl_het=i" => \$max_ctrl_het,
 	    "min_cohort_hv=i" => \$min_cohort_hv,
@@ -47,19 +48,26 @@ GetOptions ("max_ctrl_hv=i" => \$max_ctrl_hv,
     or die("E $0: Error in command line arguments\n");
 
 # build string of all filter values, for logging
-my $filterString = "max_ctrl_hv=$max_ctrl_hv max_ctrl_het=$max_ctrl_het";
-($min_cohort_hv) && ($filterString .= " min_cohort_hv=$min_cohort_hv");
-($min_hr) && ($filterString .= " min_hr=$min_hr");
-($no_mod) && ($filterString .= " no_mod");
-($no_low) && ($filterString .= " no_low");
-($canon) && ($filterString .= " canonical");
-$filterString .= " max_af_gnomad=$max_af_gnomad max_af_1kg=$max_af_1kg";
+my $filterString = "";
+($max_ctrl_hv) && ($filterString .= "max_ctrl_hv=$max_ctrl_hv ");
+($max_ctrl_het) && ($filterString .= "max_ctrl_het=$max_ctrl_het ");
+($min_cohort_hv) && ($filterString .= "min_cohort_hv=$min_cohort_hv ");
+($min_hr) && ($filterString .= "min_hr=$min_hr ");
+($no_mod) && ($filterString .= "no_mod ");
+($no_low) && ($filterString .= "no_low ");
+($canon) && ($filterString .= "canonical ");
+($max_af_gnomad) && ($filterString .= "max_af_gnomad=$max_af_gnomad ");
+($max_af_1kg) && ($filterString .= "max_af_1kg=$max_af_1kg ");
+# remove trailing space and add leading tab if any filters are applied
+if ($filterString) {
+    $filterString = "\t$filterString";
+    chop($filterString);
+}
 
-
-# copy header, adding a final column with all filter values
+# copy header, adding a column with all filter values
 my $header = <STDIN>;
 chomp($header);
-print "$header\t$filterString\n" ;
+print "$header$filterString\n" ;
 # build hash of header titles, value is the column number for that header
 my %title2index;
 my @titles = split(/\t/, $header);
@@ -87,16 +95,16 @@ while(my $line = <STDIN>) {
     if (($canon) && ($fields[$title2index{"CANONICAL"}] ne 'YES')) {
 	next;
     }
-    if ($fields[$title2index{"COUNT_NEGCTRL_HV"}] > $max_ctrl_hv) {
+    if ((defined $max_ctrl_hv) && ($fields[$title2index{"COUNT_NEGCTRL_HV"}] > $max_ctrl_hv)) {
 	next;
     }
-    if ($fields[$title2index{"COUNT_NEGCTRL_HET"}] > $max_ctrl_het) {
+    if ((defined $max_ctrl_het) && ($fields[$title2index{"COUNT_NEGCTRL_HET"}] > $max_ctrl_het)) {
 	next;
     }
-    if ($fields[$title2index{"COUNT_COHORT_HV"}] < $min_cohort_hv) {
+    if ((defined $min_cohort_hv) && ($fields[$title2index{"COUNT_COHORT_HV"}] < $min_cohort_hv)) {
 	next;
     }
-    if ($fields[$title2index{"COUNT_HR"}]  < $min_hr) {
+    if  ((defined $min_hr) && ($fields[$title2index{"COUNT_HR"}]  < $min_hr)) {
 	next;
     }
    if (($no_mod) && ($fields[$title2index{"IMPACT"}] eq "MODIFIER")) {
@@ -105,7 +113,7 @@ while(my $line = <STDIN>) {
     if (($no_low) && ($fields[$title2index{"IMPACT"}] eq "LOW")) {
 	next;
     }
-    if ($fields[$title2index{"gnomAD_AF"}]) {
+    if ((defined $max_af_gnomad) && ($fields[$title2index{"gnomAD_AF"}])) {
 	# sometimes we have several &-separated values, in this case
 	# only filter if all values are high
 	my $keep = 0;
@@ -114,7 +122,7 @@ while(my $line = <STDIN>) {
 	}
 	($keep) || next;
     }
-    if ($fields[$title2index{"AF"}]) {
+    if ((defined $max_af_1kg) && ($fields[$title2index{"AF"}])) {
 	#again several &-separated values
 	my $keep = 0;
 	foreach my $af (split(/&/, $fields[$title2index{"AF"}])) {
