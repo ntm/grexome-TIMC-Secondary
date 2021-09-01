@@ -322,6 +322,17 @@ else {
 }
 system($com) && die "E $0: step9-finalCohorts failed: $?";
 
+# STEP 9 - COHORTFILES_CANONICAL , if called without --canon we still
+# produce CohortFiles restricted to canonical transcripts (in case
+# the AllTranscripts CohortFiles are too heavy for oocalc/excel)
+if (! $canon) {
+    $com = "perl $RealBin/7_filterAndReorderAll.pl --indir $outDir/Cohorts/ --outdir $outDir/Cohorts_Canonical/ --canon ";
+    if ($debug) {
+	$com .= "2> $outDir/step9-cohortsCanonical.err";
+    }
+    system($com) && die "E $0: step9-cohortsCanonical failed: $?";
+}
+
 ######################
 # STEP 9 - SUBCOHORTS (can run after requireUndiagnosed and addPatientIDs)
 #
@@ -356,6 +367,8 @@ if ($doSubCs) {
 	$outFileRoot = "$outDir/SubCohorts/$outFileRoot";
 	
 	$com .= "perl $RealBin/9_extractSubcohort.pl $subC < $outDir/Cohorts/$patho.final.patientIDs.csv > $outFileRoot.cohort.csv ; ";
+	($canon) ||
+	    ($com .= "perl $RealBin/9_extractSubcohort.pl $subC < $outDir/Cohorts_Canonical/$patho.final*.csv > $outFileRoot.cohort.canon.csv ; ");
 	$com .= "perl $RealBin/9_extractSubcohort.pl $subC < $outDir/Transcripts/$patho.Transcripts.patientIDs.csv > $outFileRoot.transcripts.csv ; ";
     }
     if ($debug) {
