@@ -272,11 +272,16 @@ else {
 }
 
 ######################
-  
+# subsequent steps work on the individual CohortFiles
+
 # STEP 7: filter variants and reorder columns, clean up unfiltered CohortFiles
+$com = "perl $RealBin/7_filterAndReorderAll.pl --indir $tmpdir/Cohorts/ --outdir $tmpdir/Cohorts_Filtered/ ";
 # set min_hr to 20% of $numSamples
 my $min_hr = int($numSamples * 0.2);
-$com = "perl $RealBin/7_filterAndReorderAll.pl --indir $tmpdir/Cohorts/ --outdir $tmpdir/Cohorts_Filtered/ --min_hr=$min_hr ";
+$com .= "--min_hr=$min_hr ";
+# other hard-coded filters:
+$com .= "--max_ctrl_hv 3 --max_ctrl_het 10 --no_mod ";
+$com .= " --max_af_gnomad 0.01 --max_af_1kg 0.03 ";
 ($canon) && ($com .= "--canonical ");
 if ($debug) {
     $com .= "2> $outDir/step7.err";

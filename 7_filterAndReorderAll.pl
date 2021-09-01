@@ -47,24 +47,29 @@ my ($inDir, $outDir);
 # number of parallel jobs to run
 my $jobs = 8;
 
-# if true, restrict to CANONICAL transcripts
-my $canon = '';
-
-# min number of HR calls at a position to consider it,
-# default 100 works well for us with a heterogeneous cohort of 500
-my $min_hr = 100;
-
-# other arguments to $filterBin could be added here if we want to
-# occasionally use non-defaults:
-## $max_ctrl_hv,$max_ctrl_het,$min_cohort_hv,
-## $no_mod, $no_low
-## $max_af_gnomad,$max_af_1kg
+# arguments for filtering: no default values, all filters disabled by default
+my $max_ctrl_hv; # COUNT_NEGCTRL_HV <= $x
+my $max_ctrl_het; # COUNT_NEGCTRL_HET <= $x
+my $min_cohort_hv; # COUNT_$cohort_HV >= $x
+my $min_hr; # COUNT_HR >= $x
+my $no_mod = ''; # if enabled, filter out MODIFIER impacts
+my $no_low = ''; # if enabled, filter out LOW impacts
+my $canon = ''; # if enabled, only keep lines with CANONICAL==YES
+my $max_af_gnomad; # gnomAD_AF <= $x
+my $max_af_1kg; # AF <= $x, this is 1KG phase 3
 
 GetOptions ("indir=s" => \$inDir,
 	    "outdir=s" => \$outDir,
 	    "jobs=i" => \$jobs,
+	    "max_ctrl_hv=i" => \$max_ctrl_hv,
+	    "max_ctrl_het=i" => \$max_ctrl_het,
+	    "min_cohort_hv=i" => \$min_cohort_hv,
+	    "min_hr=i" => \$min_hr,
+	    "no_mod" => \$no_mod,
+	    "no_low" => \$no_low,
 	    "canonical" => \$canon,
-	    "min_hr=i" => \$min_hr)
+	    "max_af_gnomad=f" => \$max_af_gnomad,
+	    "max_af_1kg=f" => \$max_af_1kg)
     or die("E $0: Error in command line arguments\n");
 
 ($inDir) ||
@@ -110,13 +115,21 @@ while (my $inFile = readdir(INDIR)) {
     ($canon) && ($outFile .= ".canon");
     $outFile .= ".csv";
 
-    # using some hard-coded filter params here, add them as options if
-    # they need to be customized
-    my $com = "perl $filterBin --max_ctrl_hv 3 --max_ctrl_het 10 --no_mod";
-    $com .= " --max_af_gnomad 0.01 --max_af_1kg 0.03";
-    $com .= " --min_hr $min_hr";
+    # filtering options
+    my $com = "perl $filterBin";
+    ($max_ctrl_hv) && ($com .= " --max_ctrl_hv=$max_ctrl_hv");
+    ($max_ctrl_het) && ($com .= " --max_ctrl_het=$max_ctrl_het");
+    ($min_cohort_hv) && ($com .= " --min_cohort_hv=$min_cohort_hv");
+    ($min_hr) && ($com .= " --min_hr=$min_hr");
+    ($no_mod) && ($com .= " --no_mod");
+    ($no_low) && ($com .= " --no_low");
     ($canon) && ($com .= " --canonical");
-
+    ($max_af_gnomad) && ($com .= " --max_af_gnomad=$max_af_gnomad");
+    ($max_af_1kg) && ($com .= " --max_af_1kg=$max_af_1kg");
+#    --max_ctrl_hv 3 --max_ctrl_het 10 --no_mod";
+ #   $com .= " --max_af_gnomad 0.01 --max_af_1kg 0.03";
+   #  $com .= " --min_hr $min_hr";
+    
     if ($gz) {
 	$com = "gunzip -c $inDir/$inFile | $com ";
     }
