@@ -109,9 +109,6 @@ while (my $inFile = readdir(INDIR)) {
     # using some hard-coded filter params here, add them as options if
     # they need to be customized
     my $com = "perl $filterBin --max_ctrl_hv 3 --max_ctrl_het 10 --no_mod";
-    # disable filtering on 1KG AFs: VEP 104 seems broken for AF, see
-    # https://github.com/Ensembl/ensembl-vep/issues/1042
-    $com .= " --max_af_1kg 1";
     $com .= " --min_hr $min_hr";
     ($canon) && ($com .= " --canonical");
 

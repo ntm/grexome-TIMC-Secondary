@@ -118,7 +118,10 @@ while(my $line = <STDIN>) {
 	#again several &-separated values
 	my $keep = 0;
 	foreach my $af (split(/&/, $fields[$title2index{"AF"}])) {
-	    ($af <= $max_af_1kg) && ($keep = 1);
+	    # VEP 104 sometimes returns aberrant large values for 1KG AFs,
+	    # if AF > 50% ignore it - see:
+	    # https://github.com/Ensembl/ensembl-vep/issues/1042
+	    (($af <= $max_af_1kg) || ($af >= 0.5)) && ($keep = 1);
 	}
 	($keep) || next;
     }
