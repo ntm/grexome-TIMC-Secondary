@@ -9,8 +9,8 @@
 # - $inDir must contain cohort or sample TSVs (possibly gzipped) as 
 #   produced by extractCohorts.pl or extractSamples.pl;
 # - $outDir doesn't exist, it will be created and filled with one TSV
-#   per infile (never gzipped), adding .filtered or .filtered.canon to 
-#   the filename.
+#   per infile (never gzipped), adding .canon to the filename if called
+#   with --canonical.
 
 use strict;
 use warnings;
@@ -115,7 +115,6 @@ while (my $inFile = readdir(INDIR)) {
     }
 
     my $outFile = $fileStart ;
-    ($outFile =~ /\.filtered/) || ($outFile .= ".filtered");
     ($canon) && ($outFile .= ".canon");
     $outFile .= ".csv";
 

@@ -5,7 +5,7 @@
 
 # Takes 2 arguments: $inDir $outDir
 # - $inDir must contain cohort TSVs as produced by extractCohorts.pl,
-#   filtered and reordered by filterVariants.pl and reorderColumns.pl,
+#   possibly filtered and reordered by filterVariants.pl and reorderColumns.pl,
 #   possibly with patientIDs;
 # - $outDir doesn't exist, it will be created and filled with one TSV
 #   per infile named $cohort.final.csv
@@ -44,7 +44,7 @@ warn "I $now: $0 - starting to run\n";
 while (my $inFile = readdir(INDIR)) {
     ($inFile =~ /^\./) && next;
     my $cohort;
-    if (($inFile =~ (/^(\w+)\.filtered\.\S+\.csv$/)) || ($inFile =~ (/^(\w+)\.filtered\.csv$/))) {
+    if ($inFile =~ /^(\w+)\..*csv$/) {
 	$cohort = $1;
     }
     else {

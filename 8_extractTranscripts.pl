@@ -5,14 +5,10 @@
 
 # Takes as arguments: $inDir $outDir [$pathologies]
 # - $inDir must contain cohort TSVs as produced by extractCohorts.pl,
-#   filtered and reordered by filterVariants.pl and reorderColumns.pl;
+#   possibly filtered/reordered by filterVariants.pl and reorderColumns.pl;
 # - $outDir doesn't exist, it will be created and filled with one TSV
 #   per infile, adding .Transcripts to the name;
 # - $pathologies (optional) is the pathologies metadata file.
-#
-# We expect that cohort files were filtered to consider only rare variants 
-# (max_af_*) that aren't seen in too many CTRLs (max_ctrl_*) and that are
-# well genotyped in our dataset (min_hr).
 #
 # We then produce one TSV for each cohort.
 # In each TSV we print one line for each transcript (=="Feature"), with:
@@ -95,7 +91,7 @@ my $help = '';
 my $USAGE = "\nParse cohort TSVs from inDir, create transcript TSVs in outDir.
 Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --indir string: subdir containing cohort TSVs as produced by extractCohorts.pl, 
-                              filtered and reordered by filterVariants.pl and reorderColumns.pl;
+                              possibly filtered/reordered by 7_filterAndReorderAll.pl;
 --outdir string: subdir where resulting Transcripts TSV files will be created, must not pre-exist
 --pathologies [optional] : pathologies metadata xlsx file, with path
 --help : print this USAGE";
@@ -196,7 +192,7 @@ my %cohort2header;
 while (my $inFile = readdir(INDIR)) {
     ($inFile =~ /^\./) && next;
     my $cohort;
-    if (($inFile =~ (/^(\w+)\.filtered\.canon\.csv$/)) || ($inFile =~ (/^(\w+)\.filtered\.csv$/)))   {
+    if ($inFile =~ /^(\w+)\..*csv$/) {
 	$cohort = $1;
     }
     else {
