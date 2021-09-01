@@ -4,7 +4,7 @@
 # 26/03/2018
 # NTM
 
-# Every infile from $inDir is filtered and columns are reordered,
+# Every infile from $inDir is filtered and columns are optionally reordered,
 # results go into $outDir (which must not pre-exist)
 # - $inDir must contain cohort or sample TSVs (possibly gzipped) as 
 #   produced by extractCohorts.pl or extractSamples.pl;
@@ -47,6 +47,9 @@ my ($inDir, $outDir);
 # number of parallel jobs to run
 my $jobs = 8;
 
+# $reorder: if enabled we reorder columns with $reorderBin
+my $reorder = '';
+
 # arguments for filtering: no default values, all filters disabled by default
 my $max_ctrl_hv; # COUNT_NEGCTRL_HV <= $x
 my $max_ctrl_het; # COUNT_NEGCTRL_HET <= $x
@@ -61,6 +64,7 @@ my $max_af_1kg; # AF <= $x, this is 1KG phase 3
 GetOptions ("indir=s" => \$inDir,
 	    "outdir=s" => \$outDir,
 	    "jobs=i" => \$jobs,
+	    "reorder" => \$reorder,
 	    "max_ctrl_hv=i" => \$max_ctrl_hv,
 	    "max_ctrl_het=i" => \$max_ctrl_het,
 	    "min_cohort_hv=i" => \$min_cohort_hv,
@@ -136,8 +140,10 @@ while (my $inFile = readdir(INDIR)) {
     else {
 	$com = "cat $inDir/$inFile | $com ";
     }
-    
-    $com .= " | perl $reorderBin ";
+
+    # reorder columns if requested
+    ($reorder) && ($com .= " | perl $reorderBin ");
+
     $com .= " > $outDir/$outFile";
     # my $now = strftime("%F %T", localtime);
     # warn "I $now: $0 - starting $com\n";
