@@ -421,7 +421,7 @@ close(FILES);
 
 # QC_CHECKCAUSAL: report coverage of known causal genes by (severe) variants
 # QC report will be printed to $qc_causal file
-my $qc_causal = "$outDir/qc_causal.out";
+my $qc_causal = "$outDir/qc_causal.txt";
 
 $com = "perl $RealBin/10_qc_checkCausal.pl --samplesFile=$samples --indir=$outDir/Samples/ ";
 $com .= "> $qc_causal";
