@@ -84,8 +84,10 @@ my $sample2causalR;
 my $nbSamples = scalar(keys(%$sample2cohortR));
 # number of samples with a causal gene in metadata
 my $nbCausal = scalar(keys(%$sample2causalR));
-# number of samples whose "causal gene" is hit by biallelic HIGH / MODHIGH
-my ($nbCausalH,$nbCausalMH) = (0,0);
+# arrays of strings to print for samples whose "causal gene" is hit by
+# biallelic HIGH / MODHIGH variants
+my @causalHigh = ();
+my @causalModHigh = ();
 # arrays of strings to print (grep commands for investigating) for samples with:
 # only LOW or MODERATE biallelic variants / NO biallelic variants / NO variants at all
 my @noMH = ();
@@ -141,10 +143,10 @@ foreach my $inFile (sort(readdir(INDIR))) {
 	($line[$canonCol] eq 'YES') || next;
 
 	if ($line[$biallelCol] eq 'HIGH') {
-	    $nbCausalH++;
+	    push(@causalHigh, "$sample $causal");
 	}
 	elsif ($line[$biallelCol] eq 'MODHIGH') {
-	    $nbCausalMH++;
+	    push(@causalModHigh, "$sample $causal");
 	}
 	elsif ($line[$biallelCol] eq 'NO') {
 	    push(@noBA, "grep -P ' $causal\\t' $inFile");
@@ -170,12 +172,23 @@ closedir(INDIR);
 print "Total number of samples in metadata: $nbSamples\n";
 print "Samples with a causal gene in metadata: $nbCausal\n\n";
 print "Examining the samples CSV files in $inDir (canonical transcripts only), we found:\n";
-print "samples whose causal gene is BIALLELIC HIGH: $nbCausalH\n";
-print "samples whose causal gene is BIALLELIC MODHIGH: $nbCausalMH\n";
+print "samples whose causal gene is BIALLELIC HIGH: ".scalar(@causalHigh)."\n";
+print "samples whose causal gene is BIALLELIC MODHIGH: ".scalar(@causalModHigh)."\n";
 print "samples whose causal gene is BIALLELIC MODERATE or LOW: ".scalar(@noMH)."\n";
 print "samples whose causal gene is only hit by MONOALLELIC: ".scalar(@noBA)."\n";
 print "samples whose causal gene has NO VARIANT: ".scalar(@noVar)."\n";
 print"\n";
+
+if (@causalHigh) {
+    print "List of samples whose causal gene is BIALLELIC HIGH:\n";
+    print join("\n", @causalHigh);
+    print "\n\n";
+}
+if (@causalModHigh) {
+    print "List of samples whose causal gene is BIALLELIC MODHIGH:\n";
+    print join("\n", @causalModHigh);
+    print "\n\n";
+}
 
 if (@noMH) {
     print "To investigate the samples whose causal gene is BIALLELIC MODERATE or LOW:\n";
@@ -183,14 +196,12 @@ if (@noMH) {
     print join("\n", @noMH);
     print "\n\n";
 }
-
 if (@noBA) {
     print "To investigate samples whose causal gene is only hit by MONOALLELIC:\n";
     print "cd $inDir\n";
     print join("\n", @noBA);
     print "\n\n";
 }
-
 if (@noVar) {
     print "To confirm samples whose causal gene has NO VARIANT:\n";
     print "cd $inDir\n";
