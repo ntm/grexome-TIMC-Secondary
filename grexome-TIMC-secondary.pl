@@ -71,8 +71,10 @@ my $outDir;
 # you can also copy it elsewhere and customize it, then use --config
 my $config = "$RealBin/grexomeTIMCsec_config.pm";
 
-# if $canon is true, results only concern CANONICAL transcripts,
-# otherwise every ensembl transcript is considered
+# if $canon is true, results are restricted to CANONICAL transcripts.
+# Otherwise you can filter the CSVs using the CANONICAL column,
+# and we also still produce canonical-only Cohorts files (because
+# the unrestricted Cohorts files can be too heavy for oocalc/excel)
 my $canon = '';
 
 # debug: if true:
