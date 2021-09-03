@@ -106,6 +106,7 @@ foreach my $inFile (sort(readdir(INDIR))) {
     ($sample) || 
 	((print "W: inFile $inFile doesn't seem to correspond to any sample, skipping it\n") && next);
 
+    my $patho = $sample2cohortR->{$sample};
     # empty $sample2cohortR as we go, for sanity testing and speed
     delete($sample2cohortR->{$sample});
 
@@ -143,10 +144,10 @@ foreach my $inFile (sort(readdir(INDIR))) {
 	($line[$canonCol] eq 'YES') || next;
 
 	if ($line[$biallelCol] eq 'HIGH') {
-	    push(@causalHigh, "$sample $causal");
+	    push(@causalHigh, "$patho $sample $causal");
 	}
 	elsif ($line[$biallelCol] eq 'MODHIGH') {
-	    push(@causalModHigh, "$sample $causal");
+	    push(@causalModHigh, "$patho $sample $causal");
 	}
 	elsif ($line[$biallelCol] eq 'NO') {
 	    push(@noBA, "grep -P ' $causal\\t' $inFile");
