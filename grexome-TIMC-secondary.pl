@@ -121,7 +121,7 @@ GetOptions ("samples=s" => \$samples,
 # make sure required options were provided and sanity check them
 ($help) && die "$USAGE\n\n";
 
-($samples) || die "E $0: you must provide a samples file\n";
+($samples) || die "E $0: you must provide a samples file\n\n$USAGE\n";
 (-f $samples) || die "E $0: the supplied samples file doesn't exist:\n$samples\n";
 
 ($inFile) || die "E $0: you must provide an input bgzipped (G)VCF file\n";
