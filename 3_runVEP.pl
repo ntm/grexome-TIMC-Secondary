@@ -135,7 +135,7 @@ my $vepPlugins = "";
     my $dbNsfpFields = "MutationTaster_pred,REVEL_rankscore,CADD_raw_rankscore";
     # MetaRNN: both MetaRNN_rankscore and MetaRNN_pred: T(olerated) or D(amaging)
     $dbNsfpFields .= ",MetaRNN_rankscore,MetaRNN_pred";
-    $vepPlugins .= " --plugin dbNSFP,$dbNsfpPath/dbNSFP4.2a.gz,pep_match=0,$dbNsfpFields";
+    $vepPlugins .= " --plugin dbNSFP,$dbNsfpPath/dbNSFP4.2a.gz,$dbNsfpFields";
 
     # dbscSNV (splicing), data is with dbNSFP (same authors), specify 
     # assembly GRCh38 as second param because the plugin can't figure it out
