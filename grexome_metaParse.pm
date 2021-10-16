@@ -131,17 +131,20 @@ sub parsePathologies {
 
 # Parse samples metadata XLSX file: required columns are "sampleID",
 # "specimenID", "patientID", "pathologyID", and "Causal gene" (they
-# can be in any order but they MUST exist).
+# can be in any order but they MUST exist). An optional column "Sex"
+# is parsed if it exists.
 # The optional second argument, if povided and non-empty, is the
 # pathologies metadata XLSX file; it is used to make sure every
 # pathologyID in samples.xlsx is defined in pathologies.xlsx (ie
 # sanity-check for typoes).
 #
-# Return a list of 4 hashrefs (caller can use whichever it needs):
+# Return a list of 4 (or 5 if "Sex" column exists) hashrefs, the caller can use
+# whichever it needs:
 # - sample2patho: key is sampleID, value is pathologyID
 # - sample2specimen: key is sampleID, value is specimenID
 # - sample2patient: key is sampleID, value is patientID if it exists, specimenID otherwise
 # - sample2causal: key is sampleID, value is causal gene if it exists (undef otherwise)
+# - sample2sex (only if the sex column exists): key is sampleID, value is "M" or "F"
 #
 # If the metadata file has errors, log as many as possible and die.
 sub parseSamples {
@@ -162,6 +165,8 @@ sub parseSamples {
     my %sample2patient;
     # sample2causal: key is sampleID, value is causal gene if it exists (undef otherwise)
     my %sample2causal;
+    # sample2sex: key is sampleID, value is the sample's sex
+    my %sample2sex;
 
     ################
     # parse $pathosFile immediately if it was provided
@@ -181,7 +186,7 @@ sub parseSamples {
     my ($colMin, $colMax) = $worksheet->col_range();
     my ($rowMin, $rowMax) = $worksheet->row_range();
     # check the column titles and grab indexes of our columns of interest
-    my ($sampleCol, $pathoCol, $specimenCol, $patientCol, $causalCol) = (-1,-1,-1,-1,-1);
+    my ($sampleCol, $pathoCol, $specimenCol, $patientCol, $causalCol, $sexCol) = (-1,-1,-1,-1,-1,-1);
     foreach my $col ($colMin..$colMax) {
 	my $cell = $worksheet->get_cell($rowMin, $col);
 	# if column has no header just ignore it
@@ -192,6 +197,7 @@ sub parseSamples {
 	elsif ($val eq "specimenID") { $specimenCol = $col; }
 	elsif ($val eq "patientID") { $patientCol = $col; }
 	elsif ($val eq "Causal gene") { $causalCol = $col; }
+	elsif ($val eq "Sex") { $sexCol = $col; }
     }
     ($sampleCol >= 0) ||
 	die "E in $subName: missing required column title: 'sampleID'\n";
@@ -203,6 +209,7 @@ sub parseSamples {
 	die "E in $subName: missing required column title: 'patientID'\n";
     ($causalCol >= 0) ||
 	die "E in $subName: missing required column title: 'Causal gene'\n";
+    # Sex is optional, don't test
 
     ################
     # parse data rows
@@ -297,11 +304,31 @@ sub parseSamples {
 	    }
 	    $sample2causal{$sample} = $causal;
 	}
-    }
 
+	################ sample2sex
+	if ($sexCol >= 0) {
+	    my $sex = $worksheet->get_cell($row, $sexCol);
+	    if (! $sex) {
+		warn "E in $subName, row ",$row+1,": since we have the optional \"Sex\" column, every row MUST have a sex\n";
+		$errorsFound++;
+		next;
+	    }
+	    $sex = $sex->unformatted();
+	    if (($sex ne "M") && ($sex ne "F")) {
+		warn "E in $subName, row ",$row+1,": sex must be M or F, found \"$sex\"\n";
+		$errorsFound++;
+		next;
+	    }
+	    $sample2sex{$sample} = $sex;
+	}
+    }
+    
     ################
     if ($errorsFound) {
 	die "E in $subName: encountered $errorsFound errors while parsing $samplesFile, please fix the file.\n";
+    }
+    elsif ($sexCol >= 0) {
+	return(\%sample2patho, \%sample2specimen, \%sample2patient, \%sample2causal, \%sample2sex);
     }
     else {
 	return(\%sample2patho, \%sample2specimen, \%sample2patient, \%sample2causal);
