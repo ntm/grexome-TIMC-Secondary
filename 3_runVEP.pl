@@ -155,7 +155,8 @@ $vepCommand .= " --force_overwrite";
 $vepCommand .= " --stats_file $vepStats";
 $vepCommand .= " --allele_number"; # for knowing which CSQ annotates which ALT
 $vepCommand .= " --canonical --biotype --xref_refseq --symbol --mane";
-$vepCommand .= " --numbers --total_length  --variant_class" ;
+$vepCommand .= " --numbers --total_length  --variant_class";
+$vepCommand .= " --shift_3prime 1"; # right-align indels before consequence calculation
 $vepCommand .= " --sift b --polyphen b";
 # --af is 1KG-phase3 global AF, --af_1kg is per continent AFs
 $vepCommand .= " --af --af_1kg --af_gnomad";
