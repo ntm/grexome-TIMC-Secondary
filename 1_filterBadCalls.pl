@@ -132,12 +132,13 @@ my $USAGE = "Parse a Strelka or GATK4 GVCF on stdin, print to stdout a similar G
 - calls that are blatantly wrong are fixed,
 - ALTs that are never called are removed,
 - lines are only printed if at least one sample still has some genotype call (including HomoRefs with --keepHR).
+
 Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --samplesFile [no default] : samples metadata xlsx file, with path
 --samplesOfInterest [default = all samples in xlsx] : comma-separated list of sampleIDs of interest (other samples are ignored)
 --keepHR : keep lines even if the only genotype call is homoref
---tmpdir [default = $tmpDir] : subdir where tmp files will be created (on a RAMDISK if possible), it must not pre-exist  
-	 (but it's parent must exist) and it will be removed after execution
+--tmpdir [default = $tmpDir] : subdir where tmp files will be created (on a RAMDISK if possible), it must 
+	 not pre-exist (but it's parent must exist) and it will be removed after execution
 --jobs N [default = $numJobs] : number of parallel jobs=threads to run
 --verbose N [default $verbose] : if > 0 increase verbosity on stderr
 --help : print this USAGE";
@@ -164,7 +165,7 @@ GetOptions ("samplesFile=s" => \$samplesFile,
 # make sure required options were provided and sanity check them
 ($help) && die "$USAGE\n\n";
 
-($samplesFile) || die "E $0: you must provide a samplesFile file\n";
+($samplesFile) || die "E $0: you must provide a samplesFile file\n\n$USAGE\n";
 (-f $samplesFile) || die "E $0: the supplied samplesFile file doesn't exist\n";
 
 (-e $tmpDir) && 
