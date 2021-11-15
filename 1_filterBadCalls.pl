@@ -170,8 +170,13 @@ GetOptions ("samplesFile=s" => \$samplesFile,
 
 (-e $tmpDir) && 
     die "E $0: tmpDir $tmpDir exists, please remove or rename it, or provide a different one with --tmpdir\n";
-mkdir($tmpDir) || 
-    die "E $0: cannot mkdir tmpDir $tmpDir\n";
+# we will mkdir after checking other args
+
+if ($numJobs < 2) {
+    # need at least one job for eatTmpFiles and one worker, more is better
+    warn "W $0: this program requires at least two worker threads, setting jobs=2\n";
+    $numJobs = 2;
+}
 
 my $now = strftime("%F %T", localtime);
 warn "I $now: $0 - starting to run\n";
@@ -247,10 +252,7 @@ while(my $line = <STDIN>) {
 	}
 	if (! $goodSamples) {
 	    # STDIN doesn't contain any samples of interest
-	    warn "W $0: no valid samples (of interest) here, nothing to do\n";
-	    rmdir($tmpDir) || 
-		die "E $0: no samples of interest but cannot rmdir tmpDir $tmpDir, why? $!\n";
-	    exit(0);
+	    die "W $0: no valid samples (of interest) here, nothing to do\n";
 	}
 	else {
 	    $headerToPrint .= join("\t",@fields)."\n";
@@ -263,6 +265,9 @@ while(my $line = <STDIN>) {
     }
 }
 
+# looks AOK, can mkdir
+mkdir($tmpDir) || 
+    die "E $0: cannot mkdir tmpDir $tmpDir\n";
 
 # flush stdout before starting our eatTmpFiles job
 STDOUT->flush();
