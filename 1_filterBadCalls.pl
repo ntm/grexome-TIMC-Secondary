@@ -46,8 +46,6 @@
 # - it also doesn't try to merge lines with overlapping REFs or identical POS values,
 #   even if this results from our renormalization (where POS can increase): if this
 #   occurs it means the clash was already present, even if it wasn't explicit.
-# - similarly, it is possible to obtain out-of-order POS lines (again, only if the
-#   input GVCF is broken IMO, but this does happen).
 # Downstream tools need to be aware of this. 4_mergeGVCFs.pl is, and tries to do
 # the right thing.
 
@@ -294,6 +292,14 @@ my $batchNum = 0;
 my $lineForNextBatch = <STDIN>;
 chomp($lineForNextBatch);
 
+# max possible POS (in current batch) of an indel after renormalization,
+# this is needed to make sure we don't end a batch with an indel that,
+# after renormalization, goes beyond the beginning of the next batch
+my $maxPossibleIndelPos = 0;
+# chrom of the latest indel of this batch, if we changed chrom and we
+# have enough lines we can end the batch for sure
+my $prevChr = "";
+
 while ($lineForNextBatch) {
     $batchNum++;
     my @lines = ($lineForNextBatch);
@@ -301,16 +307,42 @@ while ($lineForNextBatch) {
     my $eaten = 0;
     while (my $line = <STDIN>) {
 	chomp($line);
-	if (($eaten >= $batchSize) && ($line =~ /^[^\t]+\t[^\t]+\t[^\t]+\t.\t([^\t]+)\t/)) {
-	    # batch already has enough lines and has a single-char REF...
-	    my $alts = $1;
-	    if (($alts eq '<NON_REF>') || ($alts =~ /^.,<NON_REF>$/) || ($alts =~ /^.$/)) {
-		# non-variant position or single-char ALT, can't be an indel
-		$lineForNextBatch = $line;
-		last;
+	if ($line =~ /^([^\t]+)\t([^\t]+)\t[^\t]+\t(.[^\t]+)\t(.[^\t]+)\t/) {
+	    # at least 2 chars in REF and in ALT, could be an indel whose POS may change
+	    my ($chr,$pos,$ref,@alts) = ($1,$2,$3,split(/,/,$4));
+	    # after normalizing, the new pos could be at most POS + min(lengthOfRef,lengthOfLongestAlt) - 1
+	    my $maxAlt = 1;
+	    foreach my $alt (@alts) {
+		($alt eq '<NON_REF>') && next;
+		(length($alt) > $maxAlt) && ($maxAlt = length($alt));
+	    }
+	    my $maxPos = length($ref);
+	    ($maxPos > $maxAlt) && ($maxPos = $maxAlt);
+	    $maxPos += $pos - 1;
+	    # OK, remember maxPos and chr unless a previous indel went further
+	    if ($maxPossibleIndelPos < $maxPos) {
+		$maxPossibleIndelPos = $maxPos;
+		$prevChr = $chr;
 	    }
 	}
-	# if we didn't "last" batch isn't full yet, or $line might be an indel -> in both cases eat it
+
+	if ($eaten >= $batchSize) {
+	    # batch has enough lines
+	    if ($line =~ /^([^\t]+)\t([^\t]+)\t[^\t]+\t.\t([^\t]+)\t/) {
+		# $line has a single-char REF...
+		my ($chr,$pos,$alts) = ($1,$2,$3);
+		if (($chr ne $prevChr) ||
+		    (($pos > $maxPossibleIndelPos) && 
+		     (($alts eq '<NON_REF>') || ($alts =~ /^.,<NON_REF>$/) || ($alts =~ /^.$/)))) {
+		    # we changed chrom, OR
+		    # we are far enough from closest indel AND non-variant or single-char ALT => can't be an indel
+		    $lineForNextBatch = $line;
+		    last;
+		}
+	    }
+	}
+	# if we didn't "last" batch isn't full yet, or $line is too close to closest indel 
+	# or might itself be an indel -> in all cases eat it
 	push(@lines,$line);
 	$eaten++;
     }
@@ -364,10 +396,16 @@ warn "I $now: $0 - ALL DONE, completed successfully!\n";
 # - ref to array saying which columns to skip
 # - $keepHR: HR-only lines are skipped if false, kept if true
 # - $verbose, 0 is quiet, increase value for more verbosity
+#
 # WARNING: if a batch ends with a non-variant call or block and the
 # next batch starts with an indel, the prevToPrint mechanism to work
-# around a strelka bug won't work at the batch boundary. To avoid this
-# make sure batches don't start with an indel position.
+# around a strelka bug (indels can be preceded by an HR call at the same POS)
+# won't work at the batch boundary. Similarly indel positions may get their
+# POS increased when normalizing, and this could result in out-of-order
+# positions if a batch ends with an indel that can be renormalized into
+# the next batch.
+# To avoid this, batches shouldn't start with an indel position and should
+# end with enough non-indel positions after the last indel.
 sub processBatch {
     (@_ == 6) || die "E $0: processBatch needs 6 args\n";
     my ($linesR,$outFH,$filterParamsR,$skippedColsR,$keepHR,$verbose) = @_;
@@ -380,7 +418,7 @@ sub processBatch {
     # delay printing lines so we can decrement END= if needed
     # (to work-around strelka bug: indels can be preceded by HR calls
     # at the same POS or by non-variant blocks whose END= goes one too far)
-    # => our solution: delete the HR call at the same POS as a subsequent indel
+    # => our solution: delete the HR call at the same POS as an indel
     my @prevToPrint = ();
     
     foreach my $line (@$linesR) {
@@ -390,24 +428,6 @@ sub processBatch {
 	my @data = split(/\t/, $line);
 	(@data >= 10) || die "E $0: no sample data in line?\n$line\n";
 
-	# BEFORE ANYTHING ELSE: deal with @prevToPrint
-	if (@prevToPrint) {
-	    if (($prevToPrint[0] eq $data[0]) && ($prevToPrint[1] == $data[1]) && 
-		(($prevToPrint[4] eq '.') || ($prevToPrint[4] eq '<NON_REF>'))) {
-		# prevToPrint was HR line at same POS as $line, don't print prev -> NOOP
-	    }
-	    else {
-		# if prev was a non-var block on same chrom ending at current POS, decrement END=
-		my $thisPos = $data[1];
-		my $prevEnd = $thisPos - 1;
-		$prevToPrint[7] =~ s/END=$thisPos;/END=$prevEnd;/;
-		# whether we substituted or not, print prev
-		print $outFH join("\t", @prevToPrint)."\n";
-	    }
-	    # in all cases clear prev
-	    @prevToPrint = ();
-	}
-	
 	# if not --keepHR and there is no ALT in line, skip immediately
 	(! $keepHR) && (($data[4] eq '.') || ($data[4] eq '<NON_REF>')) && next;
 	# GATK4 produces useless lines where there are NO sequencing reads
@@ -657,8 +677,50 @@ sub processBatch {
 	    &removeUncalledALTs(\@lineToPrint, \@altsCalled);
 	    # normalize REF + remaining ALTs
 	    &normalizeVariants(\@lineToPrint);
-	    # save for printing
-	    @prevToPrint = @lineToPrint;
+
+	    # deal with @prevToPrint
+	    if (! @prevToPrint) {
+		# first line of batch, just save it
+		@prevToPrint = @lineToPrint;
+	    }
+	    elsif ($prevToPrint[0] ne $lineToPrint[0]) {
+		# different chroms: print prev and save line
+		print $outFH join("\t", @prevToPrint)."\n";
+		@prevToPrint = @lineToPrint;
+	    }
+	    elsif ($prevToPrint[1] == $lineToPrint[1]) {
+		# same chrom, same POS
+		if (($prevToPrint[4] eq '.') || ($prevToPrint[4] eq '<NON_REF>')) {
+		    # prevToPrint was HR line at same POS as $line, ignore prev and save line
+		    @prevToPrint = @lineToPrint;
+		}
+		elsif (($lineToPrint[4] eq '.') || ($lineToPrint[4] eq '<NON_REF>')) {
+		    # current is HR line at same POS as $prevToPrint, ignore current ie NOOP
+		}
+		else {
+		    # prev and current are both non-HR at same POS, strange but just 
+		    # print prev and save current
+		    print $outFH join("\t", @prevToPrint)."\n";
+		    @prevToPrint = @lineToPrint;
+		}
+	    }
+	    else {
+		# same chrom, different POS
+		if ($prevToPrint[1] > $lineToPrint[1]) {
+		    # prev actually comes after current, switch them
+		    my @tmpLine = @prevToPrint;
+		    @prevToPrint = @lineToPrint;
+		    @lineToPrint = @tmpLine;
+		}
+		# whether we switched or not, processing is the same:
+		# if prev was a non-var block ending at current POS, decrement END=
+		my $thisPos = $lineToPrint[1];
+		my $prevEnd = $thisPos - 1;
+		$prevToPrint[7] =~ s/END=$thisPos;/END=$prevEnd;/;
+		# whether we substituted or not, print prev and save current
+		print $outFH join("\t", @prevToPrint)."\n";
+		@prevToPrint = @lineToPrint;
+	    }
 	}
 	# else this line is discarded -> NOOP
     }
