@@ -133,7 +133,7 @@ sub parsePathologies {
 # "specimenID", "patientID", "pathologyID", and "Causal gene" (they
 # can be in any order but they MUST exist). An optional column "Sex"
 # is parsed if it exists.
-# The optional second argument, if povided and non-empty, is the
+# The optional second argument, if provided and non-empty, is the
 # pathologies metadata XLSX file; it is used to make sure every
 # pathologyID in samples.xlsx is defined in pathologies.xlsx (ie
 # sanity-check for typoes).
