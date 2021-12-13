@@ -6,13 +6,13 @@ EXAMPLE USAGE:
 **************
 perl grexome-TIMC-Secondary/grexome-TIMC-secondary.pl --samples=Grexome_Metadata/samples.xlsx --pathologies=Grexome_Metadata/pathologies.xlsx --candidateGenes=Grexome_Metadata/candidateGenes.xlsx --infile=GVCFs_Merged/grexomes_merged.g.vcf.gz --outDir=SecondaryAnalyses_TEST --config=Grexome_Metadata/sec_config.pm  2> grexomeTIMCsec.log &
 
-This will create SecondaryAnalyses_TEST/ , copy the samples.xlsx, pathologies.xlsx and candidateGenes.xlsx files into it, and populate it with subdirs Cohorts/ Cohorts_Canonical/ Samples/ Transcripts/ and optionnally SubCohorts/ (if sub-cohorts are defined), as well as qc_causal.txt (see below).
+This will create the provided workdir (eg SecondaryAnalyses_TEST/) , copy the samples.xlsx, pathologies.xlsx and candidateGenes.xlsx files into it, and populate it with subdirs Cohorts/ Cohorts_Canonical/ Samples/ Transcripts/ and optionnally SubCohorts/ (if sub-cohorts are defined), as well as qc_causal.txt (see below).
 The subdirectories provide three different viewpoints on the analysis results, corresponding to three use-cases:
 - Cohorts/for identifying candidate causal variants;
 - Cohorts_Canonical/ is the same as Cohorts/ but restricted to canonical transcripts (useful because Cohorts files with ALL transcripts can get too large for working comofortably with calc/excel), it is not created if you use the --canonical switch;
 - Transcripts/ for identifying candidate causal genes;
 - and Samples/ for analyzing each sample/patient.
-All results are presented in tsv-formatted text files (can be opened in libreoffice-calc or MS-excel). The formats and columns are documented in Documentation/grexome_userManual.pdf . Feedback on this document is particularly welcome.
+All results are presented in tsv-formatted text files (can be opened in libreoffice-calc or MS-excel). The formats and columns are documented in Documentation/grexome_userManual.pdf . If anything is unclear please provide feedback so we can improve this manual, eg as an issue on github.
 The qc_causal.txt file contains statistics (useful for quality-control) concerning the samples that have a listed "causal gene" in the samples metadata file.
 
 In our hands on a dual-CPU Centos 7 system (two Intel Xeon Silver 4114 CPUs), the above command takes ~2 hours to analyze a GVCF containing ~500 exomes.
@@ -23,14 +23,17 @@ NOTE that this timing is observed with a vepCacheFile that was previously popula
 
 METADATA FILES:
 ***************
-The pipeline can use several xlsx files containing metadata, some are REQUIRED and some are OPTIONAL. Examples are provided in the Documentation/ subdirectory, these can serve as starting points. All columns present in the Documentation/ example files (and listed below) are required by the pipeline, don't change their names! You can add new columns and/or change the order of columns to your taste, just don't touch the pre-existing column names. The filenames can also be modified, you provide them as arguments to grexome-TIMC-secondary.pl.
+The pipeline can use several xlsx files containing metadata, some are REQUIRED and some are OPTIONAL. Examples are provided in the Documentation/ subdirectory, these can serve as starting points. All columns present in the Documentation/ example files (and listed below) are required by the pipeline (except "Sex" in samples.xlsx, which is optional), don't change their names! You can add new columns and/or change the order of columns to your taste, just don't touch the pre-existing column names. The filenames can also be modified, you provide them as arguments to grexome-TIMC-secondary.pl.
 
-1. samples.xlsx: REQUIRED, describes the samples. Required columns:
+1. samples.xlsx: REQUIRED, describes the samples. This metadata file (and the code that parses it, in grexome_metaParse.pm) is shared with the grexome-TIMC-Primary pipeline [1].
+Required columns:
 - sampleID: unique identifier for each sample, these are typically created with a uniform naming scheme when new samples are integrated into the pipeline and are used internally throughout the pipeline. Rows with sampleID=="0" are ignored, this allows to retain metadata info about obsolete samples.
 - specimenID: external identifier for each sample, typically related to the BAM or FASTQ filenames.
 - patientID: a more user-friendly identifier for each sample - can be empty, but if it isn't it will be used instead of specimenID as external sample identifier.
 - pathologyID: the phenotype of each patient/sample, used to define the "cohorts". Must be listed in pathologies.xlsx if that file is provided.
 - Causal gene: contains the name of the gene when a causal variant is identified for a patient (can be empty).
+Optional column:
+- Sex: if this column exists each sample must be 'F' or 'M', ignored in grexome-TIMC-Secondary.
 
 2. pathologies.xlsx: OPTIONAL, defines the pathologies/phenotypes and allows to specify "compatible" phenotypes. Required columns:
 - pathologyID: unique identifier for the pathology/phenotype, must be an alphanumeric string (eg no whitespaces).
