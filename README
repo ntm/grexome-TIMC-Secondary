@@ -48,10 +48,16 @@ Optional column:
 To add or remove sub-cohorts you have to edit &subCohorts() in grexomeTIMCsec_config.pm , in addition to creating your subCohort_*.txt files.
 
 
+REQUIRED DATA:
+**************
+The pipeline (step 5_addGTEX.pl) uses gene expression data produced by the GTEx consortium, but the required file is included in the GTEX_Data/ of this git repo.
+In addition, step 3_runVEP.pl relies on VEP for annotating variants and therefore requires a working VEP installation, including the VEP Ensembl cache and plugin data (see DEPENDENCIES below). VEP also needs the reference genome in fasta format for HGVS annotations, we use the same file as in our primary pipeline [1] (see REQUIRED DATA there).
+
+
 CONFIGURATION:
 **************
 Before using the pipeline you must customize the grexomeTIMCsec_config.pm file, which defines every install-specific variable (eg path+name of the reference human genome fasta file). To do this you can either copy the file somewhere and edit the copy, then use --config; or edit the distributed copy in-place (not as flexible).
-Every subroutine in grexomeTIMCsec_config.pm is self-documented and will need to be customized. The top-of-file comments in grexomeTIMCsec_config.pm list the few other hard-coded things that we believe users may wish to tweak. If comments are unclear or if you believe something should be moved to *config.pm, please report it (open a github issue).
+Every subroutine in grexomeTIMCsec_config.pm is self-documented and most will need to be customized. The top-of-file comments in grexomeTIMCsec_config.pm list the few other hard-coded things that we believe users may wish to tweak. If comments are unclear or if you believe something should be moved to *config.pm, please report it (open a github issue).
 
 
 DEPENDENCIES:
