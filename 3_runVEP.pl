@@ -140,6 +140,11 @@ my $vepPlugins = "";
     # dbscSNV (splicing), data is with dbNSFP (same authors), specify 
     # assembly GRCh38 as second param because the plugin can't figure it out
     $vepPlugins .= " --plugin dbscSNV,$dbNsfpPath/dbscSNV1.1_GRCh38.txt.gz,GRCh38";
+
+    # spliceAI - I installed the plugin but it also needs data, to DL that data you
+    # have to create an account, provide your email and personal details... see:
+    # https://github.com/Ensembl/VEP_plugins/blob/release/105/SpliceAI.pm
+    # $vepPlugins .= " --plugin SpliceAI,snv=/path/to/spliceai_scores.raw.snv.hg38.vcf.gz,indel=/path/to/spliceai_scores.raw.indel.hg38.vcf.gz,cutoff=0.5";
 }
 
 # --no_stats results in buggy VEP output (VEP git issue 1034), so we produce stats
