@@ -1,4 +1,25 @@
 ###############################################
+26/01/2022
+
+Updating to Ensembl release 105:
+
+- grab the latest ensembl Human GTF in /data/Ensembl/ with:
+wget ftp://ftp.ensembl.org/pub/release-105/gtf/homo_sapiens/Homo_sapiens.GRCh38.105.chr.gtf.gz
+
+- update listCanonicalTranscripts_MYSQL.sh , then
+  generate updated list of canonical transcripts [from home, tcp/3306 is still blocked at TIMC]
+/bin/sh < listCanonicalTranscripts_MYSQL.sh | gzip -c >  listCanonicalTranscripts_220126.tsv.gz
+
+- then on fauve:
+gunzip -c Homo_sapiens.GRCh38.105.chr.gtf.gz | makeCanonicalTranscriptTable.pl listCanonicalTranscripts_220126.tsv.gz | gzip -c > canonicalTranscripts_220126.tsv.gz
+
+- also want it in BED format for samtools bedcov:
+gunzip -c canonicalTranscripts_220126.tsv.gz | canonicalTranscripts_table2bed.pl | gzip -c > canonicalTranscripts_220126.bed.gz
+
+AOK, move previous versions to Old/ .
+
+
+###############################################
 26/08/2021
 
 Updating to Ensembl release 104:
