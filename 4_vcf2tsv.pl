@@ -10,8 +10,12 @@
 # We define a new MODHIGH impact, as follows:
 # - missense variants are upgraded from MODER to MODHIGH if they are
 #   considered deleterious by most methods (details in code, look for "missense");
-# - similarly, splice_region_variants are upgraded from LOW to MODHIGH if they
-#   are considered deleterious (look for "splice" in code).
+# - splice_region_variants are upgraded from LOW to MODHIGH if they are
+#   considered deleterious (currently by ada_score and rf_score from dbscSNV,
+#   look for "splice" in code);
+# - variants predicted by SpliceAI to alter splicing with high confidence
+#   AND having a high CADD rankscore (presumably thanks to CADD-Splice) are
+#   also upgraded to MODHIGH, whatever their VEP "Consequence" category.
 #
 # When a variant impacts several transcripts and/or for multi-allelic lines
 # (ie with several variants), we will print one line per transcript and per 
@@ -41,6 +45,7 @@ warn "I $now: $0 - starting to run\n";
 # upgrade-to-MODHIGH code, make sure they get fixed there as
 # well if they change names.
 # Current available annotations (26/08/2021) are:
+# TODO UPDATE THIS WITH VEP 105 + SpliceAI 
 # Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|EXON|INTRON|
 # HGVSc|HGVSp|cDNA_position|CDS_position|Protein_position|Amino_acids|Codons|
 # Existing_variation|ALLELE_NUM|DISTANCE|STRAND|FLAGS|VARIANT_CLASS|SYMBOL_SOURCE|
@@ -58,6 +63,7 @@ my @goodVeps = ("SYMBOL","Gene","IMPACT","Consequence","Feature","CANONICAL",
 		"MetaRNN_pred","MetaRNN_rankscore","CADD_raw_rankscore",
 		"MutationTaster_pred","REVEL_rankscore",
 		"ada_score","rf_score",
+		"DS_AG","DP_AG","DS_AL","DP_AL","DS_DG","DP_DG","DS_DL","DP_DL",
 		"gnomAD_AF","AF",
 		"Existing_variation","CLIN_SIG","SOMATIC","PHENO","PUBMED");
 
@@ -152,12 +158,27 @@ while (my $line =<STDIN>) {
 	    $thisCsq{$vepNames[$i]} = $csqTmp[$i] ;
 	}
 
+	# upgrade any variant to MODHIGH if it alters splicing according to
+	# both SpliceAI AND CADD (presumably via CADD-Splice AKA CADD 1.6) 
+	if ($thisCsq{"IMPACT"} ne "HIGH") {
+	    # according to SpliceAI authors, variant is splice-altering
+	    # with high confidence if max(DS_AG, DS_AL, DS_DG, DS_DL) > 0.8
+	    foreach my $ds ("DS_AG","DS_AL","DS_DG","DS_DL") {
+		if (($thisCsq{$ds}) && ($thisCsq{$ds} > 0.7)) {
+		    # affects splicing according to SpliceAI, test CADD
+		    if (($thisCsq{"CADD_raw_rankscore"}) && ($thisCsq{"CADD_raw_rankscore"} >= 0.7)) {
+			$thisCsq{"IMPACT"} = "MODHIGH";
+		    }
+		    last;
+		}
+	    }
+	}
+
 	# upgrade splice_region_variant from LOW to MODHIGH if:
 	# (ada_score > 0.6) AND (rf_score > 0.6)
-	# TODO: CADD v1.6 (AKA CADD-Splice) is supposedly good for splice-affecting variants,
-	# I want to use CADD_raw_rankscore here. Unfortunately currently the dbNSFP VEP
-	# plugin doesn't report CADD_raw_rankscore for splicing variants, despite the score
-	# being present in the dbNSFP gz file
+	# NOTE: SpliceAI and CADD-Splice can make splice-altering predictions
+	# for eg deep intronic variants, not just splice_region_variant
+	# => processed independantly
 	if (($thisCsq{"IMPACT"} eq "LOW") && ($thisCsq{"Consequence"}) &&
 	    ($thisCsq{"Consequence"} =~ /splice_region_variant/)) {
 	    # NOTE: VEP consequence column can have several &-separated consequences,
