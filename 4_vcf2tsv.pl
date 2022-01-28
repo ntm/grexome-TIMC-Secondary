@@ -102,7 +102,7 @@ while (my $line = <STDIN>) {
 	$vepNames{$v} = 1;
     }
     foreach my $v (@goodVeps) {
-	($vepNames{$v} == 1) ||
+	((defined $vepNames{$v}) && ($vepNames{$v} == 1)) ||
 	    die "E $0: the VEP field $v doesn't seem to exist anymore, update goodVeps and maybe other things!\n";
     }
 }
