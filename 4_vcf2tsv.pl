@@ -44,17 +44,16 @@ warn "I $now: $0 - starting to run\n";
 # Some of these are hard-coded in the "missense" and "splice"
 # upgrade-to-MODHIGH code, make sure they get fixed there as
 # well if they change names.
-# Current available annotations (26/08/2021) are:
-# TODO UPDATE THIS WITH VEP 105 + SpliceAI 
+# Current available annotations (28/01/2022) are:
 # Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|EXON|INTRON|
 # HGVSc|HGVSp|cDNA_position|CDS_position|Protein_position|Amino_acids|Codons|
 # Existing_variation|ALLELE_NUM|DISTANCE|STRAND|FLAGS|VARIANT_CLASS|SYMBOL_SOURCE|
 # HGNC_ID|CANONICAL|MANE_SELECT|MANE_PLUS_CLINICAL|RefSeq|SIFT|PolyPhen|HGVS_OFFSET|
 # AF|AFR_AF|AMR_AF|EAS_AF|EUR_AF|SAS_AF|gnomAD_AF|gnomAD_AFR_AF|gnomAD_AMR_AF|
 # gnomAD_ASJ_AF|gnomAD_EAS_AF|gnomAD_FIN_AF|gnomAD_NFE_AF|gnomAD_OTH_AF|gnomAD_SAS_AF|
-# CLIN_SIG|SOMATIC|PHENO|PUBMED|
-# CADD_raw_rankscore|MetaRNN_pred|MetaRNN_rankscore|MutationTaster_pred|REVEL_rankscore|
-# ada_score|rf_score
+# CLIN_SIG|SOMATIC|PHENO|PUBMED|ada_score|rf_score|SpliceAI_pred_DP_AG|
+# SpliceAI_pred_DP_AL|SpliceAI_pred_DP_DG|SpliceAI_pred_DP_DL|SpliceAI_pred_DS_AG|
+# SpliceAI_pred_DS_AL|SpliceAI_pred_DS_DG|SpliceAI_pred_DS_DL|SpliceAI_pred_SYMBOL
 my @goodVeps = ("SYMBOL","Gene","IMPACT","Consequence","Feature","CANONICAL",
 		"BIOTYPE","VARIANT_CLASS","RefSeq","MANE_SELECT","MANE_PLUS_CLINICAL",
 		"ALLELE_NUM","EXON","INTRON",
@@ -63,7 +62,9 @@ my @goodVeps = ("SYMBOL","Gene","IMPACT","Consequence","Feature","CANONICAL",
 		"MetaRNN_pred","MetaRNN_rankscore","CADD_raw_rankscore",
 		"MutationTaster_pred","REVEL_rankscore",
 		"ada_score","rf_score",
-		"DS_AG","DP_AG","DS_AL","DP_AL","DS_DG","DP_DG","DS_DL","DP_DL",
+		"SpliceAI_pred_DS_AG","SpliceAI_pred_DP_AG","SpliceAI_pred_DS_AL",
+		"SpliceAI_pred_DP_AL","SpliceAI_pred_DS_DG","SpliceAI_pred_DP_DG",
+		"SpliceAI_pred_DS_DL","SpliceAI_pred_DP_DL",
 		"gnomAD_AF","AF",
 		"Existing_variation","CLIN_SIG","SOMATIC","PHENO","PUBMED");
 
@@ -163,7 +164,7 @@ while (my $line =<STDIN>) {
 	if ($thisCsq{"IMPACT"} ne "HIGH") {
 	    # according to SpliceAI authors, variant is splice-altering
 	    # with high confidence if max(DS_AG, DS_AL, DS_DG, DS_DL) > 0.8
-	    foreach my $ds ("DS_AG","DS_AL","DS_DG","DS_DL") {
+	    foreach my $ds ("SpliceAI_pred_DS_AG","SpliceAI_pred_DS_AL","SpliceAI_pred_DS_DG","SpliceAI_pred_DS_DL") {
 		if (($thisCsq{$ds}) && ($thisCsq{$ds} > 0.7)) {
 		    # affects splicing according to SpliceAI, test CADD
 		    if (($thisCsq{"CADD_raw_rankscore"}) && ($thisCsq{"CADD_raw_rankscore"} >= 0.7)) {
