@@ -122,10 +122,11 @@ warn "I $now: $0 - starting to run\n";
 # associated datafiles (with paths)
 my $vepPlugins = "";
 {
-    # CADD - no longer needed, dbNSFP provides it (among many other things)
-    #my $caddPath = "$dataDir/CADD/";
-    # (-d $caddPath) || die "E $0: CADD datadir doesn't exist: $caddPath\n";
-    #$vepPlugins .= " --plugin CADD,$caddPath/whole_genome_SNVs.tsv.gz,$caddPath/InDels.tsv.gz";
+    # CADD - dbNSFP provides it (among many other things) for coding and consensus
+    # splice site variants, but not for deeper intronic variants
+    my $caddPath = "$dataDir/CADD/";
+    (-d $caddPath) || die "E $0: CADD datadir doesn't exist: $caddPath\n";
+    $vepPlugins .= " --plugin CADD,$caddPath/whole_genome_SNVs.tsv.gz,$caddPath/gnomad.genomes.r3.0.indel.tsv.gz";
 
     # dbNSFP
     my $dbNsfpPath = "$dataDir/dbNSFP/";
@@ -135,7 +136,7 @@ my $vepPlugins = "";
     my $dbNsfpFields = "MutationTaster_pred,REVEL_rankscore,CADD_raw_rankscore";
     # MetaRNN: both MetaRNN_rankscore and MetaRNN_pred: T(olerated) or D(amaging)
     $dbNsfpFields .= ",MetaRNN_rankscore,MetaRNN_pred";
-    $vepPlugins .= " --plugin dbNSFP,'consequence=ALL',$dbNsfpPath/dbNSFP4.2a.gz,$dbNsfpFields";
+    $vepPlugins .= " --plugin dbNSFP,$dbNsfpPath/dbNSFP4.2a.gz,$dbNsfpFields";
 
     # dbscSNV (splicing), data is with dbNSFP (same authors), specify 
     # assembly GRCh38 as second param because the plugin can't figure it out

@@ -14,7 +14,7 @@
 #   considered deleterious (currently by ada_score and rf_score from dbscSNV,
 #   look for "splice" in code);
 # - variants predicted by SpliceAI to alter splicing with high confidence
-#   AND having a high CADD rankscore (presumably thanks to CADD-Splice) are
+#   AND having a high CADD_PHRED score (presumably thanks to CADD-Splice) are
 #   also upgraded to MODHIGH, whatever their VEP "Consequence" category.
 #
 # When a variant impacts several transcripts and/or for multi-allelic lines
@@ -51,7 +51,7 @@ warn "I $now: $0 - starting to run\n";
 # HGNC_ID|CANONICAL|MANE_SELECT|MANE_PLUS_CLINICAL|RefSeq|SIFT|PolyPhen|HGVS_OFFSET|
 # AF|AFR_AF|AMR_AF|EAS_AF|EUR_AF|SAS_AF|gnomAD_AF|gnomAD_AFR_AF|gnomAD_AMR_AF|
 # gnomAD_ASJ_AF|gnomAD_EAS_AF|gnomAD_FIN_AF|gnomAD_NFE_AF|gnomAD_OTH_AF|gnomAD_SAS_AF|
-# CLIN_SIG|SOMATIC|PHENO|PUBMED|ada_score|rf_score|SpliceAI_pred_DP_AG|
+# CLIN_SIG|SOMATIC|PHENO|PUBMED|ada_score|rf_score|CADD_PHRED|CADD_RAW|SpliceAI_pred_DP_AG|
 # SpliceAI_pred_DP_AL|SpliceAI_pred_DP_DG|SpliceAI_pred_DP_DL|SpliceAI_pred_DS_AG|
 # SpliceAI_pred_DS_AL|SpliceAI_pred_DS_DG|SpliceAI_pred_DS_DL|SpliceAI_pred_SYMBOL
 my @goodVeps = ("SYMBOL","Gene","IMPACT","Consequence","Feature","CANONICAL",
@@ -61,7 +61,7 @@ my @goodVeps = ("SYMBOL","Gene","IMPACT","Consequence","Feature","CANONICAL",
 		"SIFT","PolyPhen",
 		"MetaRNN_pred","MetaRNN_rankscore","CADD_raw_rankscore",
 		"MutationTaster_pred","REVEL_rankscore",
-		"ada_score","rf_score",
+		"ada_score","rf_score","CADD_PHRED",
 		"SpliceAI_pred_DS_AG","SpliceAI_pred_DP_AG","SpliceAI_pred_DS_AL",
 		"SpliceAI_pred_DP_AL","SpliceAI_pred_DS_DG","SpliceAI_pred_DP_DG",
 		"SpliceAI_pred_DS_DL","SpliceAI_pred_DP_DL",
@@ -163,11 +163,13 @@ while (my $line =<STDIN>) {
 	# both SpliceAI AND CADD (presumably via CADD-Splice AKA CADD 1.6) 
 	if ($thisCsq{"IMPACT"} ne "HIGH") {
 	    # according to SpliceAI authors, variant is splice-altering
-	    # with high confidence if max(DS_AG, DS_AL, DS_DG, DS_DL) > 0.8
+	    # with high confidence if max(DS_AG, DS_AL, DS_DG, DS_DL) > 0.8;
+	    # for CADD_PHRED a cutoff of 20-30 seems reasonable;
+	    # since we AND the two methods, we lower these cutoffs a bit 
 	    foreach my $ds ("SpliceAI_pred_DS_AG","SpliceAI_pred_DS_AL","SpliceAI_pred_DS_DG","SpliceAI_pred_DS_DL") {
 		if (($thisCsq{$ds}) && ($thisCsq{$ds} > 0.7)) {
 		    # affects splicing according to SpliceAI, test CADD
-		    if (($thisCsq{"CADD_raw_rankscore"}) && ($thisCsq{"CADD_raw_rankscore"} >= 0.7)) {
+		    if (($thisCsq{"CADD_PHRED"}) && ($thisCsq{"CADD_PHRED"} >= 20)) {
 			$thisCsq{"IMPACT"} = "MODHIGH";
 		    }
 		    last;
