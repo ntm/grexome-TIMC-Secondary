@@ -187,23 +187,13 @@ $vepCommand .= " -o STDOUT" ;
 
 
 ##########################################################################
-# parse VCF on stdin.
-# - headers and data lines absent from cache are printed to 
-#   $vcf4vep (gzipped --fast);
-# - data lines found in cache are annotated using cache 
-#   and printed to $vcfFromCache.
-my $vcf4vep = "$tmpDir/vcf4vep.vcf.gz";
-open(VCF4VEP, "| gzip -c --fast > $vcf4vep") ||
-    die "E $0: cannot open gzip pipe to vcf4vep $vcf4vep\n";
-my $vcfFromCache = "$tmpDir/vcfFromCache.vcf.gz";
-open(VCFCACHE, "| gzip -c --fast > $vcfFromCache") ||
-    die "E $0: cannot open gzip pipe to vcfFromCache $vcfFromCache\n";
+# send header of VCF on stdin to VEP, to make sure the cache isn't stale
 
-# a small VCF containing only the headers is also made, for testing
+# make a small VCF containing only the headers, for testing
 # the VEP version etc...
-my $vcf4vepTest = "$tmpDir/vcf4vepVersionTest.vcf";
-open(VEPTEST, "> $vcf4vepTest") ||
-    die "E $0: cannot open vcf4vepTest $vcf4vepTest for writing\n";
+my $vcfHeader = "$tmpDir/vcfHeader.vcf";
+open(VCFHEAD, "> $vcfHeader") ||
+    die "E $0: cannot open vcfHeader $vcfHeader for writing\n";
 
 # $cache is a hashref. key=="chr:pos:ref:alt", value==CSQ
 my $cache = {};
@@ -218,19 +208,18 @@ my $cacheUpdate = {};
 
 # header
 while (my $line = <STDIN>) {
-    # header lines go to VCF4VEP and also to VEPTEST
-    print VCF4VEP $line;
-    print VEPTEST $line;
+    # header lines go to VCFHEAD
+    print VCFHEAD $line;
     # line #CHROM is always last header line
     ($line =~ /^#CHROM/) && last;
 }
 
-# run VEP on the small test file
-close(VEPTEST);
-open(VEPTEST_OUT, "$vepCommand < $vcf4vepTest |") ||
-    die "E $0: cannot run VEP on testfile with:\n$vepCommand < $vcf4vepTest\n";
+# run VEP on header file
+close(VCFHEAD);
+open(VCFHEAD_OUT, "$vepCommand < $vcfHeader |") ||
+    die "E $0: cannot run VEP on header file with:\n$vepCommand < $vcfHeader\n";
 # check that the cache matches the VEP and cache versions and has the correct VEP columns
-while (my $line = <VEPTEST_OUT>) {
+while (my $line = <VCFHEAD_OUT>) {
     chomp($line);
     if ($line =~ /^##VEP=/) {
 	# make sure VEP version + DBs match the cache
@@ -245,9 +234,7 @@ while (my $line = <VEPTEST_OUT>) {
 	    my $cacheLine = $cache->{"VEPversion"};
 	    if ($cacheLine ne $lineClean) {
 		# version mismatch, clean up and die
-		close(VCF4VEP);
-		close(VCFCACHE);
-		unlink($vcf4vep,$vcfFromCache,$vcf4vepTest,$vepStats);
+		unlink($vcfHeader,$vepStats);
 		rmdir($tmpDir) || warn "W $0: VEP version mismatch but can't rmdir tmpDir $tmpDir\n";
 		die "E: $0 - cached VEP version and ##VEP line from VCF are different:\n$cacheLine\n$lineClean\n".
 		    "if you updated your VEP cache this script's cachefile is now stale, you need to rm $cacheFile".
@@ -263,12 +250,11 @@ while (my $line = <VEPTEST_OUT>) {
 	if (defined $cache->{"INFOCSQ"}) {
 	    my $cacheLine = $cache->{"INFOCSQ"};
 	    if ($cacheLine ne $line) {
-		close(VCF4VEP);
-		close(VCFCACHE);
-		unlink($vcf4vep,$vcfFromCache,$vcf4vepTest);
+		unlink($vcfHeader,$vepStats);
 		rmdir($tmpDir) || warn "W $0: INFO-CSQ mismatch but can't rmdir tmpDir $tmpDir\n";
 		die "E: $0 - cacheLine and INFO-CSQ line from VCF are different:\n$cacheLine\n$line\n".
-		    "if you really want to use this vcf from STDIN you need to rm $cacheFile (or change the cacheFile in $0)\n\n";
+		    "if you changed your VEP switches or plugins this script's cachefile is now stale,\n".
+		    "you need to rm $cacheFile (or change the cacheFile in $0)\n\n";
 	    }
 	}
 	else {
@@ -276,11 +262,32 @@ while (my $line = <VEPTEST_OUT>) {
 	}
     }
 }
-close(VEPTEST_OUT);
-unlink($vcf4vepTest);
+close(VCFHEAD_OUT);
 
 
+##########################################################################
 # data
+# - headers and data lines absent from cache are sent to VEP, and result
+#   is printed to $vcfFromVep (gzipped --fast);
+# - data lines found in cache are annotated using cache 
+#   and printed to $vcfFromCache.
+my $vcfFromVep = "$tmpDir/vcfFromVep.vcf.gz";
+
+open(VCFVEP, "| $vepCommand | gzip -c --fast > $vcfFromVep") ||
+    die "E $0: cannot run VEP on new data\n";
+my $vcfFromCache = "$tmpDir/vcfFromCache.vcf.gz";
+open(VCFCACHE, "| gzip -c --fast > $vcfFromCache") ||
+    die "E $0: cannot open gzip pipe to vcfFromCache $vcfFromCache\n";
+
+# send headers to VEP
+open(VCFHEAD, "$vcfHeader") ||
+    die "E $0: cannot open vcfHeader $vcfHeader\n";
+while (my $line = <VCFHEAD>) {
+    print VCFVEP $line;
+}
+close(VCFHEAD);
+
+# parse data lines from stdin
 while (my $line = <STDIN>) {
     chomp($line);
     my @f = split(/\t/,$line,-1);
@@ -295,23 +302,15 @@ while (my $line = <STDIN>) {
 	print VCFCACHE join("\t",@f)."\n";
     }
     else {
-	print VCF4VEP "$line\n";
+	print VCFVEP "$line\n";
     }
 }
-
-close(VCF4VEP);
-close(VCFCACHE);
-
 
 $now = strftime("%F %T", localtime);
 warn "I $now: $0 - finished parsing stdin and splitting it into $tmpDir files\n";
 
-
-##########################################################################
-# run VEP on $vcf4vep, producing $vcfFromVep
-my $vcfFromVep = "$tmpDir/vcfFromVep.vcf.gz";
-
-system("gunzip -c $vcf4vep | $vepCommand | gzip -c --fast > $vcfFromVep") ;
+close(VCFVEP);
+close(VCFCACHE);
 
 $now = strftime("%F %T", localtime);
 warn "I $now: $0 - finished running VEP on the new variants\n";
@@ -453,7 +452,7 @@ close(CACHELOCK);
 
 ##########################################################################
 # clean up
-unlink($vcf4vep) || die "E $0: cannot unlink tmpfile vcf4vep $vcf4vep\n";
+unlink($vcfHeader) || die "E $0: cannot unlink tmpfile vcfHeader $vcfHeader\n";
 unlink($vcfFromCache) || die "E $0: cannot unlink tmpfile vcfFromCache $vcfFromCache\n";
 unlink($vcfFromVep) || die "E $0: cannot unlink tmpfile vcfFromVep $vcfFromVep\n";
 unlink($vepStats) || die "E $0: cannot unlink vepStats file $vepStats\n";
