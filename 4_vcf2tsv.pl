@@ -10,12 +10,9 @@
 # We define a new MODHIGH impact, as follows:
 # - missense variants are upgraded from MODER to MODHIGH if they are
 #   considered deleterious by most methods (details in code, look for "missense");
-# - splice_region_variants are upgraded from LOW to MODHIGH if they are
-#   considered deleterious (currently by ada_score and rf_score from dbscSNV,
-#   look for "splice" in code);
-# - variants predicted by SpliceAI to alter splicing with high confidence
-#   AND having a high CADD_PHRED score (presumably thanks to CADD-Splice) are
-#   also upgraded to MODHIGH, whatever their VEP "Consequence" category.
+# - variants predicted to affect splicing are upgraded to MODHIGH if they
+#   are considered splice-affecting by most methods (currently by ada_score
+#   and rf_score from dbscSNV, SpliceAI, and CADD-Splice, look for "splice");
 #
 # When a variant impacts several transcripts and/or for multi-allelic lines
 # (ie with several variants), we will print one line per transcript and per 
@@ -159,44 +156,11 @@ while (my $line =<STDIN>) {
 	    $thisCsq{$vepNames[$i]} = $csqTmp[$i] ;
 	}
 
-	# upgrade any variant to MODHIGH if it alters splicing according to
-	# both SpliceAI AND CADD (presumably via CADD-Splice AKA CADD 1.6) 
-	if ($thisCsq{"IMPACT"} ne "HIGH") {
-	    # according to SpliceAI authors, variant is splice-altering
-	    # with high confidence if max(DS_AG, DS_AL, DS_DG, DS_DL) > 0.8;
-	    # for CADD_PHRED a cutoff of 20-30 seems reasonable;
-	    # since we AND the two methods, we lower these cutoffs a bit 
-	    foreach my $ds ("SpliceAI_pred_DS_AG","SpliceAI_pred_DS_AL","SpliceAI_pred_DS_DG","SpliceAI_pred_DS_DL") {
-		if (($thisCsq{$ds}) && ($thisCsq{$ds} > 0.7)) {
-		    # affects splicing according to SpliceAI, test CADD
-		    if (($thisCsq{"CADD_PHRED"}) && ($thisCsq{"CADD_PHRED"} >= 20)) {
-			$thisCsq{"IMPACT"} = "MODHIGH";
-		    }
-		    last;
-		}
-	    }
-	}
-
-	# upgrade splice_region_variant from LOW to MODHIGH if:
-	# (ada_score > 0.6) AND (rf_score > 0.6)
-	# NOTE: SpliceAI and CADD-Splice can make splice-altering predictions
-	# for eg deep intronic variants, not just splice_region_variant
-	# => processed independantly
-	if (($thisCsq{"IMPACT"} eq "LOW") && ($thisCsq{"Consequence"}) &&
-	    ($thisCsq{"Consequence"} =~ /splice_region_variant/)) {
-	    # NOTE: VEP consequence column can have several &-separated consequences,
-	    # we just want splice_region_variant to be present somewhere
-	    if (($thisCsq{"ada_score"}) && ($thisCsq{"ada_score"} > 0.6) &&
-		($thisCsq{"rf_score"}) && ($thisCsq{"rf_score"} > 0.6)) {
-		$thisCsq{"IMPACT"} = "MODHIGH";
-	    }
-	}
-
 	# upgrade putatively deleterious missense variants:
 	if (($thisCsq{"IMPACT"} eq "MODERATE") && ($thisCsq{"Consequence"}) &&
 	    ($thisCsq{"Consequence"} =~ /missense_variant/)) {
-	    # upgrade to MODHIGH if at least $minPassedFrac criteria are passed,
-	    # among the following:
+	    # upgrade to MODHIGH if at least $minPassedFracMissense criteria are
+	    # passed among the following:
 	    # - SIFT -> deleterious
 	    # - Polyphen -> probably_damaging
 	    # - CADD_raw_rankscore >= 0.7
@@ -206,8 +170,8 @@ while (my $line =<STDIN>) {
 	    # 
 	    # NOTE: sometimes we don't have any prediction for some predictors,
 	    # due to dbNSFP using older transcripts and/or bugs in VEP or VEP plugins...
-	    # $minPassedFrac allows to upgrade variants in those cases
-	    my $minPassedFrac = 0.6;
+	    # $minPassedFracMissense allows to upgrade variants in those cases
+	    my $minPassedFracMissense = 0.6;
 	    my $passed = 0;
 	    my $totalPreds = 0;
 	    if ($thisCsq{"SIFT"}) {
@@ -236,12 +200,60 @@ while (my $line =<STDIN>) {
 		($thisCsq{"MetaRNN_pred"} =~ /D/) && ($passed++);
 	    }
 
-	    if (($totalPreds) && ($passed / $totalPreds >= $minPassedFrac)) {
+	    if (($totalPreds) && ($passed / $totalPreds >= $minPassedFracMissense)) {
 		# $totalPreds==0 can only happen due to bugs in VEP, but it does
 		$thisCsq{"IMPACT"} = "MODHIGH";
 	    }
 	}
-	
+
+	# upgrade any variant to MODHIGH if it putatively alters splicing:
+	if (($thisCsq{"IMPACT"} ne "HIGH") && ($thisCsq{"IMPACT"} ne "MODHIGH")) {
+	    # upgrade to MODHIGH if at least $minPassedFracSplicing criteria are
+	    # passed, among the following:
+	    # - SpliceAI max(DS_AG, DS_AL, DS_DG, DS_DL) > cutoff
+	    # - CADD-PHRED > cutoff (presumably via CADD-Splice AKA CADD 1.6) 
+	    # - ada_score > 0.6 (dbscSNV author-recommended cutoff)
+	    # - rf_score > 0.6 (dbscSNV author-recommended cutoff)
+
+	    # cutoffs:
+	    # SpliceAI authors recommend 0.5 and say 0.8 is high-precision
+	    my $spliceAI_cutoff = 0.7;
+	    # for CADD_PHRED, 20-30 seems reasonable
+	    my $cadd_cutoff = 25;
+
+	    # some variants don't have ada_score or rf_score -> use a frac
+	    my $minPassedFracSplicing = 0.6;
+	    my $passed = 0;
+	    my $totalPreds = 0;
+	    # SliceAI
+	    my @DS_headers = ("SpliceAI_pred_DS_AG","SpliceAI_pred_DS_AL",
+			      "SpliceAI_pred_DS_DG","SpliceAI_pred_DS_DL");
+	    foreach my $ds (@DS_headers) {
+		(defined $thisCsq{$ds}) && (++$totalPreds) && last;
+	    }
+	    foreach my $ds (@DS_headers) {
+		($thisCsq{$ds}) && ($thisCsq{$ds} > $spliceAI_cutoff) && (++$passed) && last;
+	    }
+	    # CADD-Splice
+	    if (defined $thisCsq{"CADD_PHRED"}) {
+		$totalPreds++;
+		($thisCsq{"CADD_PHRED"} > $cadd_cutoff) && ($passed++);
+	    }
+	    # dbscSNV
+	    if (defined $thisCsq{"ada_score"}) {
+		$totalPreds++;
+		($thisCsq{"ada_score"} > 0.6) && ($passed++);
+	    }
+	    if (defined $thisCsq{"rf_score"}) {
+		$totalPreds++;
+		($thisCsq{"rf_score"} > 0.6) && ($passed++);
+	    }
+
+	    if (($totalPreds) && ($passed / $totalPreds >= $minPassedFracSplicing)) {
+		$thisCsq{"IMPACT"} = "MODHIGH";
+	    }
+	}
+
 	# build vepToPrint string based on @goodVeps
 	my $vepToPrint = "";
 	foreach my $vepName (@goodVeps) {
