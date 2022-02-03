@@ -229,22 +229,22 @@ while (my $line =<STDIN>) {
 	    my @DS_headers = ("SpliceAI_pred_DS_AG","SpliceAI_pred_DS_AL",
 			      "SpliceAI_pred_DS_DG","SpliceAI_pred_DS_DL");
 	    foreach my $ds (@DS_headers) {
-		(defined $thisCsq{$ds}) && (++$totalPreds) && last;
+		($thisCsq{$ds}) && (++$totalPreds) && last;
 	    }
 	    foreach my $ds (@DS_headers) {
 		($thisCsq{$ds}) && ($thisCsq{$ds} > $spliceAI_cutoff) && (++$passed) && last;
 	    }
 	    # CADD-Splice
-	    if (defined $thisCsq{"CADD_PHRED"}) {
+	    if ($thisCsq{"CADD_PHRED"}) {
 		$totalPreds++;
 		($thisCsq{"CADD_PHRED"} > $cadd_cutoff) && ($passed++);
 	    }
 	    # dbscSNV
-	    if (defined $thisCsq{"ada_score"}) {
+	    if ($thisCsq{"ada_score"}) {
 		$totalPreds++;
 		($thisCsq{"ada_score"} > 0.6) && ($passed++);
 	    }
-	    if (defined $thisCsq{"rf_score"}) {
+	    if ($thisCsq{"rf_score"}) {
 		$totalPreds++;
 		($thisCsq{"rf_score"} > 0.6) && ($passed++);
 	    }
