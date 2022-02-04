@@ -170,7 +170,8 @@ while (my $line =<STDIN>) {
 	    # 
 	    # NOTE: sometimes we don't have any prediction for some predictors,
 	    # due to dbNSFP using older transcripts and/or bugs in VEP or VEP plugins...
-	    # $minPassedFracMissense allows to upgrade variants in those cases
+	    # -> $minPassedFracMissense allows to still upgrade variants, but we also
+	    # require that at least 2 predictors are available
 	    my $minPassedFracMissense = 0.6;
 	    my $passed = 0;
 	    my $totalPreds = 0;
@@ -200,16 +201,16 @@ while (my $line =<STDIN>) {
 		($thisCsq{"MetaRNN_pred"} =~ /D/) && ($passed++);
 	    }
 
-	    if (($totalPreds) && ($passed / $totalPreds >= $minPassedFracMissense)) {
-		# $totalPreds==0 can only happen due to bugs in VEP, but it does
+	    # require at least 2 predictors
+	    if (($totalPreds>1) && ($passed / $totalPreds >= $minPassedFracMissense)) {
 		$thisCsq{"IMPACT"} = "MODHIGH";
 	    }
 	}
 
 	# upgrade any variant to MODHIGH if it putatively alters splicing:
 	if (($thisCsq{"IMPACT"} ne "HIGH") && ($thisCsq{"IMPACT"} ne "MODHIGH")) {
-	    # upgrade to MODHIGH if at least $minPassedFracSplicing criteria are
-	    # passed, among the following:
+	    # upgrade to MODHIGH if at least $minPassedFracSplicing criteria (and at 
+	    # least 2) are passed, among the following:
 	    # - SpliceAI max(DS_AG, DS_AL, DS_DG, DS_DL) > cutoff
 	    # - CADD-PHRED > cutoff (presumably via CADD-Splice AKA CADD 1.6) 
 	    # - ada_score > 0.6 (dbscSNV author-recommended cutoff)
@@ -249,7 +250,8 @@ while (my $line =<STDIN>) {
 		($thisCsq{"rf_score"} > 0.6) && ($passed++);
 	    }
 
-	    if (($totalPreds) && ($passed / $totalPreds >= $minPassedFracSplicing)) {
+	    # require at least 2 predictors
+	    if (($totalPreds > 1) && ($passed / $totalPreds >= $minPassedFracSplicing)) {
 		$thisCsq{"IMPACT"} = "MODHIGH";
 	    }
 	}
