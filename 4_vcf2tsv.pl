@@ -172,7 +172,7 @@ while (my $line =<STDIN>) {
 	    # due to dbNSFP using older transcripts and/or bugs in VEP or VEP plugins...
 	    # -> $minPassedFracMissense allows to still upgrade variants, but we also
 	    # require that at least 2 predictors are available
-	    my $minPassedFracMissense = 0.6;
+	    my $minPassedFracMissense = 0.5;
 	    my $passed = 0;
 	    my $totalPreds = 0;
 	    if ($thisCsq{"SIFT"}) {
@@ -202,7 +202,7 @@ while (my $line =<STDIN>) {
 	    }
 
 	    # require at least 2 predictors
-	    if (($totalPreds>1) && ($passed / $totalPreds >= $minPassedFracMissense)) {
+	    if (($totalPreds>1) && ($passed / $totalPreds > $minPassedFracMissense)) {
 		$thisCsq{"IMPACT"} = "MODHIGH";
 	    }
 	}
@@ -218,12 +218,12 @@ while (my $line =<STDIN>) {
 
 	    # cutoffs:
 	    # SpliceAI authors recommend 0.5 and say 0.8 is high-precision
-	    my $spliceAI_cutoff = 0.7;
+	    my $spliceAI_cutoff = 0.5;
 	    # for CADD_PHRED, 20-30 seems reasonable
 	    my $cadd_cutoff = 25;
 
 	    # some variants don't have ada_score or rf_score -> use a frac
-	    my $minPassedFracSplicing = 0.6;
+	    my $minPassedFracSplicing = 0.5;
 	    my $passed = 0;
 	    my $totalPreds = 0;
 	    # SliceAI
@@ -251,7 +251,7 @@ while (my $line =<STDIN>) {
 	    }
 
 	    # require at least 2 predictors
-	    if (($totalPreds > 1) && ($passed / $totalPreds >= $minPassedFracSplicing)) {
+	    if (($totalPreds > 1) && ($passed / $totalPreds > $minPassedFracSplicing)) {
 		$thisCsq{"IMPACT"} = "MODHIGH";
 	    }
 	}
