@@ -220,7 +220,7 @@ while (my $line =<STDIN>) {
 	    # SpliceAI authors recommend 0.5 and say 0.8 is high-precision
 	    my $spliceAI_cutoff = 0.5;
 	    # for CADD_PHRED, 20-30 seems reasonable
-	    my $cadd_cutoff = 25;
+	    my $cadd_cutoff = 20;
 
 	    # some variants don't have ada_score or rf_score -> use a frac
 	    my $minPassedFracSplicing = 0.5;
