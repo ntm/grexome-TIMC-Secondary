@@ -69,7 +69,7 @@ GetOptions ("gtex=s" => \$gtexFile,
 # make sure required options were provided and sanity check them
 ($help) && die "$USAGE\n\n";
 
-($gtexFile) || die "E $0: you must provide a GTEX file\n";
+($gtexFile) || die "E $0: you must provide a GTEX file. Try $0 --help\n";
 (-f $gtexFile) || die "E $0: the supplied GTEX file doesn't exist\n";
 
 my @favoriteTissues = split(/,/,$favoriteTissues);
@@ -83,8 +83,11 @@ warn "I $now: $0 - starting to run\n";
 ## parse GTEX file
 
 # GTEX data will be stored in hash:
-# key is ENSG, value is a ref to an array holding the TPM values
+# key is ENSG, value is a ref to an array of strings (possibly "")
+# containing the new GTEX RATIOs, then the GTEX TPMs with
+# @favoriteTissues first.
 my %gtex;
+
 
 open(GTEX, $gtexFile) || die "E $0: cannot open gtex file $gtexFile for reading\n";
 # skip header
@@ -126,7 +129,47 @@ while ($line=<GTEX>) {
     # grab ENSG, ignore gene name
     my $ensg = shift(@data);
     shift(@data);
-    $gtex{$ensg} = \@data ;
+    ($gtex{$ensg}) &&
+	die "E $0: ENSG $ensg present twice in GTEX file\n";
+    
+    # @thisGtex: array of strings holding expression values, one per tissue
+    my @thisGtex =("") x @tissues ;
+    # calculated gtex ratio for each favorite tissue
+    my @favTissRatios = ("") x @favoriteTissues;
+
+    # for calculating GTEX_*_RATIO:
+    # sum of all gtex values
+    my $sumOfGtex = 0;
+    # number of defined gtex values
+    my $numberOfGtex = 0;
+    foreach my $i (0..$#data) {
+	($data[$i]) || next;
+	$thisGtex[$i] = $data[$i];
+	$sumOfGtex += $data[$i] ;
+	$numberOfGtex++;
+    }
+
+    # favExp / averageExp == favExp / (sumExp / numberGtex) == favExp * numberGtex / sumExp
+    # so make sure we can divide by $sumOfGtex
+    ($sumOfGtex) || die "E $0: Sum of GTEX values is zero for gene $ensg, impossible?\n$line\n";
+    foreach my $ii (0..$#favTissIndex) {
+	($thisGtex[$favTissIndex[$ii]]) && 
+	    ($favTissRatios[$ii] = $thisGtex[$favTissIndex[$ii]] * $numberOfGtex / $sumOfGtex) ;
+    }
+    
+    # OK build array of strings with GTEX_RATIOs first, then favorites, then others
+    my @toPrint = ();
+    foreach my $favTissRatio (@favTissRatios) {
+	# print max 2 digits after decimal
+	my $favTR_toPrint = $favTissRatio;
+	($favTissRatio) && ($favTR_toPrint = sprintf("%.2f",$favTissRatio));
+	push(@toPrint, $favTR_toPrint);
+    }
+    push(@toPrint, @thisGtex[@favTissIndex]);
+    foreach my $i (0..$#tissues) {
+	(grep(/^$i$/, @favTissIndex) == 0) && push(@toPrint, $thisGtex[$i]);
+    }
+    $gtex{$ensg} = \@toPrint;
 }
 
 close(GTEX);
@@ -176,50 +219,16 @@ while (my $line = <STDIN>) {
     my $gene = $fields[$geneIndex];
     ($gene =~ /,/) && die "E $0: line in inFile has several Genes, shouldn't happen:\n$line\n";
 
-    # @thisGtex: array of strings holding expression values, one per tissue
-    my @thisGtex =("") x @tissues ;
-    # calculated gtex ratio for each favorite tissue
-    my @favTissRatios = ("") x @favoriteTissues;
-
-    if (defined $gtex{$gene}) {
-	# for calculating GTEX_*_RATIO:
-	# sum of all gtex values
-	my $sumOfGtex = 0;
-	# number of defined gtex values
-	my $numberOfGtex = 0;
-	my @gtexThisGene = @{$gtex{$gene}};
-	foreach my $i (0..$#gtexThisGene) {
-	    ($gtexThisGene[$i]) || next;
-	    $thisGtex[$i] = $gtexThisGene[$i];
-	    $sumOfGtex += $gtexThisGene[$i] ;
-	    $numberOfGtex++;
-	}
-
-	# favExp / averageExp == favExp / (sumExp / numberGtex) == favExp * numberGtex / sumExp
-	# so make sure we can divide by $sumOfGtex
-	($sumOfGtex) || die "E $0: Sum of GTEX values is zero for gene $gene, impossible?\n$line\n";
-	foreach my $ii (0..$#favTissIndex) {
-	    ($thisGtex[$favTissIndex[$ii]]) && 
-		($favTissRatios[$ii] = $thisGtex[$favTissIndex[$ii]] * $numberOfGtex / $sumOfGtex) ;
-	}
-    }
-    # else: no expression data for $gene, use the default empty strings
-
-    # OK, build line with expression values inserted where they should, 
-    # and with GTEX_RATIOs first, then favorites, then others
+    # build line with expression values inserted where they should
     my @toPrint = @fields[0..$insertBeforeIndex-1];
-    foreach my $favTissRatio (@favTissRatios) {
-	# print max 2 digits after decimal
-	my $favTR_toPrint = $favTissRatio;
-	($favTissRatio) && ($favTR_toPrint = sprintf("%.2f",$favTissRatio));
-	push(@toPrint, $favTR_toPrint);
+    if (defined $gtex{$gene}) {
+	push(@toPrint, @{$gtex{$gene}});
     }
-    push(@toPrint, @thisGtex[@favTissIndex]);
-    foreach my $i (0..$#tissues) {
-	(grep(/^$i$/, @favTissIndex) == 0) && push(@toPrint, $thisGtex[$i]);
+    else {
+	# no expression data for $gene, use empty strings
+	push(@toPrint, ("") x (@favoriteTissues + @tissues)) ;
     }
     push(@toPrint, @fields[$insertBeforeIndex..$#fields]);
-
     print join("\t",@toPrint)."\n";
 }
 
