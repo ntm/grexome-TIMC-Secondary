@@ -8,7 +8,7 @@
 # transcripts from Ensembl contained in $canoTransFile (produced
 # by getCanonicalTranscripts.pl)
 # Print to stdout a tab-delimited file with columns:
-# "TRANSCRIPT\tGENE\tCHROM\tSTRAND\tCDS_START\tCDS_END\tEXON_STARTS\tEXON_ENDS\n"
+# "TRANSCRIPT\tGENE\tENSG\tCHROM\tSTRAND\tCDS_START\tCDS_END\tEXON_STARTS\tEXON_ENDS\n"
 # containing one line per canonical transcript, 
 # GENE is the ENSG id if we can't find a gene name,
 # STRAND is + or -,
@@ -54,7 +54,7 @@ foreach my $i (1..5) {
 }    
 
 # fill following data structures, each is a hash with key==$transcript and:
-# value == "TRANSCRIPT\tGENE\tCHROM\tSTRAND"
+# value == "TRANSCRIPT\tGENE\tENSG\tCHROM\tSTRAND"
 my %trans2printFirst;
 # value == $chrom (for sorting the output)
 my %trans2chr;
@@ -86,11 +86,14 @@ while (my $line = <>) {
     my $strand = $fields[6];
 
     if (! defined($trans2printFirst{$transcript})) {
+	# ENSG
+	($fields[8] =~ /gene_id "([^"]+)";/) ||
+	    die "E: cannot grab gene_id from line:\n$line\n";
+	my $ensg = $1;
 	# GENE
-	($fields[8] =~ /gene_name "([^"]+)";/) ||
-	    ($fields[8] =~ /gene_id "([^"]+)";/) ||
-	    die "E: cannot grab gene_name or gene_id from line:\n$line\n";
-	my $gene = $1;
+	my $gene = $ensg;
+	($fields[8] =~ /gene_name "([^"]+)";/) &&
+	    ($gene = $1);
 	# CHROM
 	my $chr = $fields[0];
 	# for sorting we want just the chrom number, replace X Y M by 23-25
@@ -102,7 +105,7 @@ while (my $line = <>) {
 	($chr eq "MT") && ($chr = "M");
 	$chr = "chr$chr";
 
-	$trans2printFirst{$transcript} = "$transcript\t$gene\t$chr\t$strand";
+	$trans2printFirst{$transcript} = "$transcript\t$gene\t$ensg\t$chr\t$strand";
 	$trans2cds{$transcript} = [];
 	$trans2exons{$transcript} = ["",""];
     }
@@ -155,7 +158,7 @@ sub byChrByCoord {
 
 
 # print header
-print "TRANSCRIPT\tGENE\tCHROM\tSTRAND\tCDS_START\tCDS_END\tEXON_STARTS\tEXON_ENDS\n";
+print "TRANSCRIPT\tGENE\tENSG\tCHROM\tSTRAND\tCDS_START\tCDS_END\tEXON_STARTS\tEXON_ENDS\n";
 
 # print data in chrom-coord order
 foreach my $transcript (sort byChrByCoord keys(%trans2printFirst)) {

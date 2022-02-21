@@ -137,9 +137,9 @@ open(GENES, "gunzip -c $transcriptsFile |") ||
 while (my $line = <GENES>) {
     chomp($line);
     my @fields = split(/\t/,$line);
-    (@fields == 8) || 
+    (@fields == 9) || 
 	die "E $0: wrong number of fields in line:\n$line\n";
-    my ($transcript,$gene,$chr,$strand,$cdsStart,$cdsEnd,$starts,$ends) = @fields;
+    my ($transcript,$gene,$ensg,$chr,$strand,$cdsStart,$cdsEnd,$starts,$ends) = @fields;
 
     # skip non-coding transcripts
     if ($cdsStart == $cdsEnd) {

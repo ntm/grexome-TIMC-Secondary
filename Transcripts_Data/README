@@ -1,4 +1,17 @@
 ###############################################
+21/02/2022
+
+Adding ENSG column to makeCanonicalTranscriptTable.pl CSV output,
+running on v105:
+gunzip -c Homo_sapiens.GRCh38.105.chr.gtf.gz | makeCanonicalTranscriptTable.pl listCanonicalTranscripts_220126.tsv.gz | gzip -c > canonicalTranscripts_220221.tsv.gz
+
+# also re-making the BED, although the output is actually identical:
+gunzip -c canonicalTranscripts_220221.tsv.gz | canonicalTranscripts_table2bed.pl | gzip -c > canonicalTranscripts_220221.bed.gz
+
+DONE.
+
+
+###############################################
 26/01/2022
 
 Updating to Ensembl release 105:

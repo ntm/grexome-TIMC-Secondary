@@ -15,7 +15,7 @@
 
 while(my $line = <STDIN>) {
     chomp $line;
-    my ($transcript,$gene,$chr,$strand,$cdsS,$cdsE,$exonS,$exonE) = split(/\t/,$line);
+    my ($transcript,$gene,$ensg,$chr,$strand,$cdsS,$cdsE,$exonS,$exonE) = split(/\t/,$line);
 
     my @exonsS = split(/,/,$exonS);
     my @exonsE = split(/,/,$exonE);
