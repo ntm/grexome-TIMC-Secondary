@@ -173,7 +173,7 @@ my $now = strftime("%F %T", localtime);
 warn "I $now: $0 - starting to run\n";
 
 # sanity-check all provided metadata files: just parse and ignore the results,
-# we'll die if anything is wrong
+# we'll die if anything is wrong 
 if ($pathologies) {
     &parsePathologies($pathologies);
     &parseSamples($samples, $pathologies);
@@ -188,8 +188,30 @@ else {
     }
 }
 
-# number of samples in $inFile, needed to set $min_hr (for filtering)
-my $numSamples = scalar(split(/\s+/, `zgrep --max-count=1 '#CHROM' $inFile`)) - 9;
+# sanity-check: any sample listed in $samplesFile MUST be present in $inFile,
+# otherwise we can get errors in later steps (eg step 7).
+# We also need the number of samples in $samples, to set $min_hr (for filtering).
+my $numSamples = 0;
+{
+    # grab the list of samples present in $inFile:
+    my @samplesFromInFile = split(/\s+/, `zgrep --max-count=1 '#CHROM' $inFile`);
+    # first 9 columns aren't sampleIDs
+    splice(@samplesFromInFile,0,9);
+    # key == sampleID present in $inFile, value==1
+    my %samplesFromIn = ();
+    foreach my $sample (@samplesFromInFile) {
+	$samplesFromIn{$sample} = 1;
+    }
+
+    # grab the samples listed in $samplesFile: just use the first hashref from
+    # parseSamples, keys are samples
+    my ($samplesFromMetadataR) = &parseSamples($samples);
+    $numSamples = scalar(keys(%$samplesFromMetadataR));
+    foreach my $s (sort keys(%$samplesFromMetadataR)) {
+	(defined $samplesFromIn{$s}) ||
+	    die "E $0: every sample defined in samples file $samples MUST be present in inFile $inFile, sample $s isn't.\n";
+    }
+}
 
 # variant-caller string/name, will be added to all final filenames
 my $caller;
