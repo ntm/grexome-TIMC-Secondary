@@ -309,6 +309,10 @@ while (my $inFile = readdir(INDIR)) {
 		    elsif ($impact eq "LOW") {
 			$sample2trans2counters{$sample}->{$transcript}->[3] += 2-$i;
 		    }
+		    elsif ($impact eq "MODIFIER") {
+			# NOOP: we don't want to flag transcripts affected by 2 HET MODIFIER 
+			# variants, MODIFIERs of interest should be HV
+		    }
 		    else {
 			die "E $0: unknown impact $impact in inFile $inFile, line:\n$line\n";
 		    }
