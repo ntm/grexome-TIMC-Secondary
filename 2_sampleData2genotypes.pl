@@ -4,6 +4,9 @@
 # NTM
 
 # Read on stdin a (G)VCF file with one data column per sample.
+# FORMAT MUST start with either GT:AF and have DP somewhere (for SNVs 
+# and short indels), or it must start with GT:RR and have BF somewhere
+# (for CNVs).
 # Replace all the sample data columns by genotype columns 
 # HV, HET, OTHER, HR.
 # Each column has eg: 
@@ -12,7 +15,9 @@
 # - all genotypes in HET column will be REF/VAR, eg 0/1, 0/2...
 # - all genotypes in HV column will by homovar, eg 1/1, 2/2 etc...
 # - all other genotypes (ie VAR1/VAR2) will appear in OTHER column.
-# For HV and HET genos, "sample" actually becomes: $sample[$dp:$af].
+# For HV and HET genos at SNVs/short-indels, "sample" actually 
+# becomes: $sample[$dp:$af].
+# Similarly for CNV calls "sample" becomes  $sample[$BF:$RR].
 #
 # <NON_REF> is removed from ALTs if it was present, apart from that
 # we don't touch the first 8 columns: we assume all ALTs are called
@@ -71,7 +76,7 @@ while(my $line = <STDIN>) {
 	$com .= " 2> ".`readlink -f /proc/$$/fd/2` ;
 	chomp($com);
 	print "##sampleData2genotypes=<commandLine=\"$com\">\n";
-	print "##FORMAT=<ID=GENOS,Number=.,Type=String,Description=\"pipe-separated list of genotypes called at this position, with all corresponding sample identifiers for each genotype (with [DP:AF] for HET and HV)\">\n";
+	print "##FORMAT=<ID=GENOS,Number=.,Type=String,Description=\"pipe-separated list of genotypes called at this position, with all corresponding sample identifiers for each genotype (with [DP:AF] for HET and HV SNVs/short-indels, and [BF:RR] for CNVs)\">\n";
 	print $lineToPrint;
 	last;
     }
@@ -93,18 +98,25 @@ while(my $line = <STDIN>) {
 	$lineToPrint .= "\t".shift(@data);
     }
 
-    # from FORMAT we need GT, AF and DP (assumption: filterBadCalls.pl already ran
-    # and created/updated AF and DP with correct values)
+    # from FORMAT we need GT:AF+DP (assumption: filterBadCalls.pl already ran
+    # and created/updated AF and DP with correct values), or GT:RR+BF for CNVs.
     my $format = shift(@data);
-    # GT and AF should always be first, check it
-    ($format =~ /^GT:AF:/) || die "E $0: GT:AF: aren't the first FORMAT keys in:\n$line\n";
+    # GT and AF/RR should always be first, check it
+    # Also disguise BF as DP since it's syntactically identical
+    if ($format =~ /^GT:RR:/) {
+	($format =~ s/:BF/:DP/) ||
+	    die "E $0: FORMAT starts with GT:RR but doesn't contain BF in:\n$line\n";
+    }
+    elsif ($format !~ /^GT:AF:/) {
+	die "E $0: FORMAT doesn't begin with 'GT:AF:' or 'GT:RR:' in:\n$line\n";
+    }
     # find DP index
     my $dpCol = 0;
     my @format = split(/:/, $format);
     foreach my $i (2..$#format) {
 	($format[$i] eq "DP") && ($dpCol = $i) && last;
     }
-    ($dpCol==0) && die "E $0: DP not found in format:\n$line\n";
+    ($dpCol==0) && die "E $0: DP/BF not found in format:\n$line\n";
     # print new FORMAT
     $lineToPrint .= "\tGENOS";
 
@@ -118,21 +130,28 @@ while(my $line = <STDIN>) {
 	# add trailing ':' so we know GT is followed by : (eg for NOCALLS)
 	$data[$i] .= ':';
 	# ignore NOCALLs
-	($data[$i] =~ m~^\./\.:~) && next;
-	($data[$i] =~ m~^(\d+/\d+):([^:]+):~) || 
-	    die "E $0: cannot grab genotype and AF for sample $i in $data[$i] in line:\n$line\n";
-	my ($geno,$af) = ($1,$2);
+	($data[$i] eq './.:') && next;
+	my ($geno,$af);
+	if ($data[$i] eq '0/0:') {
+	    # HR at a CNV, disguise as normal HR ie set $af='.'
+	    ($geno,$af) = ('0/0','.');
+	}
+	else {
+	    ($data[$i] =~ m~^(\d+/\d+):([^:]+):~) || 
+		die "E $0: cannot grab genotype and AF/RR for sample $i in $data[$i] in line:\n$line\n";
+	    ($geno,$af) = ($1,$2);
+	}
 
 	if (defined $geno2samples{$geno}) { $geno2samples{$geno} .= ","; }
 	else { $geno2samples{$geno} = ""; }
 	$geno2samples{$geno} .= $samples[$i];
 	if ($af ne '.') {
-	    # if we have an AF this is a HET or HV call, find DP
+	    # if we have an AF this is a HET or HV call (possibly a CNV), find DP/BF
 	    my @thisData = split(/:/, $data[$i]);
 	    my $dp = 0;
 	    ($dpCol) && ($thisData[$dpCol]) && ($thisData[$dpCol] ne '.') && ($dp = $thisData[$dpCol]);
-	    ($dp) || die "E $0: AF is $af but couldn't find DP in $data[$i]\n$line\n";
-	    # add [DP:AF] after sample ID
+	    ($dp) || die "E $0: AF/RR is $af but couldn't find DP/BF in $data[$i]\n$line\n";
+	    # add [DP:AF] / [BF:RR] after sample ID
 	    $geno2samples{$geno} .= "[$dp:$af]";
 	}
     }
