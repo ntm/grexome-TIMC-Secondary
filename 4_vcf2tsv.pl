@@ -13,6 +13,16 @@
 # - variants predicted to affect splicing are upgraded to MODHIGH if they
 #   are considered splice-affecting by most methods (currently by ada_score
 #   and rf_score from dbscSNV, SpliceAI, and CADD-Splice, look for "splice");
+# - feature_elongation variants are upgraded from MODIFIER to MODHIGH.
+#
+# In addition, feature_truncation variants are upgraded from MODIFIER to HIGH.
+#
+# Overall for CNVs, VEP currently can produce 4 different consequences:
+# - transcript_ablation = DEL covering the complete transcript, HIGH;
+# - feature_truncation = DEL with partial coverage of the transcript, 
+#   MODIFER for VEP, we upgrade to HIGH;
+# - transcript_amplification = DUP covering the complete transcript, HIGH;
+# - feature_elongation = DUP with partial coverage, MODIFER upgraded to MODHIGH.
 #
 # When a variant impacts several transcripts and/or for multi-allelic lines
 # (ie with several variants), we will print one line per transcript and per 
@@ -205,6 +215,18 @@ while (my $line =<STDIN>) {
 	    if (($totalPreds>1) && ($passed / $totalPreds > $minPassedFracMissense)) {
 		$thisCsq{"IMPACT"} = "MODHIGH";
 	    }
+	}
+
+	# upgrade CNVs with only partial coverage of the transcript:
+	if (($thisCsq{"IMPACT"} ne "HIGH") && ($thisCsq{"Consequence"}) &&
+	    ($thisCsq{"Consequence"} =~ /feature_truncation/)) {
+	    # deletion of one or more exons, upgrade to HIGH
+	    $thisCsq{"IMPACT"} = "HIGH";
+	}
+	elsif (($thisCsq{"IMPACT"} ne "HIGH") && ($thisCsq{"IMPACT"} ne "MODHIGH") &&
+	       ($thisCsq{"Consequence"}) && ($thisCsq{"Consequence"} =~ /feature_elongation/)) {
+	    # duplication of one or more exons, upgrade to MODHIGH
+	    $thisCsq{"IMPACT"} = "MODHIGH";
 	}
 
 	# upgrade any variant to MODHIGH if it putatively alters splicing:
