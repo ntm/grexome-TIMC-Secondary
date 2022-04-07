@@ -135,7 +135,8 @@ Arguments (all can be abbreviated to shortest unambiguous prefixes):
     my $vepCommand = &vepCommand($vepBin, $dataDir, $genome, $vepJobs, $vepStats);
 
     # read $cacheFile if provided
-    # $cache is a hashref. key=="chr:pos:ref:alt" value==CSQ, + 2 special keys
+    # $cache is a hashref. key=="chr:pos:ref:alt" (for SNVs/indels) or 
+    # "chr:pos:ref:alt:end" (for CNVs), value==CSQ, + 2 special keys
     # "VEPVERSION" and "INFOCSQ" used to store the VEP version and fields
     my $cache = {};
     # grab previously cached data except in debug mode
@@ -231,8 +232,14 @@ Arguments (all can be abbreviated to shortest unambiguous prefixes):
 	}
 
 	# no else: process $line whether we changed chrom or not
-	# key: chrom:pos:ref:alt
+	# key: chrom:pos:ref:alt for SNVs/indels, chrom:pos:ref:alt:end for CNVs
 	my $key = "$f[0]:$f[1]:$f[3]:$f[4]";
+	if (($f[4] eq '<DUP>') || ($f[4] eq '<DEL>')) {
+	    # CNV: grab END
+	    ($f[7] =~ /END=(\d+)/) || 
+		die "E $0: cannot grab END from CNV line:\n$line\n";
+	    $key .= ":$1";
+	}
 	if (defined $cache->{$key}) {
 	    # just copy CSQ from cache
 	    ($f[7]) && ($f[7] ne '.') && ($f[7] .= ';');
@@ -490,8 +497,14 @@ sub mergeAndPrint {
 	    # also save for updating cache at the end
 	    my @f = split(/\t/,$nextVep);
 	    (@f >= 8) || die "E $0: nextVep line doesn't have >=8 columns:\n$nextVep";
-	    # key: chrom:pos:ref:alt
+	    # key: chrom:pos:ref:alt for SNVs/indels, chrom:pos:ref:alt:end for CNVs
 	    my $key = "$f[0]:$f[1]:$f[3]:$f[4]";
+	    if (($f[4] eq '<DUP>') || ($f[4] eq '<DEL>')) {
+		# CNV: grab END
+		($f[7] =~ /END=(\d+)/) || 
+		    die "E $0: cannot grab END in nextVep line:\n$nextVep";
+		$key .= ":$1";
+	    }
 	    ($f[7] =~ /CSQ=([^;]+)/) || die "E $0: cannot grab CSQ in nextVep line:\n$nextVep";
 	    my $csq = $1;
 	    $cacheUpdate->{$key} = $csq;
@@ -502,10 +515,10 @@ sub mergeAndPrint {
 		my $thisChr = $1;
 		$nextVepPos = $2;
 		($chr eq $thisChr) ||
-		    die"E $0: vcfFromVep has line with bad chrom, expected $chr:\n$nextVep\n";
+		    die "E $0: vcfFromVep has line with bad chrom, expected $chr:\n$nextVep\n";
 	    }
 	    elsif ($nextVep) {
-		die"E $0: vcfFromVep has a data line but I can't parse it:\n$nextVep\n";
+		die "E $0: vcfFromVep has a data line but I can't parse it:\n$nextVep\n";
 	    }
 	    next;
 	}
@@ -517,10 +530,10 @@ sub mergeAndPrint {
 		my $thisChr = $1;
 		$nextCachePos = $2;
 		($chr eq $thisChr) ||
-		    die"E $0: vcfFromCache has line with bad chrom, expected $chr:\n$nextCache\n";
+		    die "E $0: vcfFromCache has line with bad chrom, expected $chr:\n$nextCache\n";
 	    }
 	    elsif ($nextCache) {
-		die"E $0: vcfFromCache has a data line but I can't parse it:\n$nextCache\n";
+		die "E $0: vcfFromCache has a data line but I can't parse it:\n$nextCache\n";
 	    }
 	}
     }
