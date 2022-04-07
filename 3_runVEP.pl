@@ -445,7 +445,8 @@ sub checkHeaders {
 # Header lines are ignored.
 # $vcfFromVep and $vcfFromCache must both concern a single identical CHROM.
 # All CSQs in $vcfFromVep are added to $cacheUpdate, a hashref similar
-# to $cache: key=="chr:pos:ref:alt", value==CSQ
+# to $cache: key=="chr:pos:ref:alt" for SNVs/indels and "chrom:pos:ref:alt:end"
+# for CNVs, value==CSQ
 sub mergeAndPrint {
     (@_ == 3) || die "E $0: mergeAndPrint needs 3 args";
     my ($vcfFromVep, $vcfFromCache, $cacheUpdate) = @_;
