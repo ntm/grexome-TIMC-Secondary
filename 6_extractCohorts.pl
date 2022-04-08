@@ -423,7 +423,8 @@ close(IN);
     die "E $0: cannot unlink tmpFileCandidatesSeen $tmpFileCandidatesSeen: $!\n";
 foreach my $gene (keys(%knownCandidatesSeen)) {
     ($knownCandidatesSeen{$gene}) ||
-	warn "W $0: \"known candidate/causal gene\" $gene was never seen! typo in samples or candidateGenes xlsx files?\n";
+	warn "W $0: \"known candidate/causal gene\" $gene for ".$knownCandidateGenes{$gene}.
+	" was never seen! typo in samples or candidateGenes xlsx files?\n";
 }
 
 $now = strftime("%F %T", localtime);
