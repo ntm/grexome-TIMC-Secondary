@@ -141,6 +141,17 @@ while (my $line =<STDIN>) {
 	push(@dataCols, "");
     }
 
+    # for CNVs, append the END= value to $alt
+    if (($alt eq '<DUP>') || ($alt eq '<DEL>')) {
+	foreach my $thisInfo (split(/;/,$info)) {
+	    ($thisInfo =~ /^END=(\d+)$/) || next;
+	    # remove trailing '>', we'll add it back after $end
+	    chop($alt);
+	    $alt .= ":$1>";
+	    last;
+	}
+    }
+    
     # line to print
     my $toPrintStart = "$chr:$pos\t$ref\t$alt";
 
