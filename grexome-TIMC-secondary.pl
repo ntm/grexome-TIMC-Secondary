@@ -61,6 +61,9 @@ my $candidateGenes;
 # input bgzipped multi-sample GVCF or VCF
 my $inFile;
 
+# input multi-sample VCF containing CNV calls, possibly (b)gzipped
+my $cnvs;
+
 # outDir must not exist, it will be created and populated with
 # subdirs (containing the pipeline results), logfiles (in debug mode),
 # and copies of all provided metadata files.
@@ -99,6 +102,8 @@ Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --pathologies : [optional] pathologies metadata xlsx file, with path
 --candidateGenes : [optional] known candidate genes in xlsx files, comma-separated, with paths
 --infile : bgzipped multi-sample GVCF or VCF file to parse
+--cnvs : [optional] multi-sample VCF file containing CNV calls, possibly (b)gzipped, conventions are:
+       	 ALT is <DEL> or <DUP>, INFO contains END=, FORMAT must start with GT:RR and contain BF
 --outdir : subdir where results will be created, must not pre-exist
 --config [defaults to grexomeTIMCsec_config.pm alongside this script] : your customized copy (with path) of the distributed *config.pm
 --canonical : restrict results to canonical transcripts
@@ -110,6 +115,7 @@ GetOptions ("samples=s" => \$samples,
 	    "pathologies=s" => \$pathologies,
 	    "candidateGenes=s" => \$candidateGenes,
 	    "infile=s" => \$inFile,
+	    "cnvs=s" => \$cnvs,
 	    "outdir=s" => \$outDir,
 	    "config=s" => \$config,
 	    "canonical" => \$canon,
@@ -127,6 +133,10 @@ GetOptions ("samples=s" => \$samples,
 ($inFile) || die "E $0: you must provide an input bgzipped (G)VCF file\n";
 (-f $inFile) || die "E $0: the supplied infile doesn't exist\n";
 ($inFile =~ /\.gz$/) || die "E $0: the supplied infile doesn't seem bgzipped\n";
+
+if ($cnvs) {
+    (-f $cnvs) || die "E $0: the supplied cnvs file doesn't exist\n";
+}
 
 # immediately import $config, so we die if file is broken
 # if $config doesn't have a path component, prepend ./ to avoid loading the dist version
@@ -245,6 +255,16 @@ if ($debug) {
     system($com) && die "E $0: debug mode on, step1 failed: $?";
     # next step will read this step's output
     $com = "cat $outDir/step1.out ";
+}
+
+# step 1B if we have a CNVs file
+if ($cnvs) {
+    $com .= " | perl $RealBin/1B_collateVCFs.pl --vcf=$cnvs ";
+    if ($debug) {
+	$com .= "2> $outDir/step1B.err > $outDir/step1B.out";
+	system($com) && die "E $0: debug mode on, step1B failed: $?";
+	$com = "cat $outDir/step1B.out ";
+    }
 }
 
 # step 2
