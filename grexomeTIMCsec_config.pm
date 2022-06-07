@@ -34,8 +34,7 @@ our @EXPORT_OK = qw(refGenome vepCacheFile vepPluginDataPath fastTmpPath
 
 # Return the reference human genome fasta file, with path
 sub refGenome {
-    # return the first file that exists, so this works on
-    # both luxor and fauve
+    # return the first file that exists, so this works on all our servers
     foreach my $genome ("/home/nthierry/HumanGenome/hs38DH.fa",
 			"/data/HumanGenome/hs38DH.fa") {
 	(-f $genome) && return($genome);
@@ -55,7 +54,7 @@ sub refGenome {
 # and has nothing to do with the VEP-provided cache.
 sub vepCacheFile {
     # you'll need to customize the array of possible values for $cachedir,
-    # we use the first dir that exists (works on luxor and fauve)
+    # we use the first dir that exists (works on all our servers)
     foreach my $cachedir ("/data/nthierry/PierreRay/RunSecondaryAnalyses/",
 			  "/home/nthierry/sshMounts/luxor/data/nthierry/PierreRay/RunSecondaryAnalyses/") {
 	if (-d $cachedir) {
