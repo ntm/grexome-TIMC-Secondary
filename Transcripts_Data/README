@@ -5,7 +5,7 @@ Making a BED file of "regions of interest" for exome-seq variant calling.
 We pad each exon with $padding on both sides, then merge any overlapping
 regions. The intermediate "sort" is required by bedtools merge.
 
-gunzip -c canonicalTranscripts_220415.bed.gz | perl -ne 'my $padding = 200; my @f = split(/\t/,$_); $f[1] -= $padding; ($f[1] <= 0) && ($f[1] = 1); $f[2] += $padding; print("$f[0]\t$f[1]\t$f[2]\n");' | sort -k1,1 -k2,2n | bedtools merge > exons_Padded200_Merged_220415.bed
+gunzip -c canonicalTranscripts_220415.bed.gz | perl -ne 'my $padding = 200; my @f = split(/\t/,$_); $f[1] -= $padding; ($f[1] <= 0) && ($f[1] = 1); $f[2] += $padding; print("$f[0]\t$f[1]\t$f[2]\n");' | sort -k1,1 -k2,2n | bedtools merge | gzip -c > exons_Padded200_Merged_220415.bed.gz
 
 
 ###############################################
