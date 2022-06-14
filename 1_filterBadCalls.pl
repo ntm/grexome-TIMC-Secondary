@@ -4,7 +4,8 @@
 # 09/07/2019 (as _strelka version, but starting from the older GATK version)
 
 
-# Parses on stdin a Strelka or GATK GVCF file with one or more sample data columns;
+# Parses on stdin a Strelka/GATK/elPrep/deepVariant GVCF file with one or more
+# sample data columns;
 # Args: see $USAGE.
 # Prints to stdout a VCF (default) or GVCF (with --keepHR) file where:
 # - samples that don't appear in $samplesFile "sampleID" column are removed
@@ -22,15 +23,15 @@
 # - without --keepHR, lines where every sample is now ./. or 0/0 are skipped;
 # - with --keepHR, lines where every sample is now ./. are skipped;
 # - the bogus read counts for the new '*' ALT used by GATK4 are substracted from DP and AD;
-# - DP is added to FORMAT right before AD if it wasn't there (eg some strelka indels),
-#   and set to sumOfADs if DP didn't exist or was smaller than sumOfADs (ignoring the
-#   new GATK4 AD for the '*' ALT, as indicated above);
 # - AF is moved (if it pre-exists) or added (otherwise) to FORMAT right after GT, 
 #   and every 0/x or x/x call gets for AF the fraction of reads supporting the x ALT
 #   (rounded to 2 decimals), HR and x/y calls get '.';
+# - DP is moved (if it pre-exists) or added (otherwise, eg deepVariant non-variant blocks
+#   and some strelka indels) to FORMAT right after AF, and set to sumOfADs if DP didn't exist
+#   or was smaller than sumOfADs (ignoring the new GATK4 AD for the '*' ALT, as indicated above);
 # - fix blatantly wrong genotype calls, see "heuristics" below;
 # - ALTs that are not called in any sample (after fixing errors) are removed, and
-#   DATA values are adjusted accordingly: GT is fixed (new ALT indexes), AD/ADF/ADR and
+#   DATA values are adjusted accordingly: GT is fixed (new ALT indexes), AD/ADF/ADR/VAF and
 #   PL values for removed ALTs are discarded (but the corresponding reads are still
 #   counted in DP, see sumOfADs above);
 # - REF + remaining ALTs are normalized (but not left-aligned): 
@@ -125,7 +126,7 @@ my $verbose = 0;
 # help: if true just print $USAGE and exit
 my $help = '';
 
-my $USAGE = "Parse a Strelka or GATK4 GVCF on stdin, print to stdout a similar GVCF or VCF where:
+my $USAGE = "Parse a Strelka/GATK4/elPrep5/deepVariant GVCF on stdin, print to stdout a similar GVCF or VCF where:
 - calls that fail basic QC tests are changed to NOCALL,
 - calls that are blatantly wrong are fixed,
 - ALTs that are never called are removed,
@@ -313,7 +314,7 @@ while ($lineForNextBatch) {
 	    # after normalizing, the new pos could be at most POS + min(lengthOfRef,lengthOfLongestAlt) - 1
 	    my $maxAlt = 1;
 	    foreach my $alt (@alts) {
-		($alt eq '<NON_REF>') && next;
+		(($alt eq '<NON_REF>') || ($alt eq '<*>')) && next;
 		(length($alt) > $maxAlt) && ($maxAlt = length($alt));
 	    }
 	    my $maxPos = length($ref);
@@ -333,9 +334,12 @@ while ($lineForNextBatch) {
 		my ($chr,$pos,$alts) = ($1,$2,$3);
 		if (($chr ne $prevChr) ||
 		    (($pos > $maxPossibleIndelPos) && 
-		     (($alts eq '<NON_REF>') || ($alts =~ /^.,<NON_REF>$/) || ($alts =~ /^.$/)))) {
+		     (($alts eq '<NON_REF>') || ($alts =~ /^.,<NON_REF>$/) || ($alts =~ /^.$/) ||
+		      ($alts eq '<*>') || ($alts =~ /^.,<*>$/) || ($alts =~ /^.$/)))) {
 		    # we changed chrom, OR
 		    # we are far enough from closest indel AND non-variant or single-char ALT => can't be an indel
+		    # [NOTE: deepVariant uses <*> the same way GATK uses <NON_REF>, a bit confusing because GATK
+		    #  also uses * as an ALT allele, but it's fine: for GATK it's * not <*> ]
 		    $lineForNextBatch = $line;
 		    last;
 		}
@@ -429,12 +433,12 @@ sub processBatch {
 	(@data >= 10) || die "E $0: no sample data in line?\n$line\n";
 
 	# if not --keepHR and there is no ALT in line, skip immediately
-	(! $keepHR) && (($data[4] eq '.') || ($data[4] eq '<NON_REF>')) && next;
+	(! $keepHR) && (($data[4] eq '.') || ($data[4] eq '<NON_REF>') || ($data[4] eq '<*>')) && next;
 	# GATK4 produces useless lines where there are NO sequencing reads
 	# (where FORMAT is eg GT or GT:GQ:PL), skip them immediately:
-	# any line with supporting reads must have a DP or AD field
-	($data[8] =~ /:DP:/) || ($data[8] =~ /:AD:/) ||
-	    ($data[8] =~ /:DP$/) || ($data[8] =~ /:AD$/) || next;
+	# any line with supporting reads must have a DP or MIN_DP or AD field
+	($data[8] =~ /:DP:/) || ($data[8] =~ /:MIN_DP:/) || ($data[8] =~ /:AD:/) ||
+	    ($data[8] =~ /:DP$/) || ($data[8] =~ /:MIN_DP$/) || ($data[8] =~ /:AD$/) || next;
 
 	# after parsing the line, $altsCalled[$i] will be true iff $alts[$i] is part of
 	# a called geno for at least one sample
@@ -446,7 +450,7 @@ sub processBatch {
 	    ($alts[$alti] eq '*') && ($starNum = $alti + 1) && last;
 	}
 	# first 9 fields are copied as-is except: QUAL is cleared, INFO is cleared except 
-	# if it contains END=, and AF is moved or added to FORMAT after GT
+	# if it contains END=, and AF:DP: are moved or added to FORMAT after GT
 	# NOTE: ALT may be modified later (remove uncalled ALTs and normalize remaining ALTs)
 	my @lineToPrint = @data[0..4];
 	# clear QUAL, copy FILTER
@@ -471,22 +475,21 @@ sub processBatch {
 	# sanity: make sure the fields we need are there
 	(defined $format{"GT"}) || die "E $0: no GT key in FORMAT string for line:\n$line\n";
 	(defined $format{"GQ"}) || (defined $format{"GQX"}) ||die "E $0: no GQ or GQX key in FORMAT string for line:\n$line\n";
-	(defined $format{"AD"}) || (defined $format{"DP"}) || die "E $0: no AD or DP key in FORMAT string for line:\n$line\n";
+	(defined $format{"AD"}) || (defined $format{"DP"}) || (defined $format{"MIN_DP"}) ||
+	    die "E $0: no AD or DP or MIN_DP key in FORMAT string for line:\n$line\n";
 
-	my $newFormat = $format;
-	# if AF isn't already right after GT we move it / create it there
-	if ($newFormat !~ /^GT:AF:/) {
-	    # remove it if it existed
+	my $newFormat = $format.':';
+	# if AF and DP aren't already right after GT we move / create them there
+	if ($newFormat !~ /^GT:AF:DP:/) {
+	    # remove them if they pre-existed
 	    $newFormat =~ s/:AF:/:/;
-	    # in any case add it after GT
-	    ($newFormat =~ s/^GT:/GT:AF:/)  || 
-		die "E $0: cannot add AF after GT in format: $format\n";
+	    $newFormat =~ s/:DP:/:/;
+	    # in any case add them after GT
+	    ($newFormat =~ s/^GT:/GT:AF:DP:/)  || 
+		die "E $0: cannot add AF:DP: after GT in format: $format\n";
 	}
-	# if DP doesn't exist we add it right before AD (which we know exists, sanity-checked above)
-	if (! defined $format{"DP"}) {
-	    ($newFormat =~ s/:AD:/:DP:AD:/)  || 
-		die "E $0: cannot add DP before AD in format: $format\n";
-	}
+	# remove trailing ':'
+	(chop($newFormat) eq ':') || die "E $0: chopping newformat $newFormat failed, impossible\n";
 	
 	push(@lineToPrint, $newFormat);
 
@@ -547,7 +550,7 @@ sub processBatch {
 
 	    # find the "real" read depth at current position: max(DP, sumOfADs), or MIN_DP if in a non-var block
 	    # Along the way, fix DP to sumOfADs if it's smaller (variant caller bugs)
-	    # we will also populate DP with sumOfADs right before AD if DP didn't exist,
+	    # we will also populate DP with sumOfADs right after AF if DP didn't exist,
 	    # but we must do this later so we don't mess up the %format mappings
 	    my $thisDP = -1;
 	    if ((defined $format{"DP"}) && (defined $thisData[$format{"DP"}]) && ($thisData[$format{"DP"}] ne '.')) {
@@ -635,29 +638,47 @@ sub processBatch {
 
 	    # other filters (eg strandDisc) could go here
 
-	    # OK data passed all filters, add/move fields (DP, AF) if needed
-	    if ((defined $format{"AD"}) && (defined $format{"AF"})) {
-		# sanity: we MUST introduce values new fields starting at the end!
-		# AF must be before AD if both are there, oterwise the successive splices below are buggy
-		($format{"AF"} < $format{"AD"}) ||
-		    die "E $0: AF comes after AD, code will break in this case, fix the code! Line is:\n$line\n";
-	    }
-	    if ((! defined $format{"DP"}) && (defined $thisData[$format{"AD"}])) {
-		# DP didn't exist but AD has some values, insert $thisDP right before AD
-		splice(@thisData, $format{"AD"}, 0, $thisDP);
-	    }
-	    # AF may need to be moved or added
-	    if ((defined $format{"AF"}) && (defined $thisData[$format{"AF"}])) {
-		if ($format{"AF"} != 1) {
-		    # remove from previous position, and add back in second position
-		    splice(@thisData, $format{"AF"}, 1);
-		    splice(@thisData, 1, 0, $af);
+	    # OK data passed all filters, add/move fields (AF, DP) if needed, careful
+	    # with order of splices!
+	    # we need to first remove pre-existing values starting at the end, then insert
+	    # values (new or pre-existing) at indexes 1 and 2 in correct order
+	    if ((defined $format{"AF"}) && (defined $format{"DP"})) {
+		# both pre-exist...
+		if ($format{"AF"} < $format{"DP"}) {
+		    # DP was last...
+		    if ($format{"DP"} > 2) {
+			# but FORMAT wasn't GT:AF:DP:... , need to splice out old DP first
+			(defined $thisData[$format{"DP"}]) && splice(@thisData, $format{"DP"}, 1);
+			# also move AF if it's not in correct position
+			if ($format{"AF"} > 1) {
+			    (defined $thisData[$format{"AF"}]) && splice(@thisData, $format{"AF"}, 1);
+			    splice(@thisData, 1, 0, $af);
+			}
+			# now insert DP where it belongs
+			splice(@thisData, 2, 0, $thisDP);
+		    }
+		    # else format already started with GT:AF:DP => noop
 		}
-		# else AF was already in second position, noop
+		else {
+		    # DP came before AF, splice them both out starting with AF
+		    (defined $thisData[$format{"AF"}]) && splice(@thisData, $format{"AF"}, 1);
+		    (defined $thisData[$format{"DP"}]) && splice(@thisData, $format{"DP"}, 1);
+		    # and insert them both back where they belong
+		    splice(@thisData, 1, 0, $af);
+		    splice(@thisData, 2, 0, $thisDP);
+		}
 	    }
 	    else {
-		# AF wasn't present, add it in second position
+		# at most one pre-existing field, splice it out
+		if (defined $format{"AF"}) {
+		    (defined $thisData[$format{"AF"}]) && splice(@thisData, $format{"AF"}, 1);
+		}
+		elsif (defined $format{"DP"}) {
+		    (defined $thisData[$format{"DP"}]) && splice(@thisData, $format{"DP"}, 1);
+		}
+		# and insert them both where they belong
 		splice(@thisData, 1, 0, $af);
+		splice(@thisData, 2, 0, $thisDP);
 	    }
 
 	    push(@lineToPrint, join(':',@thisData));
@@ -690,11 +711,11 @@ sub processBatch {
 	    }
 	    elsif ($prevToPrint[1] == $lineToPrint[1]) {
 		# same chrom, same POS
-		if (($prevToPrint[4] eq '.') || ($prevToPrint[4] eq '<NON_REF>')) {
+		if (($prevToPrint[4] eq '.') || ($prevToPrint[4] eq '<NON_REF>') || ($prevToPrint[4] eq '<*>')) {
 		    # prevToPrint was HR line at same POS as $line, ignore prev and save line
 		    @prevToPrint = @lineToPrint;
 		}
-		elsif (($lineToPrint[4] eq '.') || ($lineToPrint[4] eq '<NON_REF>')) {
+		elsif (($lineToPrint[4] eq '.') || ($lineToPrint[4] eq '<NON_REF>') || ($lineToPrint[4] eq '<*>')) {
 		    # current is HR line at same POS as $prevToPrint, ignore current ie NOOP
 		}
 		else {
@@ -778,10 +799,10 @@ sub cleanGT {
 # - arrayref, tab-splitted VCF line
 # - arrayref of ALT indexes that were called in at least one sample
 #
-# -> discard any uncalled ALTs from the ALT column (except <NON_REF>, which we
-#    always keep if it's present), set to '.' if there are no more ALTs
+# -> discard any uncalled ALTs from the ALT column (except <NON_REF> and <*>, which we
+#    always keep if present), set to '.' if there are no more ALTs
 # -> adjust every GT (new ALT indexes)
-# -> discard AD/ADF/ADR and PL values for removed ALTs
+# -> discard AD/ADF/ADR / VAF / PL values for removed ALTs
 #
 # Modifies the VCF line in-place and doesn't return anything.
 sub removeUncalledALTs {
@@ -799,10 +820,10 @@ sub removeUncalledALTs {
 	$newAlts .= "$alts[$i],";
 	$old2new[$i+1] = $nextAllNum++;
     }
-    if ($alts[$#alts] eq '<NON_REF>') {
+    if (($alts[$#alts] eq '<NON_REF>') || ($alts[$#alts] eq '<*>')) {
 	($old2new[$#alts+1]) &&
-	    die "E $0 in removeUncalledALTs: it seems NON_REF was called? impossible!\n".join("\t",@$lineR)."\n";
-	$newAlts .= '<NON_REF>';
+	    die "E $0 in removeUncalledALTs: it seems <NON_REF> or <*> was called? impossible!\n".join("\t",@$lineR)."\n";
+	$newAlts .= $alts[$#alts];
 	$old2new[$#alts+1] = $nextAllNum++;
     }
     elsif ($newAlts) {
@@ -841,6 +862,19 @@ sub removeUncalledALTs {
 		    (defined $old2new[$alNum]) && ($adNew .= ",$ad[$alNum]");
 		}
 		$thisData[$format{$fkey}] = $adNew;
+	    }
+	}
+	# VAF: silimar to AD except ther's no value for REF
+	foreach my $fkey ("VAF") {
+	    if (($format{$fkey}) && ($thisData[$format{$fkey}])) {
+		my @vaf = split(/,/, $thisData[$format{$fkey}]);
+		my $vafNew = "";
+		foreach my $alNum (1..$#old2new) {
+		    (defined $old2new[$alNum]) && ($vafNew .= "$vaf[$alNum-1],");
+		}
+		# remove trailing ','
+		chop($vafNew);
+		$thisData[$format{$fkey}] = $vafNew;
 	    }
 	}
 	# PL
@@ -906,12 +940,16 @@ sub normalizeVariants {
     (length($ref) >= 2) || return();
 
     my @alts = split(/,/,$lineR->[4]);
-    # never normalize <NON_REF> or * : if they are here, store their indexes
-    # in @alts and splice them out (trick: start from the end)
-    my ($nonrefi,$stari) = (-1,-1);
+    # never normalize <NON_REF>, * or <*> (the DV equivalent of gatk's <NON_REF>) : if they are here,
+    # store their indexes in @alts and splice them out (trick: start from the end)
+    my ($nonrefi,$stari,$dvStari) = (-1,-1,-1);
     foreach my $i (reverse(0..$#alts)) {
 	if ($alts[$i] eq '<NON_REF>') {
 	    $nonrefi = $i;
+	    splice(@alts,$i,1);
+	}
+	elsif ($alts[$i] eq '<*>') {
+	    $dvStari = $i;
 	    splice(@alts,$i,1);
 	}
 	elsif ($alts[$i] eq '*') {
@@ -974,8 +1012,9 @@ sub normalizeVariants {
 	}
     }
 
-    # place <NON_REF> and/or * back where they belong: need to splice
+    # place <NON_REF> and/or * or <*> back where they belong: need to splice
     # in correct order, smallest index first
+    # NOTE: dvStari (deepVariant only) and stari/nonrefi (GATK/elPrep) are exclusive
     if ($stari != -1) {
 	if ($nonrefi == -1) {
 	    splice(@alts, $stari, 0, '*');
@@ -992,6 +1031,9 @@ sub normalizeVariants {
     }
     elsif ($nonrefi != -1) {
 	splice(@alts, $nonrefi, 0, '<NON_REF>');
+    }
+    elsif ($dvStari != -1) {
+	splice(@alts, $dvStari, 0, '<*>');
     }
 
     $lineR->[3] = $ref;
