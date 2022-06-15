@@ -1,4 +1,19 @@
 #################################
+15/06/2022
+NTM
+
+Expression Atlas has finally updated their Ensembl reference (to v104, current is v106).
+Updating to latest GTEX:
+
+mv E-MTAB-5214-query-results.tpms.tsv Old/
+
+Then get latest from:
+https://www.ebi.ac.uk/gxa/experiments-content/E-MTAB-5214/resources/ExperimentDownloadSupplier.RnaSeqBaseline/tpms.tsv
+
+DONE.
+
+
+#################################
 26/08/2021
 NTM
 
