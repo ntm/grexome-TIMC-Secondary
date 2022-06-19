@@ -460,6 +460,8 @@ sub mergeAndPrint {
     my ($nextVep, $nextCache);
     # POS from each next line (undef if no more data)
     my ($nextVepPos, $nextCachePos);
+    # also need ALT and END (set to -1 if absent), to obtain deterministic merged output
+    my ($nextVepAlt, $nextCacheAlt, $nextVepEnd, $nextCacheEnd);
     # CHROM, must be the same for both files and all lines
     my $chr;
 
@@ -468,17 +470,31 @@ sub mergeAndPrint {
     do {
 	$nextVep = <$FROMVEP>;
     } while(($nextVep) && ($nextVep =~ /^#/));
-    $nextCache = <$FROMCACHE>;
+    if ($nextVep) {
+	# grab next* values for deterministic merging of fromVep and fromCache, and
+	# also populate $cacheUpdate for updating cache at the end
+	my @f = split(/\t/,$nextVep);
+	(@f >= 8) || die "E $0: nextVep line doesn't have >=8 columns:\n$nextVep";
+	($chr,$nextVepPos,$nextVepAlt)=($f[0],$f[1],$f[4]);
+	# key for $cacheUpdate: chrom:pos:ref:alt for SNVs/indels, chrom:pos:ref:alt:end for CNVs
+	my $key = "$f[0]:$f[1]:$f[3]:$f[4]";
+	$nextVepEnd = -1;
+	if (($nextVepAlt eq '<DUP>') || ($nextVepAlt eq '<DEL>')) {
+	    # CNV: grab END
+	    ($f[7] =~ /END=(\d+)/) || 
+		die "E $0: cannot grab END in nextVep line:\n$nextVep";
+	    $nextVepEnd = $1;
+	    $key .= ":$1";
+	}
+	($f[7] =~ /CSQ=([^;]+)/) || die "E $0: cannot grab CSQ in nextVep line:\n$nextVep";
+	my $csq = $1;
+	$cacheUpdate->{$key} = $csq;
+    }
 
-    if ($nextVep && ($nextVep =~ /^([^\t]+)\t(\d+)\t/)) {
-	($chr,$nextVepPos)=($1,$2);
-    }
-    elsif ($nextVep) {
-	die"E $0: vcfFromVep has a first data line but I can't parse it:\n$nextVep\n";
-    }
-    if ($nextCache && ($nextCache =~ /^([^\t]+)\t(\d+)\t/)) {
-	my $thisChr = $1;
-	$nextCachePos = $2;
+    $nextCache = <$FROMCACHE>;
+    if ($nextCache) {
+	my @f = split(/\t/,$nextCache);
+	my $thisChr = $f[0];
 	if (!defined $chr) {
 	    $chr = $thisChr;
 	}
@@ -486,57 +502,68 @@ sub mergeAndPrint {
 	    ($chr eq $thisChr) ||
 		die"E $0: vcfFromCache has line with bad chrom, expected $chr:\n$nextCache\n";
 	}
-    }
-    elsif ($nextCache) {
-	die"E $0: vcfFromCache has a first data line but I can't parse it:\n$nextCache\n";
+	($nextCachePos,$nextCacheAlt) = ($f[1],$f[4]);
+	$nextCacheEnd = -1;
+	if (($nextCacheAlt eq '<DUP>') || ($nextCacheAlt eq '<DEL>')) {
+	    # CNV: grab END
+	    ($f[7] =~ /END=(\d+)/) || 
+		die "E $0: cannot grab END in nextCache line:\n$nextCache";
+	    $nextCacheEnd = $1;
+	}
     }
     
     #######################
     # as long as there is data
     while ($nextVep || $nextCache) {
-	if (($nextVep) && ((! $nextCache) || ($nextVepPos <= $nextCachePos))) {
+	if (($nextVep) && ((! $nextCache) ||
+			   ($nextVepPos < $nextCachePos) ||
+			   (($nextVepPos == $nextCachePos) && ($nextVepAlt lt $nextCacheAlt)) ||
+			   (($nextVepPos == $nextCachePos) && ($nextVepAlt eq $nextCacheAlt) && ($nextVepEnd < $nextCacheEnd)) )) {
 	    # still have VEP data and it must be printed now
 	    print $nextVep;
-	    # also save for updating cache at the end
-	    my @f = split(/\t/,$nextVep);
-	    (@f >= 8) || die "E $0: nextVep line doesn't have >=8 columns:\n$nextVep";
-	    # key: chrom:pos:ref:alt for SNVs/indels, chrom:pos:ref:alt:end for CNVs
-	    my $key = "$f[0]:$f[1]:$f[3]:$f[4]";
-	    if (($f[4] eq '<DUP>') || ($f[4] eq '<DEL>')) {
-		# CNV: grab END
-		($f[7] =~ /END=(\d+)/) || 
-		    die "E $0: cannot grab END in nextVep line:\n$nextVep";
-		$key .= ":$1";
-	    }
-	    ($f[7] =~ /CSQ=([^;]+)/) || die "E $0: cannot grab CSQ in nextVep line:\n$nextVep";
-	    my $csq = $1;
-	    $cacheUpdate->{$key} = $csq;
-
 	    # read next VEP line
 	    $nextVep = <$FROMVEP>;
-	    if ($nextVep && ($nextVep =~ /^([^\t]+)\t(\d+)\t/)) {
-		my $thisChr = $1;
-		$nextVepPos = $2;
+	    if ($nextVep) {
+		# grab next* values for deterministic merging of fromVep and fromCache, and
+		# also populate $cacheUpdate for updating cache at the end
+		my @f = split(/\t/,$nextVep);
+		(@f >= 8) || die "E $0: nextVep line doesn't have >=8 columns:\n$nextVep";
+		my $thisChr = $f[0];
 		($chr eq $thisChr) ||
 		    die "E $0: vcfFromVep has line with bad chrom, expected $chr:\n$nextVep\n";
+		($nextVepPos,$nextVepAlt)=($f[1],$f[4]);
+		# key for $cacheUpdate: chrom:pos:ref:alt for SNVs/indels, chrom:pos:ref:alt:end for CNVs
+		my $key = "$f[0]:$f[1]:$f[3]:$f[4]";
+		$nextVepEnd = -1;
+		if (($nextVepAlt eq '<DUP>') || ($nextVepAlt eq '<DEL>')) {
+		    # CNV: grab END
+		    ($f[7] =~ /END=(\d+)/) || 
+			die "E $0: cannot grab END in nextVep line:\n$nextVep";
+		    $nextVepEnd = $1;
+		    $key .= ":$1";
+		}
+		($f[7] =~ /CSQ=([^;]+)/) || die "E $0: cannot grab CSQ in nextVep line:\n$nextVep";
+		my $csq = $1;
+		$cacheUpdate->{$key} = $csq;
 	    }
-	    elsif ($nextVep) {
-		die "E $0: vcfFromVep has a data line but I can't parse it:\n$nextVep\n";
-	    }
-	    next;
 	}
 	else {
 	    # cache data must be printed
 	    print $nextCache;
 	    $nextCache = <$FROMCACHE>;
-	    if ($nextCache && ($nextCache =~ /^([^\t]+)\t(\d+)\t/)) {
-		my $thisChr = $1;
-		$nextCachePos = $2;
+	    if ($nextCache) {
+		my @f = split(/\t/,$nextCache);
+		my $thisChr = $f[0];
 		($chr eq $thisChr) ||
-		    die "E $0: vcfFromCache has line with bad chrom, expected $chr:\n$nextCache\n";
-	    }
-	    elsif ($nextCache) {
-		die "E $0: vcfFromCache has a data line but I can't parse it:\n$nextCache\n";
+		    die"E $0: vcfFromCache has line with bad chrom, expected $chr:\n$nextCache\n";
+		($nextCachePos,$nextCacheAlt) = ($f[1],$f[4]);
+		$nextCacheEnd = -1;
+		if (($nextCacheAlt eq '<DUP>') || ($nextCacheAlt eq '<DEL>')) {
+		    # CNV: grab END
+		    ($f[7] =~ /END=(\d+)/) || 
+			die "E $0: cannot grab END in nextCache line:\n$nextCache";
+		    $nextCacheEnd = $1;
+		}
 	    }
 	}
     }
