@@ -304,12 +304,15 @@ sub vepCommand {
     $vepCommand .= " --sift b --polyphen b";
     # --af is 1KG-phase3 global AF, --af_1kg is per continent AFs
     $vepCommand .= " --af --af_1kg --af_gnomade --af_gnomadg";
-    $vepCommand .= " --pubmed --check_existing";
+    $vepCommand .= " --check_existing";
     # Don't URI escape HGVS strings
     $vepCommand .= " --no_escape";
     # commenting out "--domains", it's a bit massive and in non-deterministic order
     # and we don't curently look at it
-    ## other possibilities to consider: --regulatory --tsl --appris 
+    # also removing --pubmed, don't think anyone looks at that either
+    # trying out --regulatory
+    $vepCommand .= " --regulatory";
+    ## other possibilities to consider: --tsl --appris 
     $vepCommand .= " --fasta $genome --hgvs";
 
     # plugins:
