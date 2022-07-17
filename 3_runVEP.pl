@@ -303,7 +303,7 @@ sub vepCommand {
     $vepCommand .= " --shift_3prime 1";
     $vepCommand .= " --sift b --polyphen b";
     # --af is 1KG-phase3 global AF, --af_1kg is per continent AFs
-    $vepCommand .= " --af --af_1kg --af_gnomad";
+    $vepCommand .= " --af --af_1kg --af_gnomade --af_gnomadg";
     $vepCommand .= " --pubmed --check_existing";
     # Don't URI escape HGVS strings
     $vepCommand .= " --no_escape";
@@ -329,7 +329,7 @@ sub vepCommand {
     my $dbNsfpFields = "MutationTaster_pred,REVEL_rankscore,CADD_raw_rankscore";
     # MetaRNN: both MetaRNN_rankscore and MetaRNN_pred: T(olerated) or D(amaging)
     $dbNsfpFields .= ",MetaRNN_rankscore,MetaRNN_pred";
-    $vepPlugins .= " --plugin dbNSFP,$dbNsfpPath/dbNSFP4.2a.gz,$dbNsfpFields";
+    $vepPlugins .= " --plugin dbNSFP,$dbNsfpPath/dbNSFP4.3a.gz,transcript_match=1,$dbNsfpFields";
     # dbscSNV (splicing), data is with dbNSFP (same authors), specify 
     # assembly GRCh38 as second param because the plugin can't figure it out
     $vepPlugins .= " --plugin dbscSNV,$dbNsfpPath/dbscSNV1.1_GRCh38.txt.gz,GRCh38";
