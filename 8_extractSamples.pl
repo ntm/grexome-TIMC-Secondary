@@ -147,7 +147,7 @@ while (my $inFile = readdir(INDIR)) {
 	}
     }
     (($hvCol >= 0) && ($hvColOC >= 0)) || 
-	die "E: $0 - couldn't find {$cohort}_HV or {$cohort}_OTHERCAUSE_HV in header of infile $inFile\n";
+	die "E: $0 - couldn't find ${cohort}_HV or ${cohort}_OTHERCAUSE_HV in header of infile $inFile\n";
     (($hetCol >= 0) && ($hetColOC >= 0)) || 
 	die "E: $0 - couldn't find HET or OC_HET in header of infile $inFile\n";
 
