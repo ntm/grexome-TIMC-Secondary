@@ -58,7 +58,7 @@ my $min_hr; # COUNT_HR >= $x
 my $no_mod = ''; # if enabled, filter out MODIFIER impacts
 my $no_low = ''; # if enabled, filter out LOW impacts
 my $canon = ''; # if enabled, only keep lines with CANONICAL==YES
-my $max_af_gnomad; # gnomAD_AF <= $x
+my $max_af_gnomad; # gnomADe_AF <= $x AND gnomADg_AF <= $x
 my $max_af_1kg; # AF <= $x, this is 1KG phase 3
 
 GetOptions ("indir=s" => \$inDir,

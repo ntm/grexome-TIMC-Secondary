@@ -33,7 +33,7 @@ my $canon = ''; # if enabled, only keep lines with CANONICAL==YES
 # processed_transcript, retained_intron, nonsense_mediated_decay)
 # Not implementing now.
 
-my $max_af_gnomad; # gnomAD_AF <= $x
+my $max_af_gnomad; # gnomADe_AF <= $x AND gnomADg_AF <= $x (if available)
 my $max_af_1kg; # AF <= $x, this is 1KG phase 3
 
 GetOptions ("max_ctrl_hv=i" => \$max_ctrl_hv,
@@ -80,12 +80,17 @@ foreach my $i (0..$#titles) {
 	# OK replace cohort name with COHORT as hash key
 	$title = "COUNT_COHORT_HV";
     }
-    # sanity (eg if some column titles change)
+    # sanity
     (defined $title2index{$title}) &&
 	die "E $0: title $title defined twice\n";
     $title2index{$title} = $i;
 }
-
+# make sure all titles we use in this script are present
+foreach my $t ("CANONICAL","COUNT_NEGCTRL_HV","COUNT_NEGCTRL_HET","COUNT_COHORT_HV",
+	       "COUNT_HR","IMPACT","gnomADe_AF","gnomADg_AF","AF") {
+    (defined $title2index{$t}) ||
+	die "E $0: title $t required by script but missing, some VEP columns changed?\n";
+}
 
 # parse data
 while(my $line = <STDIN>) {
@@ -113,11 +118,20 @@ while(my $line = <STDIN>) {
     if (($no_low) && ($fields[$title2index{"IMPACT"}] eq "LOW")) {
 	next;
     }
-    if ((defined $max_af_gnomad) && ($fields[$title2index{"gnomAD_AF"}])) {
+    if ((defined $max_af_gnomad) && ($fields[$title2index{"gnomADe_AF"}])) {
 	# sometimes we have several &-separated values, in this case
 	# only filter if all values are high
 	my $keep = 0;
-	foreach my $gnomad (split(/&/, $fields[$title2index{"gnomAD_AF"}])) {
+	foreach my $gnomad (split(/&/, $fields[$title2index{"gnomADe_AF"}])) {
+	    ($gnomad <= $max_af_gnomad) && ($keep = 1);
+	}
+	($keep) || next;
+    }
+    if ((defined $max_af_gnomad) && ($fields[$title2index{"gnomADg_AF"}])) {
+	# sometimes we have several &-separated values, in this case
+	# only filter if all values are high
+	my $keep = 0;
+	foreach my $gnomad (split(/&/, $fields[$title2index{"gnomADg_AF"}])) {
 	    ($gnomad <= $max_af_gnomad) && ($keep = 1);
 	}
 	($keep) || next;
