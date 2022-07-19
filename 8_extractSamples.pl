@@ -3,36 +3,15 @@
 # 25/03/2018
 # NTM
 
-# Take 3 or 4 arguments: $samplesFile $inDir $outDir [$covDir]
-# $samplesFile is the samples metadata xlsx file;
-# $inDir must contain cohort TSVs as produced by extractCohorts.pl,
-# possibly filtered and reordered with 7_filterAndReorderAll.pl, and 
-# possibly gzipped (but not with PatientIDs);
-# $outDir doesn't exist, it will be created and filled with one TSV
-# per sample;
-# $covDir is optional, if provided it is a subdir containing per-sample 
-# coverage files as produced by 0_coverage.pl.
-#
-# Filenames in $outDir will include patientID/specimenID.
-# If $covDir is provided, the global coverage data (ALL_CANDIDATES and ALL_SAMPLED)
-# for each sample is grabbed from $covDir and appended at the end of the header line.
-# For a sample, we only print lines from its cohort file and where 
-# it has an HV or HET genotype: this genotype is printed in new columns
-# GENOTYPE and DP:AF/BF:RR, inserted right after KNOWN_CANDIDATE_GENE.
-# Immediately after DP:AF/BF:RR we insert a new column BIALLELIC, value is one of:
-#   HIGH -> patient has >=2 HET or at >=1 HV HIGH variants;
-#   MODHIGH -> patient has >=2 HET or >=1 HV variants of impact HIGH or MODHIGH,
-#     but isn't in HIGH category;
-#   MODERATE -> same for impact >= MODERATE;
-#   LOW -> same for impact >= LOW;
-#   NO -> patient has at most one allele >= LOW.
-# Also the genoData columns ($cohort_HV, NEGCTRL_HV, etc...) are not printed.
+# Parse COHORT TSVs and produce SAMPLE TSVs. See $USAGE.
 
 use strict;
 use warnings;
 use File::Basename qw(basename);
 use FindBin qw($RealBin);
+use Getopt::Long;
 use POSIX qw(strftime);
+use Parallel::ForkManager;
 
 use lib "$RealBin";
 use grexome_metaParse qw(parseSamples);
@@ -42,16 +21,75 @@ use grexome_metaParse qw(parseSamples);
 $0 = basename($0);
 
 
-(@ARGV == 3) || (@ARGV == 4) || 
-    die "E: $0 - needs 3 or 4 args: a samples metadata XLSX, an inDir, a non-existant outDir and optionally a covDir\n";
-my ($samplesFile, $inDir, $outDir, $covDir) = @ARGV;
+#############################################
+## options / params from the command-line
+
+# samples metadata xlsx
+my $samplesFile = "";
+
+# $inDir containing cohort TSVs
+my $inDir = "";
+
+# $outDir will be created and filled with one TSV per sample
+my $outDir = "";
+
+# number of cohorts to process in parallel
+my $jobs = 8;
+
+# $covDir is optional, if provided it is a subdir containing per-sample 
+# coverage files as produced by 0_coverage.pl
+my $covDir = "";
+
+# help: if true just print $USAGE and exit
+my $help = '';
+
+my $USAGE = "\nParse COHORT TSV files in inDir, and produce SAMPLE TSVs in outDir.
+Filenames in outDir will include patientID/specimenID.
+If covDir is provided, the global coverage data (ALL_CANDIDATES and ALL_SAMPLED)
+for each sample is grabbed from covDir and appended at the end of the header line.
+For a sample, we only print lines from its cohort file and where it has an HV or 
+HET genotype: this genotype is printed in new columns GENOTYPE and DP:AF/BF:RR,
+inserted right after KNOWN_CANDIDATE_GENE.
+Immediately after DP:AF/BF:RR we insert a new column BIALLELIC, value is one of:
+  HIGH -> patient has >=2 HET or at >=1 HV HIGH variants;
+  MODHIGH -> patient has >=2 HET or >=1 HV variants of impact HIGH or MODHIGH,
+     but isn't in HIGH category;
+  MODERATE -> same for impact >= MODERATE;
+  LOW -> same for impact >= LOW;
+  NO -> patient has at most one allele >= LOW.
+Also the genoData columns (\$cohort_HV, NEGCTRL_HV, etc...) are not printed.
+
+Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
+--samples : samples metadata xlsx file, with path
+--indir : must contain cohort TSVs as produced by extractCohorts.pl,
+          possibly filtered and reordered with 7_filterAndReorderAll.pl, and 
+          possibly gzipped (but not with PatientIDs)
+--outdir : subdir where SAMPLE TSVs will be created, must not pre-exist
+--covdir : optional, if provided it must be a subdir containing per-sample 
+           coverage files as produced by 0_coverage.pl
+--jobs [$jobs] : number of cohorts to process in parallel
+--help : print this USAGE";
+
+
+GetOptions ("samples=s" => \$samplesFile,
+	    "indir=s" => \$inDir,
+	    "outdir=s" => \$outDir,
+	    "covdir=s" => \$covDir,
+	    "jobs=i" => \$jobs,
+	    "help" => \$help)
+    or die("E $0: Error in command line arguments\n$USAGE\n");
+
+# make sure required options were provided and sanity check them
+($help) && die "$USAGE\n\n";
+
+($samplesFile) || die "E $0: you must provide a samples file\n";
+(-f $samplesFile) || die "E $0: the supplied samples file doesn't exist\n";
+
+($inDir) || die "E $0: you must provide an inDir\n";
 (-d $inDir) ||
     die "E: $0 - inDir $inDir doesn't exist or isn't a directory\n";
 opendir(INDIR, $inDir) ||
     die "E: $0 - cannot opendir inDir $inDir\n";
-(-e $outDir) && 
-    die "E: $0 - found argument $outDir but it already exists, remove it or choose another name.\n";
-mkdir($outDir) || die "E: $0 - cannot mkdir outDir $outDir\n";
 
 if ($covDir) {
     (-d $covDir) ||
@@ -60,6 +98,13 @@ if ($covDir) {
 else {
     warn "I: $0 - no covDir provided, coverage statistics won't be appended to the header lines\n";
 }
+
+($jobs > 0) || die "E $0: jobs = $jobs, really??\n";
+
+($outDir) || die "E $0: you must provide an outDir\n";
+(-e $outDir) && 
+    die "E $0: outdir $outDir already exists, remove it or choose another name.\n";
+mkdir($outDir) || die "E: $0 - cannot mkdir outDir $outDir\n";
 
 my $now = strftime("%F %T", localtime);
 warn "I $now: $0 - starting to run\n";
@@ -89,8 +134,11 @@ my $sample2patientR;
 #########################################################
 # read infiles
 
+my $pm = new Parallel::ForkManager($jobs);
+
 while (my $inFile = readdir(INDIR)) {
     ($inFile =~ /^\./) && next;
+    $pm->start && next;
     my ($cohort,$fileEnd,$gz);
     if ($inFile =~ (/^([^\.]+)\.(.*csv)$/)) {
 	# $fileEnd allows for .canon etc...
@@ -102,6 +150,7 @@ while (my $inFile = readdir(INDIR)) {
     }
     else {
 	warn "W $0: cannot parse filename of inFile $inDir/$inFile, skipping it\n";
+	$pm->finish;
     }
 
     my $inFull = "$inDir/$inFile";
@@ -364,8 +413,11 @@ while (my $inFile = readdir(INDIR)) {
     foreach my $fh (values %outFHs) {
 	close($fh);
     }
+    $pm->finish;
 }
 closedir(INDIR);
+
+$pm->wait_all_children;
 
 $now = strftime("%F %T", localtime);
 warn "I $now: $0 - ALL DONE, completed successfully!\n";

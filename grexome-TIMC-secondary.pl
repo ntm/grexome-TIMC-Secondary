@@ -337,7 +337,9 @@ else {
 system($com) && die "E $0: step7 failed: $?";
 
 # STEP 8 - SAMPLES
-$com = "perl $RealBin/8_extractSamples.pl $samples $tmpdir/Cohorts_Filtered/ $outDir/Samples/ ".&coveragePath()." ";
+$com = "perl $RealBin/8_extractSamples.pl --samples $samples ";
+$com .= "--indir $tmpdir/Cohorts_Filtered/ --outdir $outDir/Samples/ ";
+(&coveragePath()) && ($com .= "--covdir ".&coveragePath()." ");
 if ($debug) {
     $com .= "2> $outDir/step8s.err";
 }
