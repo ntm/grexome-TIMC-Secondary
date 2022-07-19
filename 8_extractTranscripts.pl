@@ -105,13 +105,17 @@ GetOptions ("indir=s" => \$inDir,
 # make sure required options were provided and sanity check them
 ($help) && die "$USAGE\n\n";
 
+($inDir) ||
+    die "E $0: you must provide an indir.\nUSAGE:$USAGE\n";
 (-d $inDir) ||
     die "E $0: inDir $inDir doesn't exist or isn't a directory\n";
 opendir(INDIR, $inDir) ||
     die "E $0: cannot opendir inDir $inDir\n";
 
+($outDir) ||
+    die "E $0: you must provide an outdir\n";
 (-e $outDir) && 
-    die "E $0: found argument outDir $outDir but it already exists, remove it or choose another name.\n";
+    die "E $0: provided outDir $outDir already exists, remove it or choose another name.\n";
 mkdir($outDir) || die "E $0: cannot mkdir outDir $outDir\n";
 
 # If $pathologies was provided we want to parse (and check) it now, it is used
@@ -199,9 +203,6 @@ while (my $inFile = readdir(INDIR)) {
 	warn "W $0: cannot parse filename of inFile $inFile, skipping it\n";
 	next;
     }
-
-    $now = strftime("%F %T", localtime);
-    warn "I $now: $0 - starting on $cohort\n";
 
     open(INFILE, "$inDir/$inFile") ||
 	die "E $0: cannot open infile $inDir/$inFile\n";
@@ -423,8 +424,6 @@ while (my $inFile = readdir(INDIR)) {
 	    }
 	}
     }
-    $now = strftime("%F %T", localtime);
-    warn "I $now: $0 - Finished parsing $cohort infile\n";
     close(INFILE);
 }
 closedir(INDIR);
