@@ -17,6 +17,10 @@
 #
 # In addition, feature_truncation variants are upgraded from MODIFIER to HIGH.
 #
+# Also, in an attempt to make use of VEP's --regulatory switch:
+# regulatory_region_variant(s), as well as TF_binding_site_variant(s) with 
+# HIGH_INF_POS=Y, are upgraded from MODIFIER to LOW.
+#
 # Overall for CNVs, VEP currently can produce 4 different consequences:
 # - transcript_ablation = DEL covering the complete transcript, HIGH;
 # - feature_truncation = DEL with partial coverage of the transcript, 
@@ -265,7 +269,7 @@ while (my $line =<STDIN>) {
 	    my $minPassedFracSplicing = 0.5;
 	    my $passed = 0;
 	    my $totalPreds = 0;
-	    # SliceAI
+	    # SpliceAI
 	    my @DS_headers = ("SpliceAI_pred_DS_AG","SpliceAI_pred_DS_AL",
 			      "SpliceAI_pred_DS_DG","SpliceAI_pred_DS_DL");
 	    foreach my $ds (@DS_headers) {
@@ -292,6 +296,18 @@ while (my $line =<STDIN>) {
 	    # require at least 2 predictors
 	    if (($totalPreds > 1) && ($passed / $totalPreds > $minPassedFracSplicing)) {
 		$thisCsq{"IMPACT"} = "MODHIGH";
+	    }
+	}
+
+	# upgrade regulatory_region_variant(s), as well as TF_binding_site_variant(s) with
+	# HIGH_INF_POS=Y, from MODIFIER to LOW
+	if (($thisCsq{"IMPACT"} eq "MODIFIER") && ($thisCsq{"Consequence"})) {
+	    if ($thisCsq{"Consequence"} =~ /regulatory_region_variant/) {
+		$thisCsq{"IMPACT"} = "LOW";
+	    }
+	    elsif (($thisCsq{"Consequence"} =~ /TF_binding_site_variant/) && 
+		   ($thisCsq{"HIGH_INF_POS"}) && ($thisCsq{"HIGH_INF_POS"} eq "Y")) {
+		$thisCsq{"IMPACT"} = "LOW";
 	    }
 	}
 
