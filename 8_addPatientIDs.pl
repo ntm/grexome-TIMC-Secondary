@@ -3,7 +3,7 @@
 # 12/08/2019
 # NTM
 
-# Take 3 arguments: $samplesFile $inDir $outDir
+# Take 3 or 4 arguments: $samplesFile $inDir $outDir [$jobs]
 # $samplesFile is the samples metadata xlsx file;
 # $inDir must contain cohort TSVs as produced by extractCohorts.pl,
 # possibly filtered and reordered with 7_filterAndReorderAll.pl,
@@ -14,12 +14,14 @@
 # with $patientID taken from patientID column if it's not empty, 
 # specimenID otherwise.
 # Filenames get ".patientIDs" added before .csv.
+# $jobs is the number of cohort infiles to process in parallel.
 
 use strict;
 use warnings;
 use File::Basename qw(basename);
 use FindBin qw($RealBin);
 use POSIX qw(strftime);
+use Parallel::ForkManager;
 
 use lib "$RealBin";
 use grexome_metaParse qw(parseSamples);
@@ -28,8 +30,12 @@ use grexome_metaParse qw(parseSamples);
 # the program name, not the path
 $0 = basename($0);
 
+# number of cohorts to process in parallel
+my $jobs = 8;
 
-(@ARGV == 3) || die "E $0: needs 3 args: a samples XLSX, an inDir and a non-existant outDir\n";
+(@ARGV == 3) || (@ARGV == 4) ||
+    die "E $0: needs 3 or 4 args: a samples XLSX, an inDir, a non-existant outDir, and optionally the number of jobs (default=$jobs)\n";
+(@ARGV == 4) && ($jobs = $ARGV[3]);
 my ($samplesFile, $inDir, $outDir) = @ARGV;
 (-d $inDir) ||
     die "E $0: inDir $inDir doesn't exist or isn't a directory\n";
@@ -64,8 +70,11 @@ foreach my $sample (keys %$sample2patientR) {
 #########################################################
 # read infiles
 
+my $pm = new Parallel::ForkManager($jobs);
+
 while (my $inFile = readdir(INDIR)) {
     ($inFile =~ /^\./) && next;
+    $pm->start && next;
     my ($fileStart,$gz);
     if ($inFile =~ /^(.+)\.csv$/) {
 	$fileStart = $1;
@@ -76,6 +85,7 @@ while (my $inFile = readdir(INDIR)) {
     }
     else {
 	warn "W $0: cannot parse filename of inFile $inDir/$inFile, skipping it\n";
+	$pm->finish;
     }
 
     my $inFull = "$inDir/$inFile";
@@ -103,8 +113,11 @@ while (my $inFile = readdir(INDIR)) {
     }
     close(IN);
     close(OUT);
+    $pm->finish;
 }
 closedir(INDIR);
+
+$pm->wait_all_children;
 
 $now = strftime("%F %T", localtime);
 warn "I $now: $0 - ALL DONE, completed successfully!\n";
