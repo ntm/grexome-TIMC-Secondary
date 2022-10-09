@@ -30,9 +30,12 @@ my $favoriteTissues = $ARGV[0];
 # with the current cohort)
 my @newOrder = qw(POSITION REF ALT SYMBOL KNOWN_CANDIDATE_GENE COUNT_HR COUNT_COHORT_HV COUNT_COHORT_HET COUNT_COHORT_OTHERCAUSE_HV COUNT_COHORT_OTHERCAUSE_HET COUNT_COMPAT_HV COUNT_COMPAT_HET COUNT_NEGCTRL_HV COUNT_NEGCTRL_HET COUNT_OTHERGENO IMPACT Consequence HGVSc HGVSp Protein_position gnomADe_AF gnomADg_AF COHORT_HV COHORT_HET COHORT_OTHERCAUSE_HV COHORT_OTHERCAUSE_HET COMPAT_HV COMPAT_HET);
 foreach my $favTissue (split(/,/, $favoriteTissues)) {
-    push(@newOrder, "GTEX_$favTissue"."_RATIO", "GTEX_$favTissue");
+    push(@newOrder, "GTEX_$favTissue"."_RATIO");
 }
-# some additional tissues that we like to see early, hard-coded but whatever
+foreach my $favTissue (split(/,/, $favoriteTissues)) {
+    push(@newOrder, "GTEX_$favTissue");
+}
+# some additional tissues that we like to see early, hard-coded
 push(@newOrder, qw(GTEX_blood GTEX_cerebellar_hemisphere GTEX_liver GTEX_lung));
 
 
