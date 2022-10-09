@@ -149,7 +149,7 @@ while (my $inFile = readdir(INDIR)) {
     $com .= " > $outDir/$outFile";
     # my $now = strftime("%F %T", localtime);
     # warn "I $now: $0 - starting $com\n";
-    system($com);
+    system($com) && warn "E $0: filter and/or reorder failed for $inFile\n";
     # $now = strftime("%F %T", localtime);
     # warn "I $now: $0 - Finished $com\n";
     $pm->finish;
@@ -159,4 +159,4 @@ closedir(INDIR);
 $pm->wait_all_children;
 
 $now = strftime("%F %T", localtime);
-warn "I $now: $0 - ALL DONE, completed successfully!\n";
+warn "I $now: $0 - ALL DONE\n";
