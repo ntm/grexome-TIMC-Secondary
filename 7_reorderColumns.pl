@@ -3,6 +3,7 @@
 # 18/09/2019
 # NTM
 
+# Takes a single argument: a comma-separated list of favorite GTEX tissues.
 # Parse on stdin a TSV file produced by extractCohorts.pl,
 # preferably filtered by 7_filterVariants.pl.
 # Print to stdout a similar file but where the order of
@@ -19,10 +20,20 @@ use File::Basename qw(basename);
 # the program name, not the path
 $0 = basename($0);
 
+(@ARGV == 1) || 
+    die "E $0: need a single argument: a comma-separated list of GTEX tissues\n";
+my $favoriteTissues = $ARGV[0];
+# no sanity checking, these favorite tissues should have been passed to 5_addGTEX.pl 
+# earlier and therefore already checked
 
 # columns to be printed first, in that order (replace COHORT
 # with the current cohort)
-my @newOrder = qw(POSITION REF ALT SYMBOL KNOWN_CANDIDATE_GENE COUNT_HR COUNT_COHORT_HV COUNT_COHORT_HET COUNT_COHORT_OTHERCAUSE_HV COUNT_COHORT_OTHERCAUSE_HET COUNT_COMPAT_HV COUNT_COMPAT_HET COUNT_NEGCTRL_HV COUNT_NEGCTRL_HET COUNT_OTHERGENO IMPACT Consequence HGVSc HGVSp Protein_position gnomADe_AF gnomADg_AF COHORT_HV COHORT_HET COHORT_OTHERCAUSE_HV COHORT_OTHERCAUSE_HET COMPAT_HV COMPAT_HET GTEX_testis_RATIO GTEX_ovary_RATIO GTEX_testis GTEX_ovary GTEX_blood GTEX_cerebellar_hemisphere GTEX_liver GTEX_lung);
+my @newOrder = qw(POSITION REF ALT SYMBOL KNOWN_CANDIDATE_GENE COUNT_HR COUNT_COHORT_HV COUNT_COHORT_HET COUNT_COHORT_OTHERCAUSE_HV COUNT_COHORT_OTHERCAUSE_HET COUNT_COMPAT_HV COUNT_COMPAT_HET COUNT_NEGCTRL_HV COUNT_NEGCTRL_HET COUNT_OTHERGENO IMPACT Consequence HGVSc HGVSp Protein_position gnomADe_AF gnomADg_AF COHORT_HV COHORT_HET COHORT_OTHERCAUSE_HV COHORT_OTHERCAUSE_HET COMPAT_HV COMPAT_HET);
+foreach my $favTissue (split(/,/, $favoriteTissues)) {
+    push(@newOrder, "GTEX_$favTissue"."_RATIO", "GTEX_$favTissue");
+}
+# some additional tissues that we like to see early, hard-coded but whatever
+push(@newOrder, qw(GTEX_blood GTEX_cerebellar_hemisphere GTEX_liver GTEX_lung));
 
 
 # build hash of @newOrder headers, value is the new column index

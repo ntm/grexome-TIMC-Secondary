@@ -319,7 +319,8 @@ else {
 # subsequent steps work on the individual CohortFiles
 
 # STEP 7: filter variants and reorder columns, clean up unfiltered CohortFiles
-$com = "perl $RealBin/7_filterAndReorderAll.pl --indir $tmpdir/Cohorts/ --outdir $tmpdir/Cohorts_Filtered/ --reorder ";
+$com = "perl $RealBin/7_filterAndReorderAll.pl --indir $tmpdir/Cohorts/ --outdir $tmpdir/Cohorts_Filtered/ ";
+$com .= "--reorder --favoriteTissues=".&gtexFavoriteTissues()." ";
 # set min_hr to 20% of $numSamples
 my $min_hr = int($numSamples * 0.2);
 $com .= "--min_hr=$min_hr ";

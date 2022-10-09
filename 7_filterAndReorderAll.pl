@@ -50,6 +50,11 @@ my $jobs = 8;
 # $reorder: if enabled we reorder columns with $reorderBin
 my $reorder = '';
 
+# for $reorderBin: comma-separated list of favorite tissues (with default), 
+# should be the same as what was passed to 5_addGTEX.pl
+my $favoriteTissues = "testis,ovary";
+
+
 # arguments for filtering: no default values, all filters disabled by default
 my $max_ctrl_hv; # COUNT_NEGCTRL_HV <= $x
 my $max_ctrl_het; # COUNT_NEGCTRL_HET <= $x
@@ -65,6 +70,7 @@ GetOptions ("indir=s" => \$inDir,
 	    "outdir=s" => \$outDir,
 	    "jobs=i" => \$jobs,
 	    "reorder" => \$reorder,
+	    "favoriteTissues=s" => \$favoriteTissues,
 	    "max_ctrl_hv=i" => \$max_ctrl_hv,
 	    "max_ctrl_het=i" => \$max_ctrl_het,
 	    "min_cohort_hv=i" => \$min_cohort_hv,
@@ -138,7 +144,7 @@ while (my $inFile = readdir(INDIR)) {
     }
 
     # reorder columns if requested
-    ($reorder) && ($com .= " | perl $reorderBin ");
+    ($reorder) && ($com .= " | perl $reorderBin $favoriteTissues ");
 
     $com .= " > $outDir/$outFile";
     # my $now = strftime("%F %T", localtime);
