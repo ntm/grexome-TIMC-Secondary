@@ -104,6 +104,14 @@ warn "I $now: $0 - starting to run\n";
 
 my $pm = new Parallel::ForkManager($jobs);
 
+# $childFailed will become non-zero if at least one child died
+my $childFailed = 0;
+# Set up a callback so the parent knows if a child dies
+$pm->run_on_finish( sub {
+    my ($pid, $exit_code) = @_;
+    ($exit_code) && ($childFailed=1);
+		    });
+
 while (my $inFile = readdir(INDIR)) {
     ($inFile =~ /^\./) && next;
     $pm->start && next;
@@ -149,7 +157,7 @@ while (my $inFile = readdir(INDIR)) {
     $com .= " > $outDir/$outFile";
     # my $now = strftime("%F %T", localtime);
     # warn "I $now: $0 - starting $com\n";
-    system($com) && warn "E $0: filter and/or reorder failed for $inFile\n";
+    system($com) && die "E $0: filter and/or reorder failed for $inFile\n";
     # $now = strftime("%F %T", localtime);
     # warn "I $now: $0 - Finished $com\n";
     $pm->finish;
@@ -159,4 +167,9 @@ closedir(INDIR);
 $pm->wait_all_children;
 
 $now = strftime("%F %T", localtime);
-warn "I $now: $0 - ALL DONE\n";
+if ($childFailed) {
+    die "E $now: $0 FAILED\n";
+}
+else {
+    warn "I $now: $0 - ALL DONE, completed successfully!\n";
+}
