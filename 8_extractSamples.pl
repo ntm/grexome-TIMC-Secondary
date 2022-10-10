@@ -136,6 +136,14 @@ my $sample2patientR;
 
 my $pm = new Parallel::ForkManager($jobs);
 
+# $childFailed will become non-zero if at least one child died
+my $childFailed = 0;
+# Set up a callback so the parent knows if a child dies
+$pm->run_on_finish( sub {
+    my ($pid, $exit_code) = @_;
+    ($exit_code) && ($childFailed=1);
+		    });
+
 while (my $inFile = readdir(INDIR)) {
     ($inFile =~ /^\./) && next;
     $pm->start && next;
@@ -199,7 +207,7 @@ while (my $inFile = readdir(INDIR)) {
     (($hvCol >= 0) && ($hvColOC >= 0)) || 
 	die "E: $0 - couldn't find ${cohort}_HV or ${cohort}_OTHERCAUSE_HV in header of infile $inFile\n";
     (($hetCol >= 0) && ($hetColOC >= 0)) || 
-	die "E: $0 - couldn't find HET or OC_HET in header of infile $inFile\n";
+	die "E: $0 - couldn't find ${cohort}_HET or ${cohort}_OTHERCAUSE_HET in header of infile $inFile\n";
 
     # KNOWN_CANDIDATE_GENE, Feature and IMPACT column indexes after
     # removing @colsToRemove columns
@@ -421,4 +429,9 @@ closedir(INDIR);
 $pm->wait_all_children;
 
 $now = strftime("%F %T", localtime);
-warn "I $now: $0 - ALL DONE, completed successfully!\n";
+if ($childFailed) {
+    die "E $now: $0 FAILED\n";
+}
+else {
+    warn "I $now: $0 - ALL DONE, completed successfully!\n";
+}
