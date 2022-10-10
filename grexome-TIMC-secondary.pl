@@ -252,7 +252,7 @@ my $com = "$bgzip $inFile | perl $RealBin/1_filterBadCalls.pl --samplesFile=$sam
 if ($debug) {
     # specific logfile from step and save its output
     $com .= "2> $outDir/step1.err > $outDir/step1.out";
-    system($com) && die "E $0: debug mode on, step1 failed: $?";
+    system($com) && die "E $0: debug mode on, step1 failed, examine step1.err\n";
     # next step will read this step's output
     $com = "cat $outDir/step1.out ";
 }
@@ -262,7 +262,7 @@ if ($cnvs) {
     $com .= " | perl $RealBin/1B_collateVCFs.pl --vcf=$cnvs ";
     if ($debug) {
 	$com .= "2> $outDir/step1B.err > $outDir/step1B.out";
-	system($com) && die "E $0: debug mode on, step1B failed: $?";
+	system($com) && die "E $0: debug mode on, step1B failed, examine step1B.err\n";
 	$com = "cat $outDir/step1B.out ";
     }
 }
@@ -271,16 +271,17 @@ if ($cnvs) {
 $com .= " | perl $RealBin/2_sampleData2genotypes.pl ";
 if ($debug) {
     $com .= "2> $outDir/step2.err > $outDir/step2.out";
-    system($com) && die "E $0: debug mode on, step2 failed: $?";
+    system($com) && die "E $0: debug mode on, step2 failed, examine step2.err\n";
     $com = "cat $outDir/step2.out ";
 }
 
 # step 3
-$com .= " | perl $RealBin/3_runVEP.pl --cacheFile=".&vepCacheFile()." --genome=".&refGenome()." --dataDir=".&vepPluginDataPath()." --tmpDir=$tmpdir/runVepTmpDir/ ";
+$com .= " | perl $RealBin/3_runVEP.pl --cacheFile=".&vepCacheFile()." --genome=".&refGenome().
+    " --dataDir=".&vepPluginDataPath()." --tmpDir=$tmpdir/runVepTmpDir/ ";
 ($debugVep) && ($com .= "--debug ");
 if ($debug) {
     $com .= "2> $outDir/step3.err > $outDir/step3.out";
-    system($com) && die "E $0: debug mode on, step3 failed: $?";
+    system($com) && die "E $0: debug mode on, step3 failed, examine step3.err\n";
     $com = "cat $outDir/step3.out ";
 }
 
@@ -288,7 +289,7 @@ if ($debug) {
 $com .= " | perl $RealBin/4_vcf2tsv.pl ";
 if ($debug) {
     $com .= "2> $outDir/step4.err > $outDir/step4.out";
-    system($com) && die "E $0: debug mode on, step4 failed: $?";
+    system($com) && die "E $0: debug mode on, step4 failed, examine step4.err\n";
     $com = "cat $outDir/step4.out ";
 }
 
@@ -296,7 +297,7 @@ if ($debug) {
 $com .= " | perl $RealBin/5_addGTEX.pl --favoriteTissues=".&gtexFavoriteTissues()." --gtex=".&gtexDatafile($RealBin)." ";
 if ($debug) {
     $com .= "2> $outDir/step5.err > $outDir/step5.out";
-    system($com) && die "E $0: debug mode on, step5 failed: $?";
+    system($com) && die "E $0: debug mode on, step5 failed, examine step5.err\n";
     $com = "cat $outDir/step5.out ";
 }
 
@@ -307,12 +308,12 @@ $com .= " | perl $RealBin/6_extractCohorts.pl --samples=$samples ";
 $com .= "--outDir=$tmpdir/Cohorts/ --tmpDir=$tmpdir/TmpExtract/ --jobs=$numJobs6 ";
 if ($debug) {
     $com .= "2> $outDir/step6.err";
-    system($com) && die "E $0: debug mode on, step6 failed: $?";
+    system($com) && die "E $0: debug mode on, step6 failed, examine step6.err\n";
 }
 else {
     # after step6 we have several files (one per cohort) so no more piping,
     # run steps 1-6, all logs go to stderr
-    system($com) && die "E $0: steps 1 to 6 seem to have failed? $?";
+    system($com) && die "E $0: steps 1 to 6 have failed, check for previous errors in this logfile\n";
 }
 
 ######################
@@ -335,7 +336,7 @@ else {
     # remove unfiltered results in non-debug mode
     $com .= " ; rm -r $tmpdir/Cohorts/";
 }
-system($com) && die "E $0: step7 failed: $?";
+system($com) && die "E $0: step7 failed\n";
 
 # STEP 8 - SAMPLES
 $com = "perl $RealBin/8_extractSamples.pl --samples $samples ";
@@ -344,7 +345,7 @@ $com .= "--indir $tmpdir/Cohorts_Filtered/ --outdir $outDir/Samples/ ";
 if ($debug) {
     $com .= "2> $outDir/step8s.err";
 }
-system($com) && die "E $0: step8-samples failed: $?";
+system($com) && die "E $0: step8-samples failed\n";
 
 # STEP 8 - TRANSCRIPTS , adding patientIDs
 $com = "( perl $RealBin/8_extractTranscripts.pl --indir $tmpdir/Cohorts_Filtered/ --outdir $tmpdir/Transcripts_noIDs/ ";
@@ -356,7 +357,7 @@ if ($debug) {
 else {
     $com .= " ; rm -r $tmpdir/Transcripts_noIDs/ ";
 }
-system($com) && die "E $0: step8-transcripts failed: $?";
+system($com) && die "E $0: step8-transcripts failed\n";
 
 # STEP 9 - FINAL COHORTFILES , require at least one HV or HET sample and add patientIDs
 $com = "( perl $RealBin/9_requireUndiagnosed.pl $tmpdir/Cohorts_Filtered/ $tmpdir/Cohorts_FINAL/ ; ";
@@ -367,7 +368,7 @@ if ($debug) {
 else {
     $com .= " ; rm -r $tmpdir/Cohorts_Filtered/ $tmpdir/Cohorts_FINAL/ ";
 }
-system($com) && die "E $0: step9-finalCohorts failed: $?";
+system($com) && die "E $0: step9-finalCohorts failed\n";
 
 # STEP 9 - COHORTFILES_CANONICAL , if called without --canon we still
 # produce CohortFiles restricted to canonical transcripts (in case
@@ -377,7 +378,7 @@ if (! $canon) {
     if ($debug) {
 	$com .= "2> $outDir/step9-cohortsCanonical.err";
     }
-    system($com) && die "E $0: step9-cohortsCanonical failed: $?";
+    system($com) && die "E $0: step9-cohortsCanonical failed\n";
 }
 
 ######################
@@ -418,13 +419,11 @@ if ($doSubCs) {
 	    ($com .= "perl $RealBin/9_extractSubcohort.pl $subC < $outDir/Cohorts_Canonical/$patho.final.patientIDs.canon.csv > $outFileRoot.cohort.canon.csv ; ");
 	$com .= "perl $RealBin/9_extractSubcohort.pl $subC < $outDir/Transcripts/$patho.Transcripts.patientIDs.csv > $outFileRoot.transcripts.csv ; ";
     }
+    $com .= " ) ";
     if ($debug) {
-	$com .= "2> $outDir/step9-subCohorts.err )";
+	$com .= "2> $outDir/step9-subCohorts.err";
     }
-    else {
-	$com .= " )";
-    }
-    system($com) && die "E $0: step9-subCohorts failed: $?";
+    system($com) && die "E $0: step9-subCohorts failed\n";
 }
 else {
     warn "I $0: no existing sub-cohort, step9-subCohorts skipped\n";
@@ -469,8 +468,11 @@ close(FILES);
 my $qc_causal = "$outDir/qc_causal.csv";
 
 $com = "perl $RealBin/10_qc_checkCausal.pl --samplesFile=$samples --indir=$outDir/Samples/ ";
-$com .= "> $qc_causal";
-system($com) && die "E $0: step10-qc_causal failed: $?";
+$com .= "> $qc_causal ";
+if ($debug) {
+    $com .= "2> $outDir/step10-qc_causal.err";
+}
+system($com) && die "E $0: step10-qc_causal failed\n";
 
 
 ######################
