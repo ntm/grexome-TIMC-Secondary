@@ -158,6 +158,7 @@ while (my $inFile = readdir(INDIR)) {
     open(IN, $inFull) ||
 	die "E: $0 - cannot (gunzip-?)open cohort datafile $inDir/$inFile (as $inFull)\n";
     my $header = <IN>;
+    ($header) || die "E: $0 - input file $inDir/$inFile is empty\n";
     chomp($header);
     my @header = split(/\t/,$header);
 
