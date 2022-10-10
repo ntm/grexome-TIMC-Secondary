@@ -210,6 +210,7 @@ while (my $inFile = readdir(INDIR)) {
     ###################################
     # header line
     my $header = <INFILE>;
+    ($header) || die "E: $0 - input file $inDir/$inFile is empty\n";
     chomp($header);
     my @headers = split(/\t/,$header);
 
