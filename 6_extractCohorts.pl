@@ -337,6 +337,10 @@ my $batchNum = 0;
 my $timestampAdaptive = time();
 
 while (!$lastBatch) {
+    if ($childFailed) {
+	$now = strftime("%F %T", localtime);
+	die "E $now: $0 FAILED - some child died, no point going on\n";
+    }
     $batchNum++;
     if (($batchSizeAdaptive) && ($batchNum % ($jobs-1) == 0) && ($batchNum >= $jobs)) {
 	# jobs-1 because we want #workerThreads, excluding the eatTmpFiles job

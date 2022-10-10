@@ -111,6 +111,10 @@ $pm->run_on_finish( sub { ($_[1]) && ($childFailed=1) });
 
 while (my $inFile = readdir(INDIR)) {
     ($inFile =~ /^\./) && next;
+    if ($childFailed) {
+	$now = strftime("%F %T", localtime);
+	die "E $now: $0 FAILED - some child died, no point going on\n";
+    }
     $pm->start && next;
     my ($fileStart,$gz);
     if ($inFile =~ (/^(.+)\.csv$/)) {

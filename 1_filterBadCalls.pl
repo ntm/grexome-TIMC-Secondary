@@ -307,6 +307,10 @@ my $maxPossibleIndelPos = 0;
 my $prevChr = "";
 
 while ($lineForNextBatch) {
+    if ($childFailed) {
+	$now = strftime("%F %T", localtime);
+	die "E $now: $0 FAILED - some child died, no point going on\n";
+    }
     $batchNum++;
     my @lines = ($lineForNextBatch);
     $lineForNextBatch = '';
