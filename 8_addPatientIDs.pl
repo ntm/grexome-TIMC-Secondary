@@ -72,6 +72,11 @@ foreach my $sample (keys %$sample2patientR) {
 
 my $pm = new Parallel::ForkManager($jobs);
 
+# $childFailed will become non-zero if at least one child died
+my $childFailed = 0;
+# Set up a callback so the parent knows if a child dies
+$pm->run_on_finish( sub { ($_[1]) && ($childFailed=1) });
+
 while (my $inFile = readdir(INDIR)) {
     ($inFile =~ /^\./) && next;
     $pm->start && next;
@@ -120,5 +125,9 @@ closedir(INDIR);
 $pm->wait_all_children;
 
 $now = strftime("%F %T", localtime);
-warn "I $now: $0 - ALL DONE, completed successfully!\n";
-
+if ($childFailed) {
+    die "E $now: $0 FAILED\n";
+}
+else {
+    warn "I $now: $0 - ALL DONE, completed successfully!\n";
+}

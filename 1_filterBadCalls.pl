@@ -278,6 +278,11 @@ STDOUT->flush();
 # create fork manager
 my $pm = new Parallel::ForkManager($numJobs);
 
+# $childFailed will become non-zero if at least one child died
+my $childFailed = 0;
+# Set up a callback so the parent knows if a child dies
+$pm->run_on_finish( sub { ($_[1]) && ($childFailed=1) });
+
 # spawn a child process that waits for workers to finish producing batches,
 # and prints the tmpfiles to stdout in correct order, cleaning up behind itself
 if (! $pm->start) {
@@ -383,9 +388,14 @@ close OUTLAST;
 $pm->wait_all_children;
 
 $now = strftime("%F %T", localtime);
-rmdir($tmpDir) || 
-    die "E $now: $0 - all done but cannot rmdir tmpDir $tmpDir, why? $!\n";
-warn "I $now: $0 - ALL DONE, completed successfully!\n";
+if ($childFailed) {
+    die "E $now: $0 FAILED\n";
+}
+else {
+    rmdir($tmpDir) || 
+	die "E $now: $0 - all done but cannot rmdir tmpDir $tmpDir, why? $!\n";
+    warn "I $now: $0 - ALL DONE, completed successfully!\n";
+}
 
 
 #############################################

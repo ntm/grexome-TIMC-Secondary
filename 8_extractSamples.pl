@@ -139,10 +139,7 @@ my $pm = new Parallel::ForkManager($jobs);
 # $childFailed will become non-zero if at least one child died
 my $childFailed = 0;
 # Set up a callback so the parent knows if a child dies
-$pm->run_on_finish( sub {
-    my ($pid, $exit_code) = @_;
-    ($exit_code) && ($childFailed=1);
-		    });
+$pm->run_on_finish( sub { ($_[1]) && ($childFailed=1) });
 
 while (my $inFile = readdir(INDIR)) {
     ($inFile =~ /^\./) && next;

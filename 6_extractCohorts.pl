@@ -310,6 +310,11 @@ foreach my $cohorti (0..$#cohorts) {
 # create fork manager
 my $pm = new Parallel::ForkManager($jobs);
 
+# $childFailed will become non-zero if at least one child died
+my $childFailed = 0;
+# Set up a callback so the parent knows if a child dies
+$pm->run_on_finish( sub { ($_[1]) && ($childFailed=1) });
+
 # need a tmp file for listing the known candidates
 my $tmpFileCandidatesSeen = "$tmpDir/allCandidates.seen";
 open(my $knownCandidatesSeenFH, "> $tmpFileCandidatesSeen") ||
@@ -406,6 +411,11 @@ print OUTLAST "$batchNum\n";
 close OUTLAST;
 
 $pm->wait_all_children;
+
+if ($childFailed) {
+    $now = strftime("%F %T", localtime);
+    die "E $now: $0 FAILED\n";
+}
 
 foreach my $fh (@outFHs) {
     close($fh);
