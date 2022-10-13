@@ -17,6 +17,9 @@
 #
 # In addition, feature_truncation variants are upgraded from MODIFIER to HIGH.
 #
+# Also, in order to study miRNAs and oter ncRNAs, some IMPACTs are
+# upgraded from MODIFIER to LOW (look for "miRNA").
+#
 # Also, in an attempt to make use of VEP's --regulatory switch, variants
 # affecting TFBS's and/or severely affecting regulatory regions are upgraded
 # from MODIFIER to LOW or MODHIGH (look for "TF").
@@ -299,14 +302,22 @@ while (my $line =<STDIN>) {
 	    }
 	}
 
-	# upgrade severe TFBS and regulatory region variants to LOW or MODHIGH:
-	# TFBS_ablation and regulatory_region_ablation => MODHIGH 
-	# TF_binding_site_variant with [HIGH_INF_POS==Y] => MODHIGH
-	# TF_binding_site_variant without HIGH_INF_POS => LOW
-	# TFBS_amplification => LOW
-	# (regulatory_region_variant and regulatory_region_amplification stay MODIFIER)
 	if (($thisCsq{"IMPACT"} eq "MODIFIER") && ($thisCsq{"Consequence"})) {
-	    if ($thisCsq{"Consequence"} =~ /TFBS_ablation|regulatory_region_ablation/) {
+	    # upgrade some miRNA and other ncRNA IMPACTs to LOW:
+	    # non_coding_transcript_variant, non_coding_transcript_exon_variant
+	    # and mature_miRNA_variant
+	    if ($thisCsq{"Consequence"} =~ 
+		/non_coding_transcript_variant|non_coding_transcript_exon_variant|mature_miRNA_variant/) {
+		$thisCsq{"IMPACT"} = "LOW";
+	    }
+
+	    # upgrade severe TFBS and regulatory region variants to LOW or MODHIGH:
+	    # TFBS_ablation and regulatory_region_ablation => MODHIGH 
+	    # TF_binding_site_variant with [HIGH_INF_POS==Y] => MODHIGH
+	    # TF_binding_site_variant without HIGH_INF_POS => LOW
+	    # TFBS_amplification => LOW
+	    # (regulatory_region_variant and regulatory_region_amplification stay MODIFIER)
+	    elsif ($thisCsq{"Consequence"} =~ /TFBS_ablation|regulatory_region_ablation/) {
 		$thisCsq{"IMPACT"} = "MODHIGH";
 	    }
 	    elsif (($thisCsq{"Consequence"} =~ /TF_binding_site_variant/) && 
