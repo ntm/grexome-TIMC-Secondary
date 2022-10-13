@@ -327,7 +327,7 @@ my $min_hr = int($numSamples * 0.2);
 $com .= "--min_hr=$min_hr ";
 # other hard-coded filters:
 $com .= "--max_ctrl_hv 3 --max_ctrl_het 10 --no_mod ";
-$com .= " --max_af_gnomad 0.01 --max_af_1kg 0.03 ";
+$com .= "--max_af_gnomad 0.01 --max_af_1kg 0.03 ";
 ($canon) && ($com .= "--canonical ");
 if ($debug) {
     $com .= "2> $outDir/step7.err";
