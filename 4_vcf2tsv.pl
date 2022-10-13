@@ -304,10 +304,15 @@ while (my $line =<STDIN>) {
 
 	if (($thisCsq{"IMPACT"} eq "MODIFIER") && ($thisCsq{"Consequence"})) {
 	    # upgrade some miRNA and other ncRNA IMPACTs to LOW:
-	    # non_coding_transcript_variant, non_coding_transcript_exon_variant
-	    # and mature_miRNA_variant
-	    if ($thisCsq{"Consequence"} =~ 
-		/non_coding_transcript_variant|non_coding_transcript_exon_variant|mature_miRNA_variant/) {
+	    # non_coding_transcript_variant (except deep intronic ones), 
+	    # non_coding_transcript_exon_variant, and mature_miRNA_variant
+	    if ($thisCsq{"Consequence"} =~ /non_coding_transcript_exon_variant|mature_miRNA_variant/) {
+		$thisCsq{"IMPACT"} = "LOW";
+	    }
+	    elsif (($thisCsq{"Consequence"} =~ /non_coding_transcript_variant/) &&
+		   ($thisCsq{"Consequence"} ne 'intron_variant&non_coding_transcript_variant')) {
+		# deepish intronic variants affecting ncRNAs should stay MODIFIER, but we do want
+		# to upgrade eg 'splice_donor_region_variant&intron_variant&non_coding_transcript_variant'
 		$thisCsq{"IMPACT"} = "LOW";
 	    }
 
