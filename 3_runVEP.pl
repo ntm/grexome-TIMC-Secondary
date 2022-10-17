@@ -298,6 +298,10 @@ sub vepCommand {
     $vepCommand .= " --allele_number"; # for knowing which CSQ annotates which ALT
     $vepCommand .= " --canonical --biotype --xref_refseq --symbol --mane";
     $vepCommand .= " --numbers --total_length  --variant_class";
+    # report where the variant lies in the miRNA secondary structure
+    $vepCommand .= " --mirna";
+    # reduce default distance (5000) for annotating [upstream|downstream]_gene_variant
+    $vepCommand .= " --distance 1000";
     # right-align indels before consequence calculation, see:
     # https://www.ensembl.org/info/docs/tools/vep/script/vep_other.html#shifting
     $vepCommand .= " --shift_3prime 1";
