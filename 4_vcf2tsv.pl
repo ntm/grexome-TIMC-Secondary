@@ -86,7 +86,7 @@ my @goodVeps = ("SYMBOL","Gene","IMPACT","Consequence","Feature","CANONICAL",
 		"SpliceAI_pred_DS_DL","SpliceAI_pred_DP_DL",
 		"gnomADe_AF","gnomADg_AF","AF",
 		"MOTIF_NAME","MOTIF_POS","HIGH_INF_POS","MOTIF_SCORE_CHANGE","TRANSCRIPTION_FACTORS",
-		"Existing_variation","CLIN_SIG","SOMATIC","PHENO");
+		"Existing_variation");
 
 # VCF headers: ignore them but grab the:
 # - VEP CSQ field names and store them in @vepNames;
