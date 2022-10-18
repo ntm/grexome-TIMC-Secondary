@@ -293,6 +293,16 @@ if ($debug) {
     $com = "cat $outDir/step4.out ";
 }
 
+# step 4B - we can immediately filter variants on IMPACT, BIOTYPE, AFs and CANONICAL
+$com .= " | perl $RealBin/7_filterVariants.pl --no_mod --no_pseudo --no_nmd ".
+    "--max_af_gnomad 0.01 --max_af_1kg 0.03 ";
+($canon) && ($com .= "--canonical ");
+if ($debug) {
+    $com .= "2> $outDir/step4B.err > $outDir/step4B.out";
+    system($com) && die "E $0: debug mode on, step4B failed, examine step4B.err\n";
+    $com = "cat $outDir/step4B.out ";
+}
+
 # step 5
 $com .= " | perl $RealBin/5_addGTEX.pl --favoriteTissues=".&gtexFavoriteTissues()." --gtex=".&gtexDatafile($RealBin)." ";
 if ($debug) {
@@ -319,16 +329,14 @@ else {
 ######################
 # subsequent steps work on the individual CohortFiles
 
-# STEP 7: filter variants and reorder columns, clean up unfiltered CohortFiles
+# STEP 7: filter variants on COUNTs and reorder columns, clean up unfiltered CohortFiles
 $com = "perl $RealBin/7_filterAndReorderAll.pl --indir $tmpdir/Cohorts/ --outdir $tmpdir/Cohorts_Filtered/ ";
 $com .= "--reorder --favoriteTissues=".&gtexFavoriteTissues()." ";
 # set min_hr to 20% of $numSamples
 my $min_hr = int($numSamples * 0.2);
 $com .= "--min_hr=$min_hr ";
-# other hard-coded filters:
-$com .= "--max_ctrl_hv 3 --max_ctrl_het 10 --no_mod ";
-$com .= "--max_af_gnomad 0.01 --max_af_1kg 0.03 ";
-($canon) && ($com .= "--canonical ");
+# other hard-coded COUNT filters:
+$com .= "--max_ctrl_hv 3 --max_ctrl_het 10 ";
 if ($debug) {
     $com .= "2> $outDir/step7.err";
 }
