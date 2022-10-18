@@ -17,7 +17,7 @@
 #
 # In addition, feature_truncation variants are upgraded from MODIFIER to HIGH.
 #
-# Also, in order to study miRNAs and oter ncRNAs, some IMPACTs are
+# Also, in order to study miRNAs and other ncRNAs, some IMPACTs are
 # upgraded from MODIFIER to LOW (look for "miRNA").
 #
 # Also, in an attempt to make use of VEP's --regulatory switch, variants
