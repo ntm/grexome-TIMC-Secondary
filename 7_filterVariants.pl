@@ -29,9 +29,8 @@ my $no_mod = ''; # if enabled, filter out MODIFIER impacts
 my $no_low = ''; # if enabled, filter out LOW impacts
 my $canon = ''; # if enabled, only keep lines with CANONICAL==YES
 
-# could add a filter on BIOTYPE values (eg protein_coding,
-# processed_transcript, retained_intron, nonsense_mediated_decay)
-# Not implementing now.
+my $no_pseudo = ''; # if enabled, filter out all *pseudogene BIOTYPEs
+my $no_nmd = ''; # if enabled, filter out nonsense_mediated_decay BIOTYPE
 
 my $max_af_gnomad; # gnomADe_AF <= $x AND gnomADg_AF <= $x (if available)
 my $max_af_1kg; # AF <= $x, this is 1KG phase 3
@@ -43,6 +42,8 @@ GetOptions ("max_ctrl_hv=i" => \$max_ctrl_hv,
 	    "no_mod" => \$no_mod,
 	    "no_low" => \$no_low,
 	    "canonical" => \$canon,
+	    "no_pseudo" => \$no_pseudo,
+	    "no_nmd" => \$no_nmd,
 	    "max_af_gnomad=f" => \$max_af_gnomad,
 	    "max_af_1kg=f" => \$max_af_1kg)
     or die("E $0: Error in command line arguments\n");
@@ -55,6 +56,8 @@ my $filterString = "";
 ($min_hr) && ($filterString .= "min_hr=$min_hr ");
 ($no_mod) && ($filterString .= "no_mod ");
 ($no_low) && ($filterString .= "no_low ");
+($no_pseudo) && ($filterString .= "no_pseudo ");
+($no_nmd) && ($filterString .= "no_nmd ");
 ($canon) && ($filterString .= "canonical ");
 ($max_af_gnomad) && ($filterString .= "max_af_gnomad=$max_af_gnomad ");
 ($max_af_1kg) && ($filterString .= "max_af_1kg=$max_af_1kg ");
@@ -87,7 +90,7 @@ foreach my $i (0..$#titles) {
 }
 # make sure all titles we use in this script are present
 foreach my $t ("CANONICAL","COUNT_NEGCTRL_HV","COUNT_NEGCTRL_HET","COUNT_COHORT_HV",
-	       "COUNT_HR","IMPACT","gnomADe_AF","gnomADg_AF","AF") {
+	       "COUNT_HR","IMPACT","BIOTYPE","gnomADe_AF","gnomADg_AF","AF") {
     (defined $title2index{$t}) ||
 	die "E $0: title $t required by script but missing, some VEP columns changed?\n";
 }
@@ -100,6 +103,19 @@ while(my $line = <STDIN>) {
     if (($canon) && ($fields[$title2index{"CANONICAL"}] ne 'YES')) {
 	next;
     }
+   if (($no_mod) && ($fields[$title2index{"IMPACT"}] eq "MODIFIER")) {
+	next;
+    }
+    if (($no_low) && ($fields[$title2index{"IMPACT"}] eq "LOW")) {
+	next;
+    }
+    if (($no_pseudo) && ($fields[$title2index{"BIOTYPE"}] =~ /pseudogene$/)) {
+	# there are a bunch of pseudogene biotypes but they all end with 'pseudogene'
+	next;
+    }
+    if (($no_nmd) && ($fields[$title2index{"BIOTYPE"}] eq "nonsense_mediated_decay")) {
+	next;
+    }
     if ((defined $max_ctrl_hv) && ($fields[$title2index{"COUNT_NEGCTRL_HV"}] > $max_ctrl_hv)) {
 	next;
     }
@@ -110,12 +126,6 @@ while(my $line = <STDIN>) {
 	next;
     }
     if  ((defined $min_hr) && ($fields[$title2index{"COUNT_HR"}]  < $min_hr)) {
-	next;
-    }
-   if (($no_mod) && ($fields[$title2index{"IMPACT"}] eq "MODIFIER")) {
-	next;
-    }
-    if (($no_low) && ($fields[$title2index{"IMPACT"}] eq "LOW")) {
 	next;
     }
     if ((defined $max_af_gnomad) && ($fields[$title2index{"gnomADe_AF"}])) {
