@@ -15,6 +15,7 @@ use Getopt::Long;
 use POSIX qw(strftime);
 use File::Copy qw(copy);
 use File::Basename qw(basename);
+use File::Path qw(remove_tree);
 use File::Temp qw(tempdir);
 use FindBin qw($RealBin);
 
@@ -337,57 +338,52 @@ my $min_hr = int($numSamples * 0.2);
 $com .= "--min_hr=$min_hr ";
 # other hard-coded COUNT filters:
 $com .= "--max_ctrl_hv 3 --max_ctrl_het 10 ";
-if ($debug) {
-    $com .= "2> $outDir/step7.err";
-}
-else {
-    # remove unfiltered results in non-debug mode
-    $com .= " ; rm -r $tmpdir/Cohorts/";
-}
+($debug) && ($com .= "2> $outDir/step7.err");
 system($com) && die "E $0: step7 failed\n";
+# remove unfiltered results in non-debug mode
+(! $debug) && remove_tree("$tmpdir/Cohorts/");
 
 # STEP 8 - SAMPLES
 $com = "perl $RealBin/8_extractSamples.pl --samples $samples ";
 $com .= "--indir $tmpdir/Cohorts_Filtered/ --outdir $outDir/Samples/ ";
-(&coveragePath()) && ($com .= "--covdir ".&coveragePath()." ");
-if ($debug) {
-    $com .= "2> $outDir/step8s.err";
-}
+(&coveragePath()) && ($com .= "--covdir ".&coveragePath());
+($debug) && ($com .= " 2> $outDir/step8s.err");
 system($com) && die "E $0: step8-samples failed\n";
 
 # STEP 8 - TRANSCRIPTS , adding patientIDs
-$com = "( perl $RealBin/8_extractTranscripts.pl --indir $tmpdir/Cohorts_Filtered/ --outdir $tmpdir/Transcripts_noIDs/ ";
+$com = "perl $RealBin/8_extractTranscripts.pl --indir $tmpdir/Cohorts_Filtered/ --outdir $tmpdir/Transcripts_noIDs/ ";
 ($pathologies) && ($com .= "--pathologies=$pathologies ");
-$com .= "; perl $RealBin/8_addPatientIDs.pl $samples $tmpdir/Transcripts_noIDs/ $outDir/Transcripts/ )";
-if ($debug) {
-    $com .= "2> $outDir/step8t.err";
-}
-else {
-    $com .= " ; rm -r $tmpdir/Transcripts_noIDs/ ";
-}
+($debug) && ($com .= "2> $outDir/step8t.err");
 system($com) && die "E $0: step8-transcripts failed\n";
 
+$com = "perl $RealBin/8_addPatientIDs.pl $samples $tmpdir/Transcripts_noIDs/ $outDir/Transcripts/ ";
+($debug) && ($com .= "2>> $outDir/step8t.err");
+system($com) && die "E $0: step8-transcripts-addPatientIDs failed\n";
+
+(! $debug) && remove_tree("$tmpdir/Transcripts_noIDs/");
+
+
 # STEP 9 - FINAL COHORTFILES , require at least one HV or HET sample and add patientIDs
-$com = "( perl $RealBin/9_requireUndiagnosed.pl $tmpdir/Cohorts_Filtered/ $tmpdir/Cohorts_FINAL/ ; ";
-$com .= " perl $RealBin/8_addPatientIDs.pl $samples $tmpdir/Cohorts_FINAL/ $outDir/Cohorts/ )";
-if ($debug) {
-    $com .= "2> $outDir/step9-finalCohorts.err";
-}
-else {
-    $com .= " ; rm -r $tmpdir/Cohorts_Filtered/ $tmpdir/Cohorts_FINAL/ ";
-}
+$com = "perl $RealBin/9_requireUndiagnosed.pl $tmpdir/Cohorts_Filtered/ $tmpdir/Cohorts_FINAL/ ";
+($debug) && ($com .= "2> $outDir/step9-finalCohorts.err");
 system($com) && die "E $0: step9-finalCohorts failed\n";
+
+$com = "perl $RealBin/8_addPatientIDs.pl $samples $tmpdir/Cohorts_FINAL/ $outDir/Cohorts/ ";
+($debug) && ($com .= "2>> $outDir/step9-finalCohorts.err");
+system($com) && die "E $0: step9-finalCohorts-addPatientIDs failed\n";
+
+(! $debug) && remove_tree("$tmpdir/Cohorts_Filtered/", "$tmpdir/Cohorts_FINAL/");
+
 
 # STEP 9 - COHORTFILES_CANONICAL , if called without --canon we still
 # produce CohortFiles restricted to canonical transcripts (in case
 # the AllTranscripts CohortFiles are too heavy for oocalc/excel)
 if (! $canon) {
     $com = "perl $RealBin/7_filterAndReorderAll.pl --indir $outDir/Cohorts/ --outdir $outDir/Cohorts_Canonical/ --canon ";
-    if ($debug) {
-	$com .= "2> $outDir/step9-cohortsCanonical.err";
-    }
+    ($debug) && ($com .= "2> $outDir/step9-cohortsCanonical.err");
     system($com) && die "E $0: step9-cohortsCanonical failed\n";
 }
+
 
 ######################
 # STEP 9 - SUBCOHORTS (can run after requireUndiagnosed and addPatientIDs)
@@ -428,9 +424,7 @@ if ($doSubCs) {
 	$com .= "perl $RealBin/9_extractSubcohort.pl $subC < $outDir/Transcripts/$patho.Transcripts.patientIDs.csv > $outFileRoot.transcripts.csv ; ";
     }
     $com .= " ) ";
-    if ($debug) {
-	$com .= "2> $outDir/step9-subCohorts.err";
-    }
+    ($debug) && ($com .= "2> $outDir/step9-subCohorts.err");
     system($com) && die "E $0: step9-subCohorts failed\n";
 }
 else {
@@ -477,9 +471,7 @@ my $qc_causal = "$outDir/qc_causal.csv";
 
 $com = "perl $RealBin/10_qc_checkCausal.pl --samplesFile=$samples --indir=$outDir/Samples/ ";
 $com .= "> $qc_causal ";
-if ($debug) {
-    $com .= "2> $outDir/step10-qc_causal.err";
-}
+($debug) && ($com .= "2> $outDir/step10-qc_causal.err");
 system($com) && die "E $0: step10-qc_causal failed\n";
 
 
