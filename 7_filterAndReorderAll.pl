@@ -11,6 +11,9 @@
 # - $outDir doesn't exist, it will be created and filled with one TSV
 #   per infile (never gzipped), adding .canon to the filename if called
 #   with --canonical.
+# This script can only apply filters on COUNTs and --canonical, other filters
+# from $filterBin should have been applied earlier (when we still had a single 
+# file for all cohorts).
 
 use strict;
 use warnings;
@@ -60,11 +63,7 @@ my $max_ctrl_hv; # COUNT_NEGCTRL_HV <= $x
 my $max_ctrl_het; # COUNT_NEGCTRL_HET <= $x
 my $min_cohort_hv; # COUNT_$cohort_HV >= $x
 my $min_hr; # COUNT_HR >= $x
-my $no_mod = ''; # if enabled, filter out MODIFIER impacts
-my $no_low = ''; # if enabled, filter out LOW impacts
 my $canon = ''; # if enabled, only keep lines with CANONICAL==YES
-my $max_af_gnomad; # gnomADe_AF <= $x AND gnomADg_AF <= $x
-my $max_af_1kg; # AF <= $x, this is 1KG phase 3
 
 GetOptions ("indir=s" => \$inDir,
 	    "outdir=s" => \$outDir,
@@ -75,11 +74,7 @@ GetOptions ("indir=s" => \$inDir,
 	    "max_ctrl_het=i" => \$max_ctrl_het,
 	    "min_cohort_hv=i" => \$min_cohort_hv,
 	    "min_hr=i" => \$min_hr,
-	    "no_mod" => \$no_mod,
-	    "no_low" => \$no_low,
-	    "canonical" => \$canon,
-	    "max_af_gnomad=f" => \$max_af_gnomad,
-	    "max_af_1kg=f" => \$max_af_1kg)
+	    "canonical" => \$canon)
     or die("E $0: Error in command line arguments\n");
 
 ($inDir) ||
@@ -139,11 +134,7 @@ while (my $inFile = readdir(INDIR)) {
     ($max_ctrl_het) && ($com .= " --max_ctrl_het=$max_ctrl_het");
     ($min_cohort_hv) && ($com .= " --min_cohort_hv=$min_cohort_hv");
     ($min_hr) && ($com .= " --min_hr=$min_hr");
-    ($no_mod) && ($com .= " --no_mod");
-    ($no_low) && ($com .= " --no_low");
     ($canon) && ($com .= " --canonical");
-    ($max_af_gnomad) && ($com .= " --max_af_gnomad=$max_af_gnomad");
-    ($max_af_1kg) && ($com .= " --max_af_1kg=$max_af_1kg");
     
     if ($gz) {
 	$com = "gunzip -c $inDir/$inFile | $com ";
@@ -156,11 +147,7 @@ while (my $inFile = readdir(INDIR)) {
     ($reorder) && ($com .= " | perl $reorderBin $favoriteTissues ");
 
     $com .= " > $outDir/$outFile";
-    # my $now = strftime("%F %T", localtime);
-    # warn "I $now: $0 - starting $com\n";
     system($com) && die "E $0: filter and/or reorder failed for $inFile\n";
-    # $now = strftime("%F %T", localtime);
-    # warn "I $now: $0 - Finished $com\n";
     $pm->finish;
 }
 closedir(INDIR);
