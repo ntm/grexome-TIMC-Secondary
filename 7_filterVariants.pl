@@ -3,8 +3,8 @@
 # 26/03/2018
 # NTM
 
-# Parses on stdin a TSV file, produced by extractCohorts.pl
-# or extractSamples.pl for example.
+# Parses on stdin a TSV file produced by extractCohorts.pl or extractSamples.pl,
+# or even straight out of 4_vcf2tsv.pl (but then don't filter on COUNT*).
 # Applies a bunch of filters (see args), and prints to stdout
 # a similar file but where some lines have been filtered out.
 
@@ -27,10 +27,9 @@ my $min_hr; # COUNT_HR >= $x
 
 my $no_mod = ''; # if enabled, filter out MODIFIER impacts
 my $no_low = ''; # if enabled, filter out LOW impacts
-my $canon = ''; # if enabled, only keep lines with CANONICAL==YES
-
 my $no_pseudo = ''; # if enabled, filter out all *pseudogene BIOTYPEs
 my $no_nmd = ''; # if enabled, filter out nonsense_mediated_decay BIOTYPE
+my $canon = ''; # if enabled, only keep lines with CANONICAL==YES
 
 my $max_af_gnomad; # gnomADe_AF <= $x AND gnomADg_AF <= $x (if available)
 my $max_af_1kg; # AF <= $x, this is 1KG phase 3
@@ -41,9 +40,9 @@ GetOptions ("max_ctrl_hv=i" => \$max_ctrl_hv,
 	    "min_hr=i" => \$min_hr,
 	    "no_mod" => \$no_mod,
 	    "no_low" => \$no_low,
-	    "canonical" => \$canon,
 	    "no_pseudo" => \$no_pseudo,
 	    "no_nmd" => \$no_nmd,
+	    "canonical" => \$canon,
 	    "max_af_gnomad=f" => \$max_af_gnomad,
 	    "max_af_1kg=f" => \$max_af_1kg)
     or die("E $0: Error in command line arguments\n");
@@ -76,23 +75,31 @@ my %title2index;
 my @titles = split(/\t/, $header);
 foreach my $i (0..$#titles) {
     my $title = $titles[$i];
-    # need COUNT_$cohort_HV , we want a uniform hash key COUNT_COHORT_HV
-    # in %title2index but we must ignore the other COUNT_*_HV columns
-    if (($title !~ /_NEGCTRL_/) && ($title !~ /_COMPAT_/) && ($title !~ /_OTHERCAUSE_/) &&
-	($title =~ /^COUNT_(\w+)_HV/)) {
-	# OK replace cohort name with COHORT as hash key
-	$title = "COUNT_COHORT_HV";
+    if (($max_ctrl_hv) || ($max_ctrl_het) || ($min_cohort_hv) || ($min_hr)) {
+	# if filtering on COUNTs we will need COUNT_$cohort_HV , we want a uniform hash
+	# key COUNT_COHORT_HV in %title2index but we must ignore the other COUNT_*_HV columns
+	if (($title !~ /_NEGCTRL_/) && ($title !~ /_COMPAT_/) && ($title !~ /_OTHERCAUSE_/) &&
+	    ($title =~ /^COUNT_(\w+)_HV/)) {
+	    # OK replace cohort name with COHORT as hash key
+	    $title = "COUNT_COHORT_HV";
+	}
     }
     # sanity
     (defined $title2index{$title}) &&
 	die "E $0: title $title defined twice\n";
     $title2index{$title} = $i;
 }
-# make sure all titles we use in this script are present
-foreach my $t ("CANONICAL","COUNT_NEGCTRL_HV","COUNT_NEGCTRL_HET","COUNT_COHORT_HV",
-	       "COUNT_HR","IMPACT","BIOTYPE","gnomADe_AF","gnomADg_AF","AF") {
+# make sure all titles we need are present
+foreach my $t ("CANONICAL","IMPACT","BIOTYPE","gnomADe_AF","gnomADg_AF","AF") {
     (defined $title2index{$t}) ||
 	die "E $0: title $t required by script but missing, some VEP columns changed?\n";
+}
+# only test for COUNT titles if needed, so we can filter early, eg on the output of vcf2tsv.pl
+if (($max_ctrl_hv) || ($max_ctrl_het) || ($min_cohort_hv) || ($min_hr)) {
+    foreach my $t ("COUNT_NEGCTRL_HV","COUNT_NEGCTRL_HET","COUNT_COHORT_HV","COUNT_HR") {
+	(defined $title2index{$t}) ||
+	    die "E $0: title $t required by script but missing, some VEP columns changed?\n";
+    }
 }
 
 # parse data
