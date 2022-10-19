@@ -34,6 +34,9 @@ my $canon = ''; # if enabled, only keep lines with CANONICAL==YES
 my $max_af_gnomad; # gnomADe_AF <= $x AND gnomADg_AF <= $x (if available)
 my $max_af_1kg; # AF <= $x, this is 1KG phase 3
 
+# if true, print timestamped start-done log messages to stderr
+my $logTime = '';
+
 GetOptions ("max_ctrl_hv=i" => \$max_ctrl_hv,
 	    "max_ctrl_het=i" => \$max_ctrl_het,
 	    "min_cohort_hv=i" => \$min_cohort_hv,
@@ -44,8 +47,14 @@ GetOptions ("max_ctrl_hv=i" => \$max_ctrl_hv,
 	    "no_nmd" => \$no_nmd,
 	    "canonical" => \$canon,
 	    "max_af_gnomad=f" => \$max_af_gnomad,
-	    "max_af_1kg=f" => \$max_af_1kg)
+	    "max_af_1kg=f" => \$max_af_1kg,
+	    "logtime" => \$logTime)
     or die("E $0: Error in command line arguments\n");
+
+if ($logTime) {
+    my $now = strftime("%F %T", localtime);
+    warn "I $now: $0 - starting to run\n";
+}
 
 # build string of all filter values, for logging
 my $filterString = "";
@@ -167,4 +176,9 @@ while(my $line = <STDIN>) {
 
     # passed all filters
     print "$line\n";
+}
+
+if ($logTime) {
+    my $now = strftime("%F %T", localtime);
+    warn "I $now: $0 - ALL DONE, completed successfully!\n";
 }
