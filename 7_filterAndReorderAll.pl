@@ -32,7 +32,7 @@ $0 = basename($0);
 ## hard-coded stuff that shouldn't change much
 
 # names of the scripts that this wrapper actually calls
-my ($filterBin,$reorderBin) = ("$RealBin/7_filterVariants.pl","$RealBin/7_reorderColumns.pl");
+my ($filterBin,$reorderBin) = ("$RealBin/4C_filterVariants.pl","$RealBin/7_reorderColumns.pl");
 
 
 # check hard-coded stuff

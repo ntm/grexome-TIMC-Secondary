@@ -5,7 +5,7 @@
 
 # Takes a single argument: a comma-separated list of favorite GTEX tissues.
 # Parse on stdin a TSV file produced by extractCohorts.pl,
-# preferably filtered by 7_filterVariants.pl.
+# preferably filtered by filterVariants.pl.
 # Print to stdout a similar file but where the order of
 # columns has been changed:
 # - columns from @newOrder are printed first, in that order;

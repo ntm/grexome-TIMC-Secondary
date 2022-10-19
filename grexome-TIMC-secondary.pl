@@ -294,8 +294,8 @@ if ($debug) {
     $com = "cat $outDir/step4.out ";
 }
 
-# step 4B - we can immediately filter variants on IMPACT, BIOTYPE, AFs and CANONICAL
-$com .= " | perl $RealBin/7_filterVariants.pl --logtime --no_mod --no_pseudo --no_nmd ".
+# step 4C - we can immediately filter variants on IMPACT, BIOTYPE, AFs and CANONICAL
+$com .= " | perl $RealBin/4C_filterVariants.pl --logtime --no_mod --no_pseudo --no_nmd ".
     "--max_af_gnomad 0.01 --max_af_1kg 0.03 ";
 ($canon) && ($com .= "--canonical ");
 if ($debug) {
