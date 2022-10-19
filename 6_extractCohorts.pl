@@ -157,11 +157,6 @@ warn "I $now: $0 - starting to run\n";
 # of "$patho:$score" pairs
 my %knownCandidateGenes;
 
-# %knownCandidatesSeen for sanity-checking known candidate and causal genes:
-# any gene name that is never seen will be reported to stderr (probably a
-# typo needs fixing).
-my %knownCandidatesSeen;
-
 {
     # $parseCandidateGenes actually returns a hashref, key==$cohort, value is
     # a hashref whose keys are gene names and values are the "Confidence scores"
@@ -182,7 +177,6 @@ my %knownCandidatesSeen;
 	    else {
 		$knownCandidateGenes{$gene} = "$c:$score";
 	    }
-	    $knownCandidatesSeen{$gene} = 0;
 	}
     }
 }
@@ -315,16 +309,11 @@ my $childFailed = 0;
 # Set up a callback so the parent knows if a child dies
 $pm->run_on_finish( sub { ($_[1]) && ($childFailed=1) });
 
-# need a tmp file for listing the known candidates
-my $tmpFileCandidatesSeen = "$tmpDir/allCandidates.seen";
-open(my $knownCandidatesSeenFH, "> $tmpFileCandidatesSeen") ||
-    die "E $0: cannot open tmpFileCandidatesSeen $tmpFileCandidatesSeen for writing\n";
 # spawn a child process that waits for workers to finish producing batches,
 # and prints the tmpfiles to @outFHs in correct order, cleaning up behind 
 # itself. 
-# Also prints seen candidate genes to $knownCandidatesSeenFH.
 if (! $pm->start) {
-    &eatTmpFiles($tmpDir,\@cohorts,\@outFHs,$knownCandidatesSeenFH);
+    &eatTmpFiles($tmpDir,\@cohorts,\@outFHs);
     $pm->finish;
 }
 
@@ -377,7 +366,7 @@ while (!$lastBatch) {
 
     # let worker threads take it from there
     $pm->start && next;
-    # NOTE: IF YOU CHANGE the tmp filenames below ($tmpOut, $tmpSeenFile, $tmpOutFlag),
+    # NOTE: IF YOU CHANGE the tmp filenames below ($tmpOut, $tmpOutFlag),
     # you MUST EDIT &eatTmpFiles()
 
     # create tmp output filehandles for this batch
@@ -387,16 +376,12 @@ while (!$lastBatch) {
 	open(my $outFH, "> $tmpOut") || die "E $0: cannot open $tmpOut for writing\n";
 	push(@tmpOutFHs, $outFH);
     }
-    # create tmp output filehandle for candidatesSeen
-    my $tmpSeenFile = "$tmpDir/$batchNum.seen";
-    open(my $tmpSeenFH, "> $tmpSeenFile") || die "E $0: cannot open $tmpSeenFile for writing\n";
-
     # process this batch
     &processBatch(\@lines,\%knownCandidateGenes,$sample2cohortR,\@cohorts,
-		  $sample2causalR,$compatibleR,$symbolCol,\%genoCols,\@tmpOutFHs,$tmpSeenFH);
+		  $sample2causalR,$compatibleR,$symbolCol,\%genoCols,\@tmpOutFHs);
 
     # done, close tmp FHs and create flag-file
-    foreach my $outFH (@tmpOutFHs,$tmpSeenFH) {
+    foreach my $outFH (@tmpOutFHs) {
 	close($outFH) || die "E $0: cannot close tmp outFH $outFH\n";
     }
     my $tmpOutFlag = "$tmpDir/$batchNum.done";
@@ -424,22 +409,6 @@ if ($childFailed) {
 foreach my $fh (@outFHs) {
     close($fh);
 }
-close($knownCandidatesSeenFH);
-
-open(IN, "$tmpFileCandidatesSeen") ||
-    die "E $0: cannot open tmpFileCandidatesSeen $tmpFileCandidatesSeen for reading";
-while (my $gene = <IN>) {
-    chomp($gene);
-    $knownCandidatesSeen{$gene} = 1;
-}
-close(IN);
-(unlink($tmpFileCandidatesSeen) == 1) ||
-    die "E $0: cannot unlink tmpFileCandidatesSeen $tmpFileCandidatesSeen: $!\n";
-foreach my $gene (keys(%knownCandidatesSeen)) {
-    ($knownCandidatesSeen{$gene}) ||
-	warn "W $0: \"known candidate/causal gene\" $gene for ".$knownCandidateGenes{$gene}.
-	" was never seen! typo in samples or candidateGenes xlsx files?\n";
-}
 
 $now = strftime("%F %T", localtime);
 rmdir($tmpDir) || 
@@ -462,15 +431,10 @@ warn "I $now: $0 - ALL DONE, completed successfully!\n";
 #   corresponding columns (in data lines)
 # - $tmpOutFilesR, ref to array of filehandles open for writing, one for each cohort,
 #   same indexes as @cohorts
-# - $tmpSeen, a filehandle open for writing, we will print one line per different
-#   candidate gene seen in this batch of lines
 sub processBatch {
-    (@_ == 10) || die "E $0: processBatch needs 10 args\n";
+    (@_ == 9) || die "E $0: processBatch needs 9 args\n";
     my ($linesR,$knownCandidateGenesR,$sample2cohortR,$cohortsR,$sample2causalR,
-	$compatibleR,$symbolCol,$genoColsR,$tmpOutFilesR,$tmpSeen) = @_;
-
-    # key == known candidate gene seen in this batch of lines, value==1
-    my %candidatesSeen = ();
+	$compatibleR,$symbolCol,$genoColsR,$tmpOutFilesR) = @_;
 
     foreach my $line (@$linesR) {
 	my @fields = split(/\t/, $line, -1) ;
@@ -478,9 +442,6 @@ sub processBatch {
 	# $symbol doesn't depend on cohorts
 	my $symbol = $fields[$symbolCol];
 
-	# we can immediately mark $symbol as seen if it's a candidate gene for any cohort
-	($knownCandidateGenesR->{$symbol}) && ($candidatesSeen{$symbol} = 1);
-    	
 	# array of references (to sampleList arrays), one per cohort, same order
 	# as in $cohortsR:
 	# each element of @cohort2samplelists is a ref to a sampleLists array, ie
@@ -640,24 +601,18 @@ sub processBatch {
 	    print { $tmpOutFilesR->[$cohorti] } "$toPrint\n";
 	}
     }
-
-    # done with this batch, print any seen candidate genes to $tmpSeen
-    foreach my $gene (keys(%candidatesSeen)) {
-	print $tmpSeen "$gene\n";
-    }
 }
 
 
 ###############
 # this function waits for flagfiles to be created and "eats" the 
 # corresponding tmpFiles in order, starting at 1.
-# "eating" means print lines to the relevant $outFH or to $knownCandidatesSeenFH
-# and remove the tmpfiles.
-# we also watch for $tmpOutLast, a file that will tell us
-# the last batch number to wait for
+# "eating" means print lines to the relevant $outFH and remove the tmpfiles.
+# We also watch for $tmpOutLast, a file that will tell us the last batch number
+# to wait for.
 sub eatTmpFiles {
-    (@_ == 4) || die "E $0: eatTmpFiles needs 4 args.\n";
-    my ($tmpDir,$cohortsR,$outFHsR,$knownCandidatesSeenFH) = @_;
+    (@_ == 3) || die "E $0: eatTmpFiles needs 3 args.\n";
+    my ($tmpDir,$cohortsR,$outFHsR) = @_;
 
     # NOTE: all tmp filenames (eg $tmpOutLast) are hard-coded here and 
     # MUST MATCH those created by the worker threads.
@@ -671,7 +626,6 @@ sub eatTmpFiles {
     my $nextBatch = 1;
 
     while(1) {
-	my $tmpSeenFile = "$tmpDir/$nextBatch.seen";
 	my $tmpOutFlag = "$tmpDir/$nextBatch.done";
 
 	if (-e $tmpOutFlag) {
@@ -687,13 +641,8 @@ sub eatTmpFiles {
 		(unlink($tmpFile) == 1) ||
 		    die "E $0: in eatTmpFiles, done with tmpFile $tmpFile but cannot unlink it: $!\n";
 	    }
-	    open(IN, $tmpSeenFile) ||
-		die "E $0: in eatTmpFiles, cannot open tmpSeenFile $tmpSeenFile: $!\n";
-	    while(<IN>) {
-		print $knownCandidatesSeenFH $_;
-	    }
-	    (unlink($tmpSeenFile,$tmpOutFlag) == 2) ||
-		die "E $0: in eatTmpFiles, done with files for batch $nextBatch but cannot unlink (both of) tmpSeen / tmpOutFlag: $!\n";
+	    (unlink($tmpOutFlag) == 1) ||
+		die "E $0: in eatTmpFiles, done with files for batch $nextBatch but cannot unlink tmpOutFlag: $!\n";
 
 	    my $now = strftime("%F %T", localtime);
 	    # progress log: one INFO message every 10 batches
