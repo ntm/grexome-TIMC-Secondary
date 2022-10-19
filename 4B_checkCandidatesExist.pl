@@ -37,7 +37,7 @@ print to STDOUT exactly the same TSV, but also check whether each candidate or c
 reporting any missing genes (likely typoes) to stderr.\n
 Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --samples string : samples metadata xlsx file, with path
---candidateGenes string [optional, script does nothing if not provided] : comma-separated list of candidateGene xlsx files, with paths
+--candidateGenes string [optional, if not provided we still search for causal genes from samples file] : comma-separated list of candidateGene xlsx files, with paths
 --help : print this USAGE";
 
 GetOptions ("samples=s" => \$samplesFile,
