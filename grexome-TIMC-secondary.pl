@@ -294,14 +294,23 @@ if ($debug) {
     $com = "cat $outDir/step4.out ";
 }
 
-# step 4C - we can immediately filter variants on IMPACT, BIOTYPE, AFs and CANONICAL
-$com .= " | perl $RealBin/4C_filterVariants.pl --logtime --no_mod --no_pseudo --no_nmd ".
-    "--max_af_gnomad 0.01 --max_af_1kg 0.03 ";
-($canon) && ($com .= "--canonical ");
+# step 4B
+$com .= " | perl $RealBin/4B_checkCandidatesExist.pl --samples=$samples ";
+($candidateGenes) && ($com .= "--candidateGenes=$candidateGenes ");
 if ($debug) {
     $com .= "2> $outDir/step4B.err > $outDir/step4B.out";
     system($com) && die "E $0: debug mode on, step4B failed, examine step4B.err\n";
     $com = "cat $outDir/step4B.out ";
+}
+
+# step 4C - immediately filter variants on IMPACT, BIOTYPE, AFs and CANONICAL
+$com .= " | perl $RealBin/4C_filterVariants.pl --logtime --no_mod --no_pseudo --no_nmd ".
+    "--max_af_gnomad 0.01 --max_af_1kg 0.03 ";
+($canon) && ($com .= "--canonical ");
+if ($debug) {
+    $com .= "2> $outDir/step4C.err > $outDir/step4C.out";
+    system($com) && die "E $0: debug mode on, step4C failed, examine step4C.err\n";
+    $com = "cat $outDir/step4C.out ";
 }
 
 # step 5
