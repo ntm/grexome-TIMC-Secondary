@@ -11,6 +11,7 @@
 
 use strict;
 use warnings;
+use POSIX qw(strftime);
 use File::Basename qw(basename);
 use Getopt::Long;
 
