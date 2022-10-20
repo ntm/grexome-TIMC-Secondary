@@ -55,7 +55,7 @@ my $favoriteTissues = "testis,ovary";
 my $help = '';
 
 
-my $USAGE = "\nParse on STDIN a TSV file as produced by steps 1-4 of this secondaryAnalysis pipeline; print to STDOUT a similar file with additional columns holding the GTEX expression data.\n
+my $USAGE = "\nParse on STDIN a TSV file as produced by steps 1-7 of this secondaryAnalysis pipeline; print to STDOUT a similar file with additional columns holding the GTEX expression data.\n
 Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --gtex string [no default] : TSV file holding the GTEX TPM values, with path
 --favoriteTissues string [default=$favoriteTissues] : comma-separated list of tissues of interest

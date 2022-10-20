@@ -92,7 +92,7 @@ my $batchSize;
 my $help = '';
 
 
-my $USAGE = "\nParse on STDIN a fully annotated TSV file as produced by steps 1-5 of this secondaryAnalysis pipeline; create in outDir one gzipped TSV file per cohort.\n
+my $USAGE = "\nParse on STDIN a fully annotated TSV file as produced by steps 1-8 of this secondaryAnalysis pipeline; create in outDir one gzipped TSV file per cohort.\n
 Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --samples string : samples metadata xlsx file, with path
 --pathologies string [optional] : pathologies metadata xlsx file, with path
