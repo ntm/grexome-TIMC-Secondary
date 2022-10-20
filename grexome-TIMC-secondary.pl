@@ -418,7 +418,7 @@ foreach my $subC (keys(%$subCohortsR)) {
 }
 if ($doSubCs) {
     mkdir("$outDir/SubCohorts") || die "E $0: cannot mkdir $outDir/SubCohorts\n";
-    $com = "( ";
+    $com = "";
     foreach my $subC (keys(%$subCohortsR)) {
 	my $patho = $subCohortsR->{$subC};
 	# grab filename from $subC and remove leading "subCohort_" and trailing .txt
@@ -426,14 +426,19 @@ if ($doSubCs) {
 	($outFileRoot =~ s/^subCohort_//) || die "E $0: cannot remove leading subCohort_ from subCohortFile $outFileRoot\n";
 	($outFileRoot =~ s/\.txt$//) || die "E $0: cannot remove .txt from subCohortFile $outFileRoot\n";
 	$outFileRoot = "$outDir/SubCohorts/$outFileRoot";
-	
-	$com .= "( perl $RealBin/13_extractSubcohort.pl $subC < $outDir/Cohorts/$patho.final.patientIDs.csv > $outFileRoot.cohort.csv ) && ";
-	($canon) ||
-	    ($com .= "( perl $RealBin/13_extractSubcohort.pl $subC < $outDir/Cohorts_Canonical/$patho.final.patientIDs.canon.csv > $outFileRoot.cohort.canon.csv ) && ");
-	$com .= "( perl $RealBin/13_extractSubcohort.pl $subC < $outDir/Transcripts/$patho.Transcripts.patientIDs.csv > $outFileRoot.transcripts.csv ) ";
+	($com) && ($com .= '&& ');
+	$com .= "( perl $RealBin/13_extractSubcohort.pl $subC < $outDir/Cohorts/$patho.final.patientIDs.csv > $outFileRoot.cohort.csv ";
+	($debug) && ($com .= "2>> $outDir/step13-subCohorts.err ");
+	$com .= ") && ";
+	if (! $canon) {
+	    $com .= "( perl $RealBin/13_extractSubcohort.pl $subC < $outDir/Cohorts_Canonical/$patho.final.patientIDs.canon.csv > $outFileRoot.cohort.canon.csv ";
+	    ($debug) && ($com .= "2>> $outDir/step13-subCohorts.err ");
+	    $com .= ") && ";
+	}
+	$com .= "( perl $RealBin/13_extractSubcohort.pl $subC < $outDir/Transcripts/$patho.Transcripts.patientIDs.csv > $outFileRoot.transcripts.csv ";
+	($debug) && ($com .= "2>> $outDir/step13-subCohorts.err ");
+	$com .= ") ";
     }
-    $com .= " ) ";
-    ($debug) && ($com .= "2> $outDir/step13-subCohorts.err");
     system($com) && die "E $0: step13-subCohorts failed\n";
 }
 else {
