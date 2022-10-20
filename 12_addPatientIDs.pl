@@ -6,7 +6,7 @@
 # Take 3 or 4 arguments: $samplesFile $inDir $outDir [$jobs]
 # $samplesFile is the samples metadata xlsx file;
 # $inDir must contain cohort TSVs as produced by extractCohorts.pl,
-# possibly filtered and reordered with 7_filterAndReorderAll.pl,
+# possibly filtered and reordered with 10_filterAndReorderAll.pl,
 # and possibly gzipped;
 # $outDir doesn't exist, it will be created and filled with 
 # similar TSVs (gzipped if infiles were gzipped), but where every

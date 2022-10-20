@@ -32,12 +32,12 @@ $0 = basename($0);
 ## hard-coded stuff that shouldn't change much
 
 # number of parallel jobs to run for the initial "bgzip -d",
-# and then for steps steps 1 and 6.
+# and then for steps 1 and 9.
 # These defaults are good for us (dual Xeon 4114) but tweaking
 # could improve performance depending on your hardware.
 my $numJobsGunzip = 6;
 my $numJobs1 = 20;
-my $numJobs6 = 16;
+my $numJobs9 = 16;
 
 # name(+path if needed) of gzip-like binary, we like bgzip (multi-threaded)
 my $bgzip = "bgzip";
@@ -88,7 +88,7 @@ my $canon = '';
 # - produce individual logfiles for each step
 my $debug = '';
 
-# $debugVep: activate --debug specifically for 3_runVep.pl
+# $debugVep: activate --debug specifically for 04_runVep.pl
 my $debugVep = '';
 
 # help: if true just print $USAGE and exit
@@ -246,10 +246,10 @@ foreach my $c ("Strelka", "GATK", "ElPrep", "DeepVariant") {
 my $tmpdir = tempdir(DIR => &fastTmpPath());
 
 ######################
-# STEPS 1-6, piped into each other except in debug mode
+# STEPS 1-9, piped into each other except in debug mode
 
 # decompress infile and step 1
-my $com = "$bgzip $inFile | perl $RealBin/1_filterBadCalls.pl --samplesFile=$samples --tmpdir=$tmpdir/FilterTmp/ --jobs $numJobs1 ";
+my $com = "$bgzip $inFile | perl $RealBin/01_filterBadCalls.pl --samplesFile=$samples --tmpdir=$tmpdir/FilterTmp/ --jobs $numJobs1 ";
 if ($debug) {
     # specific logfile from step and save its output
     $com .= "2> $outDir/step1.err > $outDir/step1.out";
@@ -258,28 +258,18 @@ if ($debug) {
     $com = "cat $outDir/step1.out ";
 }
 
-# step 1B if we have a CNVs file
+# step 2 if we have a CNVs file
 if ($cnvs) {
-    $com .= " | perl $RealBin/1B_collateVCFs.pl --vcf=$cnvs ";
+    $com .= " | perl $RealBin/02_collateVCFs.pl --vcf=$cnvs ";
     if ($debug) {
-	$com .= "2> $outDir/step1B.err > $outDir/step1B.out";
-	system($com) && die "E $0: debug mode on, step1B failed, examine step1B.err\n";
-	$com = "cat $outDir/step1B.out ";
+	$com .= "2> $outDir/step2.err > $outDir/step2.out";
+	system($com) && die "E $0: debug mode on, step2 failed, examine step2.err\n";
+	$com = "cat $outDir/step2.out ";
     }
 }
 
-# step 2
-$com .= " | perl $RealBin/2_sampleData2genotypes.pl ";
-if ($debug) {
-    $com .= "2> $outDir/step2.err > $outDir/step2.out";
-    system($com) && die "E $0: debug mode on, step2 failed, examine step2.err\n";
-    $com = "cat $outDir/step2.out ";
-}
-
 # step 3
-$com .= " | perl $RealBin/3_runVEP.pl --cacheFile=".&vepCacheFile()." --genome=".&refGenome().
-    " --dataDir=".&vepPluginDataPath()." --tmpDir=$tmpdir/runVepTmpDir/ ";
-($debugVep) && ($com .= "--debug ");
+$com .= " | perl $RealBin/03_sampleData2genotypes.pl ";
 if ($debug) {
     $com .= "2> $outDir/step3.err > $outDir/step3.out";
     system($com) && die "E $0: debug mode on, step3 failed, examine step3.err\n";
@@ -287,34 +277,17 @@ if ($debug) {
 }
 
 # step 4
-$com .= " | perl $RealBin/4_vcf2tsv.pl ";
+$com .= " | perl $RealBin/04_runVEP.pl --cacheFile=".&vepCacheFile()." --genome=".&refGenome().
+    " --dataDir=".&vepPluginDataPath()." --tmpDir=$tmpdir/runVepTmpDir/ ";
+($debugVep) && ($com .= "--debug ");
 if ($debug) {
     $com .= "2> $outDir/step4.err > $outDir/step4.out";
     system($com) && die "E $0: debug mode on, step4 failed, examine step4.err\n";
     $com = "cat $outDir/step4.out ";
 }
 
-# step 4B
-$com .= " | perl $RealBin/4B_checkCandidatesExist.pl --samples=$samples ";
-($candidateGenes) && ($com .= "--candidateGenes=$candidateGenes ");
-if ($debug) {
-    $com .= "2> $outDir/step4B.err > $outDir/step4B.out";
-    system($com) && die "E $0: debug mode on, step4B failed, examine step4B.err\n";
-    $com = "cat $outDir/step4B.out ";
-}
-
-# step 4C - immediately filter variants on IMPACT, BIOTYPE, AFs and CANONICAL
-$com .= " | perl $RealBin/4C_filterVariants.pl --logtime --no_mod --no_pseudo --no_nmd ".
-    "--max_af_gnomad 0.01 --max_af_1kg 0.03 ";
-($canon) && ($com .= "--canonical ");
-if ($debug) {
-    $com .= "2> $outDir/step4C.err > $outDir/step4C.out";
-    system($com) && die "E $0: debug mode on, step4C failed, examine step4C.err\n";
-    $com = "cat $outDir/step4C.out ";
-}
-
 # step 5
-$com .= " | perl $RealBin/5_addGTEX.pl --favoriteTissues=".&gtexFavoriteTissues()." --gtex=".&gtexDatafile($RealBin)." ";
+$com .= " | perl $RealBin/05_vcf2tsv.pl ";
 if ($debug) {
     $com .= "2> $outDir/step5.err > $outDir/step5.out";
     system($com) && die "E $0: debug mode on, step5 failed, examine step5.err\n";
@@ -322,80 +295,107 @@ if ($debug) {
 }
 
 # step 6
-$com .= " | perl $RealBin/6_extractCohorts.pl --samples=$samples ";
+$com .= " | perl $RealBin/06_checkCandidatesExist.pl --samples=$samples ";
+($candidateGenes) && ($com .= "--candidateGenes=$candidateGenes ");
+if ($debug) {
+    $com .= "2> $outDir/step6.err > $outDir/step6.out";
+    system($com) && die "E $0: debug mode on, step6 failed, examine step6.err\n";
+    $com = "cat $outDir/step6.out ";
+}
+
+# step 7 - immediately filter variants on IMPACT, BIOTYPE, AFs and CANONICAL
+$com .= " | perl $RealBin/07_filterVariants.pl --logtime --no_mod --no_pseudo --no_nmd ".
+    "--max_af_gnomad 0.01 --max_af_1kg 0.03 ";
+($canon) && ($com .= "--canonical ");
+if ($debug) {
+    $com .= "2> $outDir/step7.err > $outDir/step7.out";
+    system($com) && die "E $0: debug mode on, step7 failed, examine step7.err\n";
+    $com = "cat $outDir/step7.out ";
+}
+
+# step 8
+$com .= " | perl $RealBin/08_addGTEX.pl --favoriteTissues=".&gtexFavoriteTissues()." --gtex=".&gtexDatafile($RealBin)." ";
+if ($debug) {
+    $com .= "2> $outDir/step8.err > $outDir/step8.out";
+    system($com) && die "E $0: debug mode on, step8 failed, examine step8.err\n";
+    $com = "cat $outDir/step8.out ";
+}
+
+# step 9
+$com .= " | perl $RealBin/09_extractCohorts.pl --samples=$samples ";
 ($pathologies) && ($com .= "--pathologies=$pathologies ");
 ($candidateGenes) && ($com .= "--candidateGenes=$candidateGenes ");
-$com .= "--outDir=$tmpdir/Cohorts/ --tmpDir=$tmpdir/TmpExtract/ --jobs=$numJobs6 ";
+$com .= "--outDir=$tmpdir/Cohorts/ --tmpDir=$tmpdir/TmpExtract/ --jobs=$numJobs9 ";
 if ($debug) {
-    $com .= "2> $outDir/step6.err";
-    system($com) && die "E $0: debug mode on, step6 failed, examine step6.err\n";
+    $com .= "2> $outDir/step9.err";
+    system($com) && die "E $0: debug mode on, step9 failed, examine step9.err\n";
 }
 else {
-    # after step6 we have several files (one per cohort) so no more piping,
-    # run steps 1-6, all logs go to stderr
-    system($com) && die "E $0: steps 1 to 6 have failed, check for previous errors in this logfile\n";
+    # after step9 we have several files (one per cohort) so no more piping,
+    # run steps 1-9, all logs go to stderr
+    system($com) && die "E $0: steps 1 to 9 have failed, check for previous errors in this logfile\n";
 }
 
 ######################
 # subsequent steps work on the individual CohortFiles
 
-# STEP 7: filter variants on COUNTs and reorder columns, clean up unfiltered CohortFiles
-$com = "perl $RealBin/7_filterAndReorderAll.pl --indir $tmpdir/Cohorts/ --outdir $tmpdir/Cohorts_Filtered/ ";
+# STEP 10: filter variants on COUNTs and reorder columns, clean up unfiltered CohortFiles
+$com = "perl $RealBin/10_filterAndReorderAll.pl --indir $tmpdir/Cohorts/ --outdir $tmpdir/Cohorts_Filtered/ ";
 $com .= "--reorder --favoriteTissues=".&gtexFavoriteTissues()." ";
 # set min_hr to 20% of $numSamples
 my $min_hr = int($numSamples * 0.2);
 $com .= "--min_hr=$min_hr ";
 # other hard-coded COUNT filters:
 $com .= "--max_ctrl_hv 3 --max_ctrl_het 10 ";
-($debug) && ($com .= "2> $outDir/step7.err");
-system($com) && die "E $0: step7 failed\n";
+($debug) && ($com .= "2> $outDir/step10.err");
+system($com) && die "E $0: step10 failed\n";
 # remove unfiltered results in non-debug mode
 (! $debug) && remove_tree("$tmpdir/Cohorts/");
 
-# STEP 8 - SAMPLES
-$com = "perl $RealBin/8_extractSamples.pl --samples $samples ";
+# STEP 11 - SAMPLES
+$com = "perl $RealBin/11_extractSamples.pl --samples $samples ";
 $com .= "--indir $tmpdir/Cohorts_Filtered/ --outdir $outDir/Samples/ ";
 (&coveragePath()) && ($com .= "--covdir ".&coveragePath());
-($debug) && ($com .= " 2> $outDir/step8s.err");
-system($com) && die "E $0: step8-samples failed\n";
+($debug) && ($com .= " 2> $outDir/step11s.err");
+system($com) && die "E $0: step11-samples failed\n";
 
-# STEP 8 - TRANSCRIPTS , adding patientIDs
-$com = "perl $RealBin/8_extractTranscripts.pl --indir $tmpdir/Cohorts_Filtered/ --outdir $tmpdir/Transcripts_noIDs/ ";
+# STEP 11 - TRANSCRIPTS , adding patientIDs
+$com = "perl $RealBin/11_extractTranscripts.pl --indir $tmpdir/Cohorts_Filtered/ --outdir $tmpdir/Transcripts_noIDs/ ";
 ($pathologies) && ($com .= "--pathologies=$pathologies ");
-($debug) && ($com .= "2> $outDir/step8t.err");
-system($com) && die "E $0: step8-transcripts failed\n";
+($debug) && ($com .= "2> $outDir/step11t.err");
+system($com) && die "E $0: step11-transcripts failed\n";
 
-$com = "perl $RealBin/8_addPatientIDs.pl $samples $tmpdir/Transcripts_noIDs/ $outDir/Transcripts/ ";
-($debug) && ($com .= "2>> $outDir/step8t.err");
-system($com) && die "E $0: step8-transcripts-addPatientIDs failed\n";
+$com = "perl $RealBin/12_addPatientIDs.pl $samples $tmpdir/Transcripts_noIDs/ $outDir/Transcripts/ ";
+($debug) && ($com .= "2>> $outDir/step11t.err");
+system($com) && die "E $0: step11-transcripts-addPatientIDs failed\n";
 
 (! $debug) && remove_tree("$tmpdir/Transcripts_noIDs/");
 
 
-# STEP 9 - FINAL COHORTFILES , require at least one HV or HET sample and add patientIDs
-$com = "perl $RealBin/9_requireUndiagnosed.pl $tmpdir/Cohorts_Filtered/ $tmpdir/Cohorts_FINAL/ ";
-($debug) && ($com .= "2> $outDir/step9-finalCohorts.err");
-system($com) && die "E $0: step9-finalCohorts failed\n";
+# STEP 11 - FINAL COHORTFILES , require at least one HV or HET sample and add patientIDs
+$com = "perl $RealBin/11_requireUndiagnosed.pl $tmpdir/Cohorts_Filtered/ $tmpdir/Cohorts_FINAL/ ";
+($debug) && ($com .= "2> $outDir/step11-finalCohorts.err");
+system($com) && die "E $0: step11-finalCohorts failed\n";
 
-$com = "perl $RealBin/8_addPatientIDs.pl $samples $tmpdir/Cohorts_FINAL/ $outDir/Cohorts/ ";
-($debug) && ($com .= "2>> $outDir/step9-finalCohorts.err");
-system($com) && die "E $0: step9-finalCohorts-addPatientIDs failed\n";
+$com = "perl $RealBin/12_addPatientIDs.pl $samples $tmpdir/Cohorts_FINAL/ $outDir/Cohorts/ ";
+($debug) && ($com .= "2>> $outDir/step11-finalCohorts.err");
+system($com) && die "E $0: step11-finalCohorts-addPatientIDs failed\n";
 
 (! $debug) && remove_tree("$tmpdir/Cohorts_Filtered/", "$tmpdir/Cohorts_FINAL/");
 
 
-# STEP 9 - COHORTFILES_CANONICAL , if called without --canon we still
+# STEP 12 - COHORTFILES_CANONICAL , if called without --canon we still
 # produce CohortFiles restricted to canonical transcripts (in case
 # the AllTranscripts CohortFiles are too heavy for oocalc/excel)
 if (! $canon) {
-    $com = "perl $RealBin/7_filterAndReorderAll.pl --indir $outDir/Cohorts/ --outdir $outDir/Cohorts_Canonical/ --canon ";
-    ($debug) && ($com .= "2> $outDir/step9-cohortsCanonical.err");
-    system($com) && die "E $0: step9-cohortsCanonical failed\n";
+    $com = "perl $RealBin/10_filterAndReorderAll.pl --indir $outDir/Cohorts/ --outdir $outDir/Cohorts_Canonical/ --canon ";
+    ($debug) && ($com .= "2> $outDir/step12-cohortsCanonical.err");
+    system($com) && die "E $0: step12-cohortsCanonical failed\n";
 }
 
 
 ######################
-# STEP 9 - SUBCOHORTS (can run after requireUndiagnosed and addPatientIDs)
+# STEP 13 - SUBCOHORTS (can run after requireUndiagnosed and addPatientIDs)
 #
 # Only runs if sub-cohorts are defined in &subCohorts() (and the files exist):
 # the idea is to produce Cohorts and Transcripts files corresponding to subsets of
@@ -427,35 +427,35 @@ if ($doSubCs) {
 	($outFileRoot =~ s/\.txt$//) || die "E $0: cannot remove .txt from subCohortFile $outFileRoot\n";
 	$outFileRoot = "$outDir/SubCohorts/$outFileRoot";
 	
-	$com .= "perl $RealBin/9_extractSubcohort.pl $subC < $outDir/Cohorts/$patho.final.patientIDs.csv > $outFileRoot.cohort.csv ; ";
+	$com .= "( perl $RealBin/13_extractSubcohort.pl $subC < $outDir/Cohorts/$patho.final.patientIDs.csv > $outFileRoot.cohort.csv ) && ";
 	($canon) ||
-	    ($com .= "perl $RealBin/9_extractSubcohort.pl $subC < $outDir/Cohorts_Canonical/$patho.final.patientIDs.canon.csv > $outFileRoot.cohort.canon.csv ; ");
-	$com .= "perl $RealBin/9_extractSubcohort.pl $subC < $outDir/Transcripts/$patho.Transcripts.patientIDs.csv > $outFileRoot.transcripts.csv ; ";
+	    ($com .= "( perl $RealBin/13_extractSubcohort.pl $subC < $outDir/Cohorts_Canonical/$patho.final.patientIDs.canon.csv > $outFileRoot.cohort.canon.csv ) && ");
+	$com .= "( perl $RealBin/13_extractSubcohort.pl $subC < $outDir/Transcripts/$patho.Transcripts.patientIDs.csv > $outFileRoot.transcripts.csv ) ";
     }
     $com .= " ) ";
-    ($debug) && ($com .= "2> $outDir/step9-subCohorts.err");
-    system($com) && die "E $0: step9-subCohorts failed\n";
+    ($debug) && ($com .= "2> $outDir/step13-subCohorts.err");
+    system($com) && die "E $0: step13-subCohorts failed\n";
 }
 else {
-    warn "I $0: no existing sub-cohort, step9-subCohorts skipped\n";
+    warn "I $0: no existing sub-cohort, step13-subCohorts skipped\n";
 }
 
 ######################
-# STEP10 - clean up and QC
+# STEP14 - clean up and QC
 
 # APPENDVC: append $caller (if it was auto-detected) to all final filenames
 if ($caller) {
     open (FILES, "find $outDir/ -name \'*csv\' |") ||
-	die "E $0: step10-appendVC cannot find final csv files with find\n";
+	die "E $0: step14-appendVC cannot find final csv files with find\n";
     while (my $f = <FILES>) {
 	chomp($f);
 	my $new = $f; 
 	($new =~ s/\.csv$/.$caller.csv/) || 
-	    die "E $0: step10-appendVC cannot add $caller as suffix to $new\n";
+	    die "E $0: step14-appendVC cannot add $caller as suffix to $new\n";
 	(-e $new) && 
-	    die "E $0: step10-appendVC want to rename to new $new but it already exists?!\n";
+	    die "E $0: step14-appendVC want to rename to new $new but it already exists?!\n";
 	rename($f,$new) ||
-	    die "E $0: step10-appendVC cannot rename $f $new\n";
+	    die "E $0: step14-appendVC cannot rename $f $new\n";
     }
     close(FILES);
 }
@@ -463,13 +463,13 @@ if ($caller) {
 
 # REMOVEEMPTY: remove files with no data lines (eg if infile concerned only some samples)
 open (FILES, "find $outDir/ -name \'*csv\' |") ||
-    die "E $0: step10-removeEmpty cannot find final csv files with find\n";
+    die "E $0: step14-removeEmpty cannot find final csv files with find\n";
 while (my $f = <FILES>) {
     chomp($f);
-    my $wc = `cat $f | wc -l`;
+    my $wc = `head -n 2 $f | wc -l`;
     # there's always 1 header line
     ($wc > 1) || unlink($f) ||
-	die "E $0: step10-removeEmpty cannot unlink $f: $!\n";
+	die "E $0: step14-removeEmpty cannot unlink $f: $!\n";
 }
 close(FILES);
 
@@ -478,10 +478,10 @@ close(FILES);
 # QC report will be printed to $qc_causal file
 my $qc_causal = "$outDir/qc_causal.csv";
 
-$com = "perl $RealBin/10_qc_checkCausal.pl --samplesFile=$samples --indir=$outDir/Samples/ ";
+$com = "perl $RealBin/14_qc_checkCausal.pl --samplesFile=$samples --indir=$outDir/Samples/ ";
 $com .= "> $qc_causal ";
-($debug) && ($com .= "2> $outDir/step10-qc_causal.err");
-system($com) && die "E $0: step10-qc_causal failed\n";
+($debug) && ($com .= "2> $outDir/step14-qc_causal.err");
+system($com) && die "E $0: step14-qc_causal failed\n";
 
 
 ######################

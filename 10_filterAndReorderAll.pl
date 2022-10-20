@@ -32,7 +32,7 @@ $0 = basename($0);
 ## hard-coded stuff that shouldn't change much
 
 # names of the scripts that this wrapper actually calls
-my ($filterBin,$reorderBin) = ("$RealBin/4C_filterVariants.pl","$RealBin/7_reorderColumns.pl");
+my ($filterBin,$reorderBin) = ("$RealBin/07_filterVariants.pl","$RealBin/10_reorderColumns.pl");
 
 
 # check hard-coded stuff
@@ -54,7 +54,7 @@ my $jobs = 8;
 my $reorder = '';
 
 # for $reorderBin: comma-separated list of favorite tissues (with default), 
-# should be the same as what was passed to 5_addGTEX.pl
+# should be the same as what was passed to 08_addGTEX.pl
 my $favoriteTissues = "testis,ovary";
 
 

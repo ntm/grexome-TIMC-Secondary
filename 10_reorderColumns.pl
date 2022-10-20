@@ -23,7 +23,7 @@ $0 = basename($0);
 (@ARGV == 1) || 
     die "E $0: need a single argument: a comma-separated list of GTEX tissues\n";
 my $favoriteTissues = $ARGV[0];
-# no sanity checking, these favorite tissues should have been passed to 5_addGTEX.pl 
+# no sanity checking, these favorite tissues should have been passed to 08_addGTEX.pl 
 # earlier and therefore already checked
 
 # columns to be printed first, in that order (replace COHORT

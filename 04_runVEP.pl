@@ -7,7 +7,7 @@
 # with added VEP annotations.
 # The VEP command-line args and VEP plugins used are hard-coded
 # in &vepCommand(), edit that sub if you want different VEP fields
-# (and then you should also edit @goodVeps at the top of 4_vcf2tsv.pl)
+# (and then you should also edit @goodVeps at the top of 05_vcf2tsv.pl)
 #
 # 11/08/2019: adding a cache file (VEP is slow).
 # CSQ are taken from the cachefile when the variant is in it,

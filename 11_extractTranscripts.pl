@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# 19/08/2019, but starting from 6_extractCohorts.pl
+# 19/08/2019, but starting from extractCohorts.pl
 # NTM
 
 # Takes as arguments: $inDir $outDir [$pathologies]
@@ -91,7 +91,7 @@ my $help = '';
 my $USAGE = "\nParse cohort TSVs from inDir, create transcript TSVs in outDir.
 Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --indir string: subdir containing cohort TSVs as produced by extractCohorts.pl, 
-                              possibly filtered/reordered by 7_filterAndReorderAll.pl;
+                              possibly filtered/reordered by 10_filterAndReorderAll.pl;
 --outdir string: subdir where resulting Transcripts TSV files will be created, must not pre-exist
 --pathologies [optional] : pathologies metadata xlsx file, with path
 --help : print this USAGE";

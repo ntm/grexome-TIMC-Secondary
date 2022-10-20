@@ -37,7 +37,7 @@ my $outDir = "";
 my $jobs = 8;
 
 # $covDir is optional, if provided it is a subdir containing per-sample 
-# coverage files as produced by 0_coverage.pl
+# coverage files as produced by 00_coverage.pl
 my $covDir = "";
 
 # help: if true just print $USAGE and exit
@@ -62,11 +62,11 @@ Also the genoData columns (\$cohort_HV, NEGCTRL_HV, etc...) are not printed.
 Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --samples : samples metadata xlsx file, with path
 --indir : must contain cohort TSVs as produced by extractCohorts.pl,
-          possibly filtered and reordered with 7_filterAndReorderAll.pl, and 
+          possibly filtered and reordered with 10_filterAndReorderAll.pl, and 
           possibly gzipped (but not with PatientIDs)
 --outdir : subdir where SAMPLE TSVs will be created, must not pre-exist
 --covdir : optional, if provided it must be a subdir containing per-sample 
-           coverage files as produced by 0_coverage.pl
+           coverage files as produced by 00_coverage.pl
 --jobs [$jobs] : number of cohorts to process in parallel
 --help : print this USAGE";
 

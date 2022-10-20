@@ -4,7 +4,7 @@
 # NTM
 
 # Parses on stdin a TSV file produced by extractCohorts.pl or extractSamples.pl,
-# or even straight out of 4_vcf2tsv.pl (but then don't filter on COUNT*).
+# or even straight out of 05_vcf2tsv.pl (but then don't filter on COUNT*).
 # Applies a bunch of filters (see args), and prints to stdout
 # a similar file but where some lines have been filtered out.
 
