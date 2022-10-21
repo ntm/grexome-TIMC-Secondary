@@ -1,4 +1,31 @@
 ###############################################
+21/10/2022
+
+Update all files to Ensembl v108:
+
+export DATE=221021
+export VERS=108
+
+- grab the latest ensembl Human GTF in /data/Ensembl/ with:
+wget ftp://ftp.ensembl.org/pub/release-$VERS/gtf/homo_sapiens/Homo_sapiens.GRCh38.$VERS.chr.gtf.gz
+
+- generate updated list of canonical transcripts [from home, tcp/3306 is still blocked at TIMC]
+DATABASE=homo_sapiens_core_${VERS}_38 /bin/sh < listCanonicalTranscripts_MYSQL.sh | gzip -c >  listCanonicalTranscripts_$DATE.tsv.gz
+
+- then on fauve:
+gunzip -c Homo_sapiens.GRCh38.$VERS.chr.gtf.gz | makeCanonicalTranscriptTable.pl listCanonicalTranscripts_$DATE.tsv.gz | gzip -c > canonicalTranscripts_$DATE.tsv.gz
+
+- also want it in BED format for samtools bedcov:
+gunzip -c canonicalTranscripts_$DATE.tsv.gz | canonicalTranscripts_table2bed.pl | gzip -c > canonicalTranscripts_$DATE.bed.gz
+
+- make a padded+merged BED file of exons for exome-seq variant calling:
+gunzip -c canonicalTranscripts_$DATE.bed.gz | perl -ne 'my $padding = 200; my @f = split(/\t/,$_); $f[1] -= $padding; ($f[1] <= 0) && ($f[1] = 1); $f[2] += $padding; print("$f[0]\t$f[1]\t$f[2]\n");' | sort -k1,1 -k2,2n | bedtools merge | gzip -c > exons_Padded200_Merged_$DATE.bed.gz
+
+
+AOK, move previous versions to Old/ .
+
+
+###############################################
 17/07/2022
 
 Update all files to Ensembl v107:
@@ -23,7 +50,6 @@ gunzip -c canonicalTranscripts_$DATE.bed.gz | perl -ne 'my $padding = 200; my @f
 
 
 AOK, move previous versions to Old/ .
-
 
 
 ###############################################
