@@ -67,7 +67,7 @@ warn "I $now: $0 - starting to run\n";
 # gnomADe_ASJ_AF|gnomADe_EAS_AF|gnomADe_FIN_AF|gnomADe_NFE_AF|gnomADe_OTH_AF|gnomADe_SAS_AF|
 # gnomADg_AF|gnomADg_AFR_AF|gnomADg_AMI_AF|gnomADg_AMR_AF|gnomADg_ASJ_AF|gnomADg_EAS_AF|
 # gnomADg_FIN_AF|gnomADg_MID_AF|gnomADg_NFE_AF|gnomADg_OTH_AF|gnomADg_SAS_AF|
-# CLIN_SIG|SOMATIC|PHENO|MOTIF_NAME|MOTIF_POS|HIGH_INF_POS|MOTIF_SCORE_CHANGE|TRANSCRIPTION_FACTORS|
+# CLIN_SIG|SOMATIC|PHENO|
 # CADD_PHRED|CADD_RAW|CADD_raw_rankscore|MetaRNN_pred|MetaRNN_rankscore|MutationTaster_pred|
 # REVEL_rankscore|ada_score|rf_score|
 # SpliceAI_pred_DP_AG|SpliceAI_pred_DP_AL|SpliceAI_pred_DP_DG|SpliceAI_pred_DP_DL|SpliceAI_pred_DS_AG|
@@ -84,7 +84,6 @@ my @goodVeps = ("SYMBOL","Gene","IMPACT","Consequence","Feature","CANONICAL",
 		"SpliceAI_pred_DP_AL","SpliceAI_pred_DS_DG","SpliceAI_pred_DP_DG",
 		"SpliceAI_pred_DS_DL","SpliceAI_pred_DP_DL",
 		"gnomADe_AF","gnomADg_AF","AF",
-		"MOTIF_NAME","MOTIF_POS","HIGH_INF_POS","MOTIF_SCORE_CHANGE","TRANSCRIPTION_FACTORS",
 		"Existing_variation");
 
 # VCF headers: ignore them but grab the:
@@ -315,26 +314,32 @@ while (my $line =<STDIN>) {
 		$thisCsq{"IMPACT"} = "LOW";
 	    }
 
+	    ###############
+	    # tried upgrading some TFBS and regulatory region variants but it's
+	    # very noisy and doesn't seem usable (yet) -> commenting out for now, 
+	    # keeping the code because I expect --regulatory to become useful some day...
+	    #
 	    # upgrade severe TFBS and regulatory region variants to LOW or MODHIGH:
 	    # TFBS_ablation and regulatory_region_ablation => MODHIGH 
 	    # TF_binding_site_variant with [HIGH_INF_POS==Y] => MODHIGH
 	    # TF_binding_site_variant without HIGH_INF_POS => LOW
 	    # TFBS_amplification => LOW
 	    # (regulatory_region_variant and regulatory_region_amplification stay MODIFIER)
-	    elsif ($thisCsq{"Consequence"} =~ /TFBS_ablation|regulatory_region_ablation/) {
-		$thisCsq{"IMPACT"} = "MODHIGH";
-	    }
-	    elsif (($thisCsq{"Consequence"} =~ /TF_binding_site_variant/) && 
-		   ($thisCsq{"HIGH_INF_POS"}) && ($thisCsq{"HIGH_INF_POS"} eq "Y")) {
-		$thisCsq{"IMPACT"} = "MODHIGH";
-	    }
-	    elsif ($thisCsq{"Consequence"} =~ /TF_binding_site_variant/) {
-		# no HIGH_INF_POS
-		$thisCsq{"IMPACT"} = "LOW";
-	    }
-	    elsif ($thisCsq{"Consequence"} =~ /TFBS_amplification/) {
-		$thisCsq{"IMPACT"} = "LOW";
-	    }
+	    # elsif ($thisCsq{"Consequence"} =~ /TFBS_ablation|regulatory_region_ablation/) {
+	    # 	$thisCsq{"IMPACT"} = "MODHIGH";
+	    # }
+	    # elsif (($thisCsq{"Consequence"} =~ /TF_binding_site_variant/) && 
+	    # 	   ($thisCsq{"HIGH_INF_POS"}) && ($thisCsq{"HIGH_INF_POS"} eq "Y")) {
+	    # 	$thisCsq{"IMPACT"} = "MODHIGH";
+	    # }
+	    # elsif ($thisCsq{"Consequence"} =~ /TF_binding_site_variant/) {
+	    # 	# no HIGH_INF_POS
+	    # 	$thisCsq{"IMPACT"} = "LOW";
+	    # }
+	    # elsif ($thisCsq{"Consequence"} =~ /TFBS_amplification/) {
+	    # 	$thisCsq{"IMPACT"} = "LOW";
+	    # }
+	    ###############
 	}
 
 	# build vepToPrint string based on @goodVeps

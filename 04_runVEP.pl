@@ -314,8 +314,8 @@ sub vepCommand {
     # commenting out "--domains", it's a bit massive and in non-deterministic order
     # and we don't curently look at it
     # also removing --pubmed, don't think anyone looks at that either
-    # trying out --regulatory
-    $vepCommand .= " --regulatory";
+    # I also tried out --regulatory but it's not really usable IMO, eg we obtain
+    # ENSR and ENSM features but we can't know the target genes...
     ## other possibilities to consider: --tsl --appris 
     $vepCommand .= " --fasta $genome --hgvs";
 
