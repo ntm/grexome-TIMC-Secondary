@@ -13,22 +13,22 @@ We try to keep external dependencies to a minimum. The only required perl module
 Standard core modules: Exporter, File::Basename, File::Copy, File::Path, File::Temp, FindBin, Getopt::Long, POSIX, Storable.
 Other modules: Parallel::ForkManager, Spreadsheet::XLSX.
 
-In addition we use the excellent Ensembl Variant Effect Predictor (VEP [1]) for annotating variants. VEP must be installed along with the Ensembl cache (we use Homo sapiens cache 106_GRCh38 today 07/06/2022). We also use some VEP plugins (currently dbNSFP, dbscSNV, CADD and SpliceAI), they must be installed along with the associated datafiles. Plugins are easily installed via the VEP INSTALL.PL script, but you must follow each plugin's instructions for installing their datafiles. This can all be customized by editing &vepCommand() in 3_runVEP.pl and/or &vepPluginDataPath() in grexomeTIMCsec_config.pm.
+In addition we use the excellent Ensembl Variant Effect Predictor (VEP [1]) for annotating variants. VEP must be installed along with the Ensembl cache (we use homo_sapiens_vep_109_GRCh38 cache as of 10/02/2023). We also use some VEP plugins (currently dbNSFP, dbscSNV, CADD and SpliceAI), they must be installed along with the associated datafiles. Plugins are easily installed via the VEP INSTALL.PL script, but you must follow each plugin's instructions for installing their datafiles. This can all be customized by editing &vepCommand() in 3_runVEP.pl and/or &vepPluginDataPath() in grexomeTIMCsec_config.pm.
 
 [1] http://www.ensembl.org/info/docs/tools/vep/script
 
 
 REQUIRED DATA:
 **************
-Step 3_runVEP.pl relies on VEP for annotating variants and therefore requires a working VEP installation, including the VEP Ensembl cache and plugin data (see DEPENDENCIES above). VEP also needs the reference genome in fasta format for HGVS annotations, we use the same file as in our primary pipeline [2] (see REQUIRED DATA there).
-In adition, the pipeline (step 5_addGTEX.pl) uses gene expression data produced by the GTEx consortium, but the required file is included in the GTEX_Data/ of this git repo.
+Step 04_runVEP.pl relies on VEP for annotating variants and therefore requires a working VEP installation, including the VEP Ensembl cache and plugin data (see DEPENDENCIES above). VEP also needs the reference genome in fasta format for HGVS annotations, we use the same file as in our primary pipeline [2] (see REQUIRED DATA there).
+In adition, the pipeline (step 08_addGTEX.pl) uses gene expression data produced by the GTEx consortium, but the required file is included in the GTEX_Data/ of this git repo.
 
 [2] https://github.com/ntm/grexome-TIMC-Primary
 
 
 CONFIGURATION:
 **************
-Before using the pipeline you must customize (a copy of) the grexomeTIMCsec_config.pm file, which defines every install-specific variable (eg path+name of the reference human genome fasta file). Every subroutine in grexomeTIMCsec_config.pm is self-documented and most will need to be customized. To do this you should copy the file somewhere and edit the copy, then use --config. Otherwise you could just edit the distributed copy in-place, but this not as flexible and your customizations will get squashed when you git pull.
+Before using the pipeline you must customize (a copy of) the grexomeTIMCsec_config.pm file, which defines every install-specific variable (eg path+name of the reference human genome fasta file). Every subroutine in grexomeTIMCsec_config.pm is self-documented and most will need to be customized. To do this you should copy the file somewhere and edit the copy, then use --config. Otherwise you could just edit the distributed copy in-place, but this not as flexible and your customizations may cause conflicts that need to be resolved when you git pull to update.
 The top-of-file comments in grexomeTIMCsec_config.pm list the few other hard-coded things that we believe users may wish to tweak. If comments are unclear or if you believe something should be moved to *config.pm, please report it (open a github issue).
 
 
