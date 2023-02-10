@@ -60,7 +60,7 @@ foreach my $caller ("Strelka", "GATK") {
 	die "E adding pathos to com: cannot replace trailing comma with space in:\n$com\n";
 
     $com .= "--infile=../GVCFs_grexome/GVCFs_${caller}_Filtered_Merged/grexomes_${callerLow}_merged_$primDate.g.vcf.gz ";
-    $com .= "--cnvs=$cnvFile ";
+    ($cnvFile) && ($com .= "--cnvs=$cnvFile ");
     $com .= "--outDir=SecondaryAnalyses_${secDate}_$caller ";
     $com .= "$canon ";
     #$com .= "--debugVep ";
