@@ -134,20 +134,34 @@ while (my $line = <>) {
     }
 }
 
-# sub for sorting by chrom then by coord (using first exon start)
+# sub for sorting by chrom, then by coord of first exon, then by
+# the list of all starts-stops (just to get something deterministic)
 sub byChrByCoord {
     if ($trans2chr{$a} <=> $trans2chr{$b}) {
 	return($trans2chr{$a} <=> $trans2chr{$b});
     }
-    else {
-	($trans2exons{$a}->[0] =~ /^(\d+),/) || 
-	    die "E: in byChrByCoord cannot extract first exon start from $trans2exons{$a}->[0]\n";
-	my $startA = $1;
-	($trans2exons{$b}->[0] =~ /^(\d+),/) || 
-	    die "E: in byChrByCoord cannot extract first exon start from $trans2exons{$b}->[0]\n";
-	my $startB = $1;
+    # else... start of first exon
+    ($trans2exons{$a}->[0] =~ /^(\d+),/) ||
+	die "E: in byChrByCoord cannot extract first exon start from $trans2exons{$a}->[0]\n";
+    my $startA = $1;
+    ($trans2exons{$b}->[0] =~ /^(\d+),/) ||
+	die "E: in byChrByCoord cannot extract first exon start from $trans2exons{$b}->[0]\n";
+    my $startB = $1;
+    if ($startA <=> $startB) {
 	return($startA <=> $startB);
     }
+    # else... end of first exon
+    ($trans2exons{$a}->[1] =~ /^(\d+),/) ||
+	die "E: in byChrByCoord cannot extract first exon end from $trans2exons{$a}->[1]\n";
+    my $endA = $1;
+    ($trans2exons{$b}->[1] =~ /^(\d+),/) ||
+	die "E: in byChrByCoord cannot extract first exon end from $trans2exons{$b}->[1]\n";
+    my $endB = $1;
+    if ($endA <=> $endB) {
+	return($endA <=> $endB);
+    }
+    # else... just stringwise compare the full lists of exon coords
+    return (join("__",@{$trans2exons{$a}}) cmp join("__",@{$trans2exons{$b}}));
 }
 
 
