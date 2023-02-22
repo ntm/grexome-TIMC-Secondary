@@ -89,10 +89,11 @@ while (my $line = <>) {
 	    ($gene = $1);
 	# CHROM
 	my $chr = $fields[0];
-	# for sorting we want just the chrom number, replace X Y M by 23-25
+	$chr =~ s/^chr//;
+	# for sorting we want just the chrom number, replace X Y M|MT by 23-25
 	if ($chr eq "X") { $trans2chr{$transcript} = "23" }
 	elsif ($chr eq "Y") { $trans2chr{$transcript} = "24" }
-	elsif ($chr eq "MT") { $trans2chr{$transcript} = "25" }
+	elsif (($chr eq "M") || ($chr eq "MT")) { $trans2chr{$transcript} = "25" }
 	else { $trans2chr{$transcript} = $chr }
 	# for printing we use chr* convention
 	($chr eq "MT") && ($chr = "M");
