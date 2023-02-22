@@ -21,7 +21,7 @@ use strict;
 use warnings;
 
 
-(@ARGV == 1) || 
+(@ARGV == 1) ||
     die "E: needs one arg, a string defining transcripts of interest\n";
 
 my $TOIs = shift(@ARGV);
@@ -64,7 +64,7 @@ while (my $line = <>) {
 
     # we only want exon, start_codon and stop_codon lines
     my $lineType = $fields[2];
-    ($lineType eq "exon") || ($lineType eq "start_codon") || ($lineType eq "stop_codon") || 
+    ($lineType eq "exon") || ($lineType eq "start_codon") || ($lineType eq "stop_codon") ||
 	next;
 
     # ignore if not a TOI
@@ -183,9 +183,9 @@ foreach my $transcript (sort byChrByCoord keys(%trans2printFirst)) {
 	print "\t1\t1";
     }
     # EXONS*: chop final comma
-    (chop($trans2exons{$transcript}->[0]) eq ',') || 
+    (chop($trans2exons{$transcript}->[0]) eq ',') ||
 	die "E: chopped final comma from exon_starts but it's not a comma! $transcript $trans2exons{$transcript}->[0]\n";
-    (chop($trans2exons{$transcript}->[1]) eq ',') || 
+    (chop($trans2exons{$transcript}->[1]) eq ',') ||
 	die "E: chopped final comma from exon_ends but it's not a comma! $transcript $trans2exons{$transcript}->[1]\n";
     print "\t".$trans2exons{$transcript}->[0];
     print "\t".$trans2exons{$transcript}->[1];
