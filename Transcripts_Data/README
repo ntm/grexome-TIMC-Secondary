@@ -1,4 +1,36 @@
 ###############################################
+22/02/2023
+
+The Ensembl GTF now includes a tag identifying canonical transcripts.
+The previous 'listCanonicalTranscripts_MYSQL.sh'-based procedure is therefore
+obsolete, we can just use the new tag.
+There's also a tag identifying MAGE_Select transcripts, great because we also
+want these.
+I updated the code, process is now:
+
+export DATE=230222
+export VERS=109
+
+- grab the latest ensembl Human GTF in /data/Ensembl/ with:
+wget ftp://ftp.ensembl.org/pub/release-$VERS/gtf/homo_sapiens/Homo_sapiens.GRCh38.$VERS.chr.gtf.gz
+
+- make TSV of canonical transcripts:
+gunzip -c Homo_sapiens.GRCh38.$VERS.chr.gtf.gz | transcripts_gtf2table.pl canon | gzip -c > canonicalTranscripts_$DATE.tsv.gz
+
+- also want it in BED format for samtools bedcov:
+gunzip -c canonicalTranscripts_$DATE.tsv.gz | transcripts_table2bed.pl | gzip -c > canonicalTranscripts_$DATE.bed.gz
+
+- make a padded+merged BED file of exons for exome-seq variant calling:
+gunzip -c canonicalTranscripts_$DATE.bed.gz | perl -ne 'my $padding = 200; my @f = split(/\t/,$_); $f[1] -= $padding; ($f[1] <= 0) && ($f[1] = 1); $f[2] += $padding; print("$f[0]\t$f[1]\t$f[2]\n");' | sort -k1,1 -k2,2n | bedtools merge | gzip -c > canonicalTranscripts_Padded200_Merged_$DATE.bed.gz
+
+
+- Also make a BED of MANE_Select transcripts (don't bother building the intermediate table):
+gunzip -c Homo_sapiens.GRCh38.$VERS.chr.gtf.gz | transcripts_gtf2table.pl mane |transcripts_table2bed.pl | gzip -c > maneTranscripts_$DATE.bed.gz
+
+AOK
+
+
+###############################################
 09/02/2023
 
 Update all files to Ensembl v109:

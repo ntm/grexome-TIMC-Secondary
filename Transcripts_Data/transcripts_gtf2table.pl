@@ -3,13 +3,13 @@
 # 16/09/2019
 # NTM
 
-
-# Parse the Ensembl gtf file on stdin, and the list of canonical 
-# transcripts from Ensembl contained in $canoTransFile (produced
-# by getCanonicalTranscripts.pl)
-# Print to stdout a tab-delimited file with columns:
+# Takes a single arg: a string defining the "transcripts of interest", currently
+# 'canon' (-ical) or 'mane' (-Select)
+#
+# Parse the Ensembl gtf file on stdin.
+# Print to stdout a tab-delimited file with columns
 # "TRANSCRIPT\tGENE\tENSG\tCHROM\tSTRAND\tCDS_START\tCDS_END\tEXON_STARTS\tEXON_ENDS\n"
-# containing one line per canonical transcript, 
+# containing one line per transcript of interest:
 # GENE is the ENSG id if we can't find a gene name,
 # STRAND is + or -,
 # by convention if transcript is non-coding CDS_START==CDS_END==1,
@@ -21,29 +21,22 @@ use strict;
 use warnings;
 
 
-# take one arg: filename with ensembl canonical transcripts
-(@ARGV == 1) || 
-    die "E: needs one arg, a file listing the canonical transcripts\n";
+(@ARGV == 1) ||
+    die "E: needs one arg, a string defining transcripts of interest\n";
 
-my $ensembl_canonical = shift(@ARGV);
+my $TOIs = shift(@ARGV);
 
-(-f $ensembl_canonical) ||
-    die "E: argument $ensembl_canonical is not a file\n";
-
-
-##############################################################
-# store canonical transcripts: key==transcript_id, value==1
-my %canonical = () ;
-
-open(CANON, "gunzip -c $ensembl_canonical |") || 
-    die "cannot gunzip-open $ensembl_canonical for reading\n" ;
-
-while(my $line = <CANON>) {
-    chomp $line;
-    $canonical{$line} = 1 ;
+# precise string to search for in last data column if Ensembl GTF
+my $toiDef;
+if ($TOIs eq 'canon') {
+    $toiDef = 'tag "Ensembl_canonical";'
 }
-close(CANON);
-
+elsif ($TOIs eq 'mane') {
+    $toiDef = 'tag "MANE_Select";'
+}
+else {
+    die "E: unsuppported type of transcripts: must be 'canon' or 'mane', not $TOIs\n";
+}
 
 ##############################################################
 
@@ -71,16 +64,16 @@ while (my $line = <>) {
 
     # we only want exon, start_codon and stop_codon lines
     my $lineType = $fields[2];
-    ($lineType eq "exon") || ($lineType eq "start_codon") || ($lineType eq "stop_codon") || 
+    ($lineType eq "exon") || ($lineType eq "start_codon") || ($lineType eq "stop_codon") ||
 	next;
+
+    # ignore if not a TOI
+    ($fields[8] =~ /$toiDef/) || next;
 
     # TRANSCRIPT
     ($fields[8] =~ /transcript_id "(ENST\d+)";/) ||
 	die "E: cannot grab transcript_id from line:\n$line\n";
     my $transcript = $1;
-
-    # skip if it's not a canonical transcript
-    ($canonical{$transcript}) || next;
 
     # STRAND
     my $strand = $fields[6];
@@ -96,10 +89,11 @@ while (my $line = <>) {
 	    ($gene = $1);
 	# CHROM
 	my $chr = $fields[0];
-	# for sorting we want just the chrom number, replace X Y M by 23-25
+	$chr =~ s/^chr//;
+	# for sorting we want just the chrom number, replace X Y M|MT by 23-25
 	if ($chr eq "X") { $trans2chr{$transcript} = "23" }
 	elsif ($chr eq "Y") { $trans2chr{$transcript} = "24" }
-	elsif ($chr eq "MT") { $trans2chr{$transcript} = "25" }
+	elsif (($chr eq "M") || ($chr eq "MT")) { $trans2chr{$transcript} = "25" }
 	else { $trans2chr{$transcript} = $chr }
 	# for printing we use chr* convention
 	($chr eq "MT") && ($chr = "M");
@@ -140,20 +134,34 @@ while (my $line = <>) {
     }
 }
 
-# sub for sorting by chrom then by coord (using first exon start)
+# sub for sorting by chrom, then by coord of first exon, then by
+# the list of all starts-stops (just to get something deterministic)
 sub byChrByCoord {
     if ($trans2chr{$a} <=> $trans2chr{$b}) {
 	return($trans2chr{$a} <=> $trans2chr{$b});
     }
-    else {
-	($trans2exons{$a}->[0] =~ /^(\d+),/) || 
-	    die "E: in byChrByCoord cannot extract first exon start from $trans2exons{$a}->[0]\n";
-	my $startA = $1;
-	($trans2exons{$b}->[0] =~ /^(\d+),/) || 
-	    die "E: in byChrByCoord cannot extract first exon start from $trans2exons{$b}->[0]\n";
-	my $startB = $1;
+    # else... start of first exon
+    ($trans2exons{$a}->[0] =~ /^(\d+),/) ||
+	die "E: in byChrByCoord cannot extract first exon start from $trans2exons{$a}->[0]\n";
+    my $startA = $1;
+    ($trans2exons{$b}->[0] =~ /^(\d+),/) ||
+	die "E: in byChrByCoord cannot extract first exon start from $trans2exons{$b}->[0]\n";
+    my $startB = $1;
+    if ($startA <=> $startB) {
 	return($startA <=> $startB);
     }
+    # else... end of first exon
+    ($trans2exons{$a}->[1] =~ /^(\d+),/) ||
+	die "E: in byChrByCoord cannot extract first exon end from $trans2exons{$a}->[1]\n";
+    my $endA = $1;
+    ($trans2exons{$b}->[1] =~ /^(\d+),/) ||
+	die "E: in byChrByCoord cannot extract first exon end from $trans2exons{$b}->[1]\n";
+    my $endB = $1;
+    if ($endA <=> $endB) {
+	return($endA <=> $endB);
+    }
+    # else... just stringwise compare the full lists of exon coords
+    return (join("__",@{$trans2exons{$a}}) cmp join("__",@{$trans2exons{$b}}));
 }
 
 
@@ -190,21 +198,11 @@ foreach my $transcript (sort byChrByCoord keys(%trans2printFirst)) {
 	print "\t1\t1";
     }
     # EXONS*: chop final comma
-    (chop($trans2exons{$transcript}->[0]) eq ',') || 
+    (chop($trans2exons{$transcript}->[0]) eq ',') ||
 	die "E: chopped final comma from exon_starts but it's not a comma! $transcript $trans2exons{$transcript}->[0]\n";
-    (chop($trans2exons{$transcript}->[1]) eq ',') || 
+    (chop($trans2exons{$transcript}->[1]) eq ',') ||
 	die "E: chopped final comma from exon_ends but it's not a comma! $transcript $trans2exons{$transcript}->[1]\n";
     print "\t".$trans2exons{$transcript}->[0];
     print "\t".$trans2exons{$transcript}->[1];
     print "\n";
-    # for sanity checks later:
-    delete($canonical{$transcript});
 }
-
-# sanity?
-# Commenting out, we exepct thousands of canonical transcripts that
-# don't belong to chr1-22 or X Y M (eg they map to ALT chromosomes),
-# these aren't in the Ensembl GTF.
-# foreach my $transcript (sort keys(%canonical)) {
-#     warn "W: $transcript is canonical but was never seen\n";
-# }
