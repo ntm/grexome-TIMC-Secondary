@@ -27,7 +27,12 @@ gunzip -c canonicalTranscripts_$DATE.bed.gz | perl -ne 'my $padding = 200; my @f
 - Also make a BED of MANE_Select transcripts (don't bother building the intermediate table):
 gunzip -c Homo_sapiens.GRCh38.$VERS.chr.gtf.gz | transcripts_gtf2table.pl mane |transcripts_table2bed.pl | gzip -c > maneTranscripts_$DATE.bed.gz
 
-AOK
+AOK, same exons and info, but the exons are not in the same order
+due to a non-deterministic sort in transcripts_gtf2table.pl (fixed now).
+
+-> remove the new (redundant) canonicalTranscripts files, just keep 
+the maneTranscripts BED.
+In the future I'll use this new procedure.
 
 
 ###############################################
