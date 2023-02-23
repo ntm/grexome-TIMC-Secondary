@@ -1,4 +1,28 @@
 ###############################################
+23/02/2023
+
+Simplifying filenames, new procedure is:
+export VERS=109
+
+# grab and check the latest ensembl Human GTF in /data/Ensembl/ with:
+wget ftp://ftp.ensembl.org/pub/release-$VERS/gtf/homo_sapiens/Homo_sapiens.GRCh38.$VERS.chr.gtf.gz
+gunzip -t Homo_sapiens.GRCh38.$VERS.chr.gtf.gz
+
+# if OK:
+# make TSV and BED of canonical transcripts:
+gunzip -c Homo_sapiens.GRCh38.$VERS.chr.gtf.gz | transcripts_gtf2table.pl canon | gzip -c > canonical_$VERS.tsv.gz
+gunzip -c canonical_$VERS.tsv.gz | transcripts_table2bed.pl | gzip -c > canonical_$VERS.bed.gz
+
+# make BED of MANE transcripts (TSV is used only by 00_coverage.pl, not needed for MANE):
+gunzip -c Homo_sapiens.GRCh38.$VERS.chr.gtf.gz | transcripts_gtf2table.pl mane |transcripts_table2bed.pl | gzip -c > mane_$VERS.bed.gz
+
+# make a padded+merged BED file of exons from Ensembl-canonical for exome-seq variant calling:
+gunzip -c canonical_$VERS.bed.gz | perl -ne 'my $padding = 200; my @f = split(/\t/,$_); $f[1] -= $padding; ($f[1] <= 0) && ($f[1] = 1); $f[2] += $padding; print("$f[0]\t$f[1]\t$f[2]\t$f[3]\n");' | sort -k1,1 -k2,2n | bedtools merge -c 4 -o collapse | gzip -c > canonical_${VERS}_Padded200_Merged.bed.gz
+
+
+DONE.
+
+###############################################
 22/02/2023
 
 The Ensembl GTF now includes a tag identifying canonical transcripts.
