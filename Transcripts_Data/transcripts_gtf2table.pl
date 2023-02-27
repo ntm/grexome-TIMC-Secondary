@@ -134,8 +134,8 @@ while (my $line = <>) {
     }
 }
 
-# sub for sorting by chrom, then by coord of first exon, then by
-# the list of all starts-stops (just to get something deterministic)
+# sub for sorting by chrom, then by coord of first exon, then by the list of
+# all starts-stops, then by transcriptID (just to get something deterministic)
 sub byChrByCoord {
     if ($trans2chr{$a} <=> $trans2chr{$b}) {
 	return($trans2chr{$a} <=> $trans2chr{$b});
@@ -160,8 +160,12 @@ sub byChrByCoord {
     if ($endA <=> $endB) {
 	return($endA <=> $endB);
     }
-    # else... just stringwise compare the full lists of exon coords
-    return (join("__",@{$trans2exons{$a}}) cmp join("__",@{$trans2exons{$b}}));
+    # else... stringwise compare the full lists of exon coords
+    if (my $coordsCmp = (join("__",@{$trans2exons{$a}}) cmp join("__",@{$trans2exons{$b}}))) {
+	return($coordsCmp);
+    }
+    # else stringwise compare transcriptIDs, these are different for sure
+    return($a cmp $b);
 }
 
 
