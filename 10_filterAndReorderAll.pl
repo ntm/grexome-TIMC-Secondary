@@ -166,6 +166,10 @@ while (my $inFile = readdir(INDIR)) {
     ($reorder) && ($com .= " | perl $reorderBin $favoriteTissues ");
 
     $com .= " > $outDir/$outFile";
+
+    # fail if any component of the pipe fails
+    $com =~ s/"/\\"/g;
+    $com = "$bash -o pipefail -c \" $com \"";
     system($com) && die "E $0: filter and/or reorder failed for $inFile\n";
     $pm->finish;
 }

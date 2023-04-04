@@ -59,7 +59,12 @@ my $numJobsGunzip = 6;
 my $numJobs1 = 20;
 my $numJobs9 = 16;
 
-# name(+path if needed) of gzip-like binary, we like bgzip (multi-threaded)
+# name (+path if needed) of bash binary, needed for -o pipefail
+my $bash = "bash";
+(`which $bash` =~ /$bash$/) ||
+    die "E $0: the bash executable $bash can't be found\n";
+
+# name (+path if needed) of gzip-like binary, we like bgzip (multi-threaded)
 my $bgzip = "bgzip";
 (`which $bgzip` =~ /$bgzip/) ||
     die "E $0: the bgzip executable $bgzip can't be found\n";
@@ -352,7 +357,9 @@ if ($debug) {
 }
 else {
     # after step9 we have several files (one per cohort) so no more piping,
-    # run steps 1-9, all logs go to stderr
+    # run steps 1-9, all logs go to stderr, fail if any component of the pipe fails
+    $com =~ s/"/\\"/g;
+    $com = "$bash -o pipefail -c \" $com \"";
     system($com) && die "E $0: steps 1 to 9 have failed, check for previous errors in this logfile\n";
 }
 
