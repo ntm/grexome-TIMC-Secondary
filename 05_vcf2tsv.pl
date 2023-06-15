@@ -211,7 +211,7 @@ while (my $line =<STDIN>) {
 	# upgrade putatively deleterious missense variants:
 	if (($thisCsq{"IMPACT"} eq "MODERATE") && ($thisCsq{"Consequence"}) &&
 	    ($thisCsq{"Consequence"} =~ /missense_variant/)) {
-	    # upgrade to MODHIGH if at least $minPassedFracMissense criteria are
+	    # upgrade to MODHIGH if more than $minPassedFracMissense criteria are
 	    # passed among the following:
 	    # - SIFT -> deleterious
 	    # - Polyphen -> probably_damaging
