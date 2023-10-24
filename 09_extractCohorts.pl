@@ -358,6 +358,8 @@ while (!$lastBatch) {
 	my $elapsed = $newTime - $timestampAdaptive;
 	if ($elapsed < $batchTimeLow) {
 	    # increase batchSize by factor (1.2 * $btLow / $elapsed)
+	    # avoid divByZero
+	    $elapsed += 1;
 	    $batchSize = int(1.2 * $batchSize * $batchTimeLow / $elapsed);
 	    $now = strftime("%F %T", localtime);
 	    warn "I $now: $0 - batchNum=$batchNum, adjusting batchSize up to $batchSize\n";
