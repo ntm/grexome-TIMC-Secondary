@@ -228,10 +228,10 @@ Arguments (all can be abbreviated to shortest unambiguous prefixes):
 	}
 	elsif ($prevChr ne $chr) {
 	    # we changed chrom, start merging and printing results from prevChr
-	    $now = strftime("%F %T", localtime);
-	    warn "I $now: $0 - finished parsing/processing chrom $prevChr\n";
 	    close($VCFVEP);
 	    close($VCFCACHE);
+	    $now = strftime("%F %T", localtime);
+	    warn "I $now: $0 - finished parsing/processing chrom $prevChr\n";
 	    # merge prevChr files
 	    &mergeAndPrint($vcfFromVep, $vcfFromCache, $cacheUpdate);
 	    unlink($vcfFromVep, $vcfFromCache);
