@@ -93,7 +93,7 @@ my %candidateGenes = ();
 # or 5 if the gene is "Causal" for a $cohort patient in $samplesFile.
 my $knownCandidateGenesR = &parseCandidateGenes($candidatesFiles, $samplesFile);
 foreach my $patho (keys(%$knownCandidateGenesR)) {
-    foreach my $gene (keys($knownCandidateGenesR->{$patho})) {
+    foreach my $gene (keys(%{$knownCandidateGenesR->{$patho}})) {
 	$candidateGenes{$gene} = 1;
     }
 }
