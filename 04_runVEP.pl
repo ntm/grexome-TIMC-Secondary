@@ -429,6 +429,10 @@ sub checkHeaders {
 	    # also remove any path before /.vep/ in cache= so different users can use the
 	    # same cacheFile if they have their own VEP install with same cache versions
 	    $lineClean =~ s~(cache=")[^"]+(/.vep/)~$1$2~; # no "||die", eg if the user changed his VEPDIR
+	    # also remove ensembl* fields, they appear in a random order that changes from run to run:
+	    # https://github.com/Ensembl/ensembl-vep/issues/1540
+	    $lineClean =~ s/\sensembl\S+//g ||
+		die "E $0: cannot remove ensembl* version info from ##VEP line:\n$line\n";
 	    if (defined $cache->{"VEPversion"}) {
 		my $cacheLine = $cache->{"VEPversion"};
 		if ($cacheLine ne $lineClean) {
