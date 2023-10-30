@@ -173,7 +173,7 @@ warn "I $now: $0 - starting to run\n";
 #########################################################
 # parse all provided metadata files
 
-# %knownCandidateGenes: key==$gene, value is a comma-separated list
+# %knownCandidateGenes: key==$gene, value is a comma-separated sorted list
 # of "$patho:$score" pairs
 my %knownCandidateGenes;
 
@@ -188,7 +188,7 @@ my %knownCandidateGenes;
 	$knownCandsR = &parseCandidateGenes($candidatesFiles, $samplesFile);
     }
 
-    foreach my $c (keys(%$knownCandsR)) {
+    foreach my $c (sort keys(%$knownCandsR)) {
 	foreach my $gene (keys(%{$knownCandsR->{$c}})) {
 	    my $score = $knownCandsR->{$c}->{$gene};
 	    if ($knownCandidateGenes{$gene}) {

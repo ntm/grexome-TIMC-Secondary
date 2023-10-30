@@ -79,7 +79,7 @@ warn "I $now: $0 - starting to run\n";
 #########################################################
 # parse the provided metadata files
 
-# %knownCandidateGenes: key==$gene, value is a comma-separated list
+# %knownCandidateGenes: key==$gene, value is a comma-separated sorted list
 # of "$patho:$score" pairs.
 # This hash is initially filled from the XLSX files, and will then be emptied as
 # we parse stdin. At the end any remaining genes in the hash were never seen.
@@ -90,7 +90,7 @@ my %knownCandidateGenes;
     # a hashref whose keys are gene names and values are the "Confidence scores"
     my $knownCandsR = &parseCandidateGenes($candidatesFiles, $samplesFile);
 
-    foreach my $c (keys(%$knownCandsR)) {
+    foreach my $c (sort keys(%$knownCandsR)) {
 	foreach my $gene (keys(%{$knownCandsR->{$c}})) {
 	    my $score = $knownCandsR->{$c}->{$gene};
 	    if ($knownCandidateGenes{$gene}) {
