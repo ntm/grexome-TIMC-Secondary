@@ -102,12 +102,14 @@ my $batchSize = 500000;
 # [$dp below represents the fixed DP ie max(DP,sumOfADs), except for non-variant
 #      blocks where it is MIN_DP]:
 # if $dp < $minDP , any call becomes NOCALL
+# if $dp * AF < $minAD, any call becomes NOCALL
 # if max(GQ,GQX) < $minGQ , any call becomes NOCALL
 # if AF < $minAF and call was REF/VAR or VAR/VAR, call becomes NOCALL
 # if $dp >= $minDP_HV and AF >= $minAF_HV , call becomes HV
 # if $dp >= $minDP_HET and AF >= $minAF_HET and AF <= $maxAF_HET, call becomes HET
 my %filterParams = (
     "minDP" => 10,
+    "minAD" => 4,
     "minGQ" => 20,
     "minAF" => 0.15,
     "minDP_HV" => 20,
@@ -644,6 +646,13 @@ sub processBatch {
 
 	    if (($af ne '.') && ($af < $filterParamsR->{"minAF"})) {
 		# AF too low, change to NOCALL
+		push(@lineToPrint, './.') ;
+		next;
+	    }
+
+	    # we have correct $thisDP and $af values, apply minAD filter
+	    if (($af ne '.') && ($thisDP * $af < $filterParamsR->{"minAD"})) {
+		# not enough supporting reads, change to NOCALL
 		push(@lineToPrint, './.') ;
 		next;
 	    }
