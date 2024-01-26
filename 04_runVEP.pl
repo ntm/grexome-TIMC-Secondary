@@ -369,6 +369,16 @@ sub vepCommand {
 	"snv=$spliceAIPath/spliceai_scores.raw.snv.hg38.vcf.gz,".
 	"indel=$spliceAIPath/spliceai_scores.raw.indel.hg38.vcf.gz";
 
+    # AlphaMissense, data file must be DL'd as $alphaMSfile and tabix-indexed, see:
+    # https://github.com/Ensembl/VEP_plugins/blob/release/111/AlphaMissense.pm
+    my $alphaMSfile = "$dataDir/AlphaMissense/AlphaMissense_hg38.tsv.gz";
+    if (-f $alphaMSfile) {
+	$vepPlugins .= " --plugin AlphaMissense,file=$alphaMSfile";
+    }
+    else {
+	warn "W: $0 - AlphaMissense VEP plugin won't be used because file $alphaMSfile doesn't exist\n";
+    }
+
     $vepCommand .= $vepPlugins;
 
     # --fork borks when $vepJobs==1

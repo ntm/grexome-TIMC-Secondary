@@ -13,7 +13,7 @@ We try to keep external dependencies to a minimum. The only required perl module
 Standard core modules: Exporter, File::Basename, File::Copy, File::Path, File::Temp, FindBin, Getopt::Long, POSIX, Storable.
 Other modules: Parallel::ForkManager, Spreadsheet::XLSX.
 
-In addition we use the excellent Ensembl Variant Effect Predictor (VEP [1]) for annotating variants. VEP must be installed along with the Ensembl cache (we use homo_sapiens_vep_109_GRCh38 cache as of 10/02/2023). We also use some VEP plugins (currently dbNSFP, dbscSNV, CADD and SpliceAI), they must be installed along with the associated datafiles. Plugins are easily installed via the VEP INSTALL.PL script, but you must follow each plugin's instructions for installing their datafiles. This can all be customized by editing &vepCommand() in 3_runVEP.pl and/or &vepPluginDataPath() in grexomeTIMCsec_config.pm.
+In addition we use the excellent Ensembl Variant Effect Predictor (VEP [1]) for annotating variants. VEP must be installed along with the Ensembl cache (we use homo_sapiens_vep_109_GRCh38 cache as of 10/02/2023). We also use some VEP plugins (currently dbNSFP, dbscSNV, CADD, SpliceAI and AlphaMissense), they must be installed along with the associated datafiles. Plugins are easily installed via the VEP INSTALL.PL script, but you must follow each plugin's instructions for installing their datafiles. This can all be customized by editing &vepCommand() in 04_runVEP.pl and/or &vepPluginDataPath() in grexomeTIMCsec_config.pm.
 
 [1] http://www.ensembl.org/info/docs/tools/vep/script
 

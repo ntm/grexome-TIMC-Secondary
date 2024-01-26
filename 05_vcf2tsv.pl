@@ -71,7 +71,7 @@ warn "I $now: $0 - starting to run\n";
 # Some of these are hard-coded in the "missense" and "splice"
 # upgrade-to-MODHIGH code, make sure they get fixed there as
 # well if they change names.
-# Current available annotations produced by runVEP.pl (17/07/2022) are:
+# Current available annotations produced by runVEP.pl (26/01/2024) are:
 # Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|EXON|INTRON|
 # HGVSc|HGVSp|cDNA_position|CDS_position|Protein_position|Amino_acids|Codons|
 # Existing_variation|ALLELE_NUM|DISTANCE|STRAND|FLAGS|VARIANT_CLASS|SYMBOL_SOURCE|
@@ -84,7 +84,8 @@ warn "I $now: $0 - starting to run\n";
 # CADD_PHRED|CADD_RAW|CADD_raw_rankscore|MetaRNN_pred|MetaRNN_rankscore|MutationTaster_pred|
 # REVEL_rankscore|ada_score|rf_score|
 # SpliceAI_pred_DP_AG|SpliceAI_pred_DP_AL|SpliceAI_pred_DP_DG|SpliceAI_pred_DP_DL|SpliceAI_pred_DS_AG|
-# SpliceAI_pred_DS_AL|SpliceAI_pred_DS_DG|SpliceAI_pred_DS_DL|SpliceAI_pred_SYMBOL
+# SpliceAI_pred_DS_AL|SpliceAI_pred_DS_DG|SpliceAI_pred_DS_DL|SpliceAI_pred_SYMBOL|
+# am_class|am_pathogenicity
 my @goodVeps = ("SYMBOL","Gene","IMPACT","Consequence","Feature","CANONICAL",
 		"BIOTYPE","VARIANT_CLASS","RefSeq","MANE_SELECT","MANE_PLUS_CLINICAL",
 		"ALLELE_NUM","EXON","INTRON",
@@ -93,6 +94,7 @@ my @goodVeps = ("SYMBOL","Gene","IMPACT","Consequence","Feature","CANONICAL",
 		"MetaRNN_pred","MetaRNN_rankscore","CADD_raw_rankscore",
 		"MutationTaster_pred","REVEL_rankscore",
 		"ada_score","rf_score","CADD_PHRED",
+		"am_class","am_pathogenicity",
 		"SpliceAI_pred_DS_AG","SpliceAI_pred_DP_AG","SpliceAI_pred_DS_AL",
 		"SpliceAI_pred_DP_AL","SpliceAI_pred_DS_DG","SpliceAI_pred_DP_DG",
 		"SpliceAI_pred_DS_DL","SpliceAI_pred_DP_DL",
@@ -212,6 +214,7 @@ while (my $line =<STDIN>) {
 	    # - MutationTaster_pred -> contains at least one A or D
 	    # - REVEL_rankscore >= 0.7
 	    # - MetaRNN_pred -> contains at least one D(amaging)
+	    # - AlphaMissense class -> 'Likely pathogenic'
 	    # 
 	    # NOTE: sometimes we don't have any prediction for some predictors,
 	    # due to dbNSFP using older transcripts and/or bugs in VEP or VEP plugins...
@@ -244,6 +247,10 @@ while (my $line =<STDIN>) {
 	    if ($thisCsq{"MetaRNN_pred"}) {
 		$totalPreds++;
 		($thisCsq{"MetaRNN_pred"} =~ /D/) && ($passed++);
+	    }
+	    if ($thisCsq{"am_class"}) {
+		$totalPreds++;
+		($thisCsq{"am_class"} =~ /Likely pathogenic/) && ($passed++);
 	    }
 
 	    # require at least 2 predictors

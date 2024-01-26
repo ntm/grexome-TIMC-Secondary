@@ -93,7 +93,7 @@ sub vepCacheFile {
 }
 
 # Return a dir containing subdirs with the data required by 
-# the VEP plugins we use (seach for "plugin" in 3_runVEP.pl).
+# the VEP plugins we use (seach for "plugin" in 04_runVEP.pl).
 sub vepPluginDataPath {
     # return first existing subdir
     foreach my $dir ("/data/nthierry/", "/data/") {
