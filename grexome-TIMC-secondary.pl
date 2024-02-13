@@ -372,8 +372,11 @@ $com .= "--reorder --favoriteTissues=".&gtexFavoriteTissues()." ";
 # set min_hr to 20% of $numSamples
 my $min_hr = int($numSamples * 0.2);
 $com .= "--min_hr=$min_hr ";
-# other hard-coded COUNT filters:
-$com .= "--max_ctrl_hv 3 --max_ctrl_het 10 ";
+# set max_ctrl_het to 2% of $numSamples
+my $max_ctrl_het = int($numSamples * 0.02);
+$com .= "--max_ctrl_het=$max_ctrl_het ";
+# hard-coded max_ctrl_hv:
+$com .= "--max_ctrl_hv 3 ";
 ($debug) && ($com .= "2> $outDir/step10.err");
 system($com) && die "E $0: step10 failed\n";
 # remove unfiltered results in non-debug mode
