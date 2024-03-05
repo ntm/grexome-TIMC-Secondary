@@ -269,7 +269,8 @@ foreach my $inFile (sort(readdir(INDIR))) {
 			$hitCands{$key}->[2]++;
 		    }
 		}
-		elsif ($line[$genoCol] eq 'HV') {
+		elsif (($line[$genoCol] eq 'HV') && (($line[$impactCol] eq 'HIGH') ||
+						     ($line[$impactCol] eq 'MODHIGH'))) {
 		    # only count HVs if gene is a candidate for another patho
 		    (defined $hitCandsOtherPathos{$key}) || ($hitCandsOtherPathos{$key} = [0,0]);
 		    if ($line[$impactCol] eq 'HIGH') {
