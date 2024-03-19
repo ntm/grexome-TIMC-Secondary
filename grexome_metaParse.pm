@@ -364,7 +364,10 @@ sub parseSamples {
 # There can be several candidateGenes files, comma-separated.
 # The second argument is the samples metadata file: causalGenes in
 # this file are added as candidate genes with score=5.
-# The optional third argument, if povided and non-empty, is the
+# The third argument $verbose is a Boolean: causalGenes that are absent
+# from the candidateGenes file are reported only if $verbose (useful
+# to avoid redundant stderr output).
+# The optional fourth argument, if povided and non-empty, is the
 # pathologies metadata XLSX file; it is used to make sure every
 # pathologyID is defined in pathologies.xlsx (ie sanity-checking).
 #
@@ -375,8 +378,8 @@ sub parseSamples {
 # If the metadata files have errors, log as many as possible and die.
 sub parseCandidateGenes {
     my $subName = (caller(0))[3];
-    (@_ == 2) || (@_ == 3) || die "E: $subName needs two or three args";
-    my ($candidatesFiles, $samplesFile, $pathosFile) = @_;
+    (@_ == 3) || (@_ == 4) || die "E: $subName needs three or four args";
+    my ($candidatesFiles, $samplesFile, $verbose, $pathosFile) = @_;
 
     my @candidateFiles = split(/,/, $candidatesFiles);
 
@@ -532,7 +535,7 @@ sub parseCandidateGenes {
 	my $causal = $sample2causalR->{$sample};
 	(defined $knownCandidateGenes{$patho}) || ($knownCandidateGenes{$patho} = {});
 	# $causal could/should be in candidatesFiles
-	($knownCandidateGenes{$patho}->{$causal}) ||
+	($knownCandidateGenes{$patho}->{$causal}) || (! $verbose) ||
 	    warn "I in $subName: gene $causal is marked causal of $patho for $sample, you may want to add it to a candidateGenes file\n";
 	# in any case set score to 5
 	$knownCandidateGenes{$patho}->{$causal} = 5;

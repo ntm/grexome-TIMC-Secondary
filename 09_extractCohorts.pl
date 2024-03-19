@@ -182,10 +182,10 @@ my %knownCandidateGenes;
     # a hashref whose keys are gene names and values are the "Confidence scores"
     my $knownCandsR;
     if ($pathologies) {
-	$knownCandsR = &parseCandidateGenes($candidatesFiles, $samplesFile, $pathologies);
+	$knownCandsR = &parseCandidateGenes($candidatesFiles, $samplesFile, 0, $pathologies);
     }
     else {
-	$knownCandsR = &parseCandidateGenes($candidatesFiles, $samplesFile);
+	$knownCandsR = &parseCandidateGenes($candidatesFiles, $samplesFile, 0);
     }
 
     foreach my $c (sort keys(%$knownCandsR)) {

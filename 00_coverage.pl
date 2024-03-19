@@ -91,7 +91,7 @@ my %candidateGenes = ();
 # $knownCandidateGenesR: hashref, key==$cohort, value is a hashref whose keys 
 # are gene names and values are the "Confidence score" from a $candidatesFile,
 # or 5 if the gene is "Causal" for a $cohort patient in $samplesFile.
-my $knownCandidateGenesR = &parseCandidateGenes($candidatesFiles, $samplesFile);
+my $knownCandidateGenesR = &parseCandidateGenes($candidatesFiles, $samplesFile, 0);
 foreach my $patho (keys(%$knownCandidateGenesR)) {
     foreach my $gene (keys(%{$knownCandidateGenesR->{$patho}})) {
 	$candidateGenes{$gene} = 1;

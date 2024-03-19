@@ -209,18 +209,18 @@ my $now = strftime("%F %T", localtime);
 warn "I $now: $0 - starting to run\n";
 
 # sanity-check all provided metadata files: just parse and ignore the results,
-# we'll die if anything is wrong 
+# we'll die if anything is wrong, but call parseCandidates in verbose mode
 if ($pathologies) {
     &parsePathologies($pathologies);
     &parseSamples($samples, $pathologies);
     if ($candidateGenes) {
-	&parseCandidateGenes($candidateGenes, $samples, $pathologies);
+	&parseCandidateGenes($candidateGenes, $samples, 1, $pathologies);
     }
 }
 else {
     &parseSamples($samples);
     if ($candidateGenes) {
-	&parseCandidateGenes($candidateGenes, $samples);
+	&parseCandidateGenes($candidateGenes, $samples, 1);
     }
 }
 

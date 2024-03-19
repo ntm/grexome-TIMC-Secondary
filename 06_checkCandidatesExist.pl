@@ -88,7 +88,7 @@ my %knownCandidateGenes;
 {
     # $parseCandidateGenes actually returns a hashref, key==$cohort, value is
     # a hashref whose keys are gene names and values are the "Confidence scores"
-    my $knownCandsR = &parseCandidateGenes($candidatesFiles, $samplesFile);
+    my $knownCandsR = &parseCandidateGenes($candidatesFiles, $samplesFile, 0);
 
     foreach my $c (sort keys(%$knownCandsR)) {
 	foreach my $gene (keys(%{$knownCandsR->{$c}})) {
