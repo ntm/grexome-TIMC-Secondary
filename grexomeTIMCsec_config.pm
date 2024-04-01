@@ -166,11 +166,11 @@ sub gtexFavoriteTissues {
 # value==pathology (must match the pathologyID column of the pathologies metadata xlsx).
 sub subCohorts {
     # if you  don't have subCohorts, just return the empty hash, ie:
-    # my %subCohorts = ();
-    my %subCohorts = ("/home/nthierry/VariantCalling/GrexomeZoufris/Grexome_Metadata/4-SubCohorts/subCohort_FV.txt" => "NOA",
-		      "/home/nthierry/VariantCalling/GrexomeZoufris/Grexome_Metadata/4-SubCohorts/subCohort_London.txt" => "NOA",
-		      "/home/nthierry/VariantCalling/GrexomeZoufris/Grexome_Metadata/4-SubCohorts/subCohort_AzooZouari.txt" => "NOA",
-		      "/home/nthierry/VariantCalling/GrexomeZoufris/Grexome_Metadata/4-SubCohorts/subCohort_SB.txt" => "NOA");
+    my %subCohorts = ();
+    # my %subCohorts = ("/home/nthierry/GrexomeZoufris/WES/SubCohorts//subCohort_FV.txt" => "NOA",
+    # 		      "/home/nthierry/GrexomeZoufris/WES/SubCohorts/subCohort_London.txt" => "NOA",
+    # 		      "/home/nthierry/GrexomeZoufris/WES/SubCohorts/subCohort_AzooZouari.txt" => "NOA",
+    # 		      "/home/nthierry/GrexomeZoufris/WES/SubCohorts/subCohort_SB.txt" => "NOA");
     return(\%subCohorts);
 }
 
