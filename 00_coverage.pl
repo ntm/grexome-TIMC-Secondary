@@ -192,10 +192,10 @@ while (my $line = <GENES>) {
     my @bases0Gene = (0) x scalar(@samples);
 
     foreach my $i (0..$#starts) {
-	# ignore 5'-UTR
+	# ignore 5'-UTR (if + strand) / 3'-UTR (if - strand)
 	($ends[$i] < $cdsStart) && next;
 	($starts[$i] < $cdsStart) && ($starts[$i] = $cdsStart);
-	# ignore 3'-UTR
+	# ignore 3'-UTR on + strand / 5'-UTR on - strand
 	($starts[$i] > $cdsEnd) && next;
 	($ends[$i] > $cdsEnd) && ($ends[$i] = $cdsEnd);
 
@@ -209,7 +209,12 @@ while (my $line = <GENES>) {
 	}
 	$toPrint .= "$transcript\t";
 	# for Exon use eg 3\12 (so excel doesn't corrupt my file)
-	$toPrint .= $i+1;
+	if ($strand eq '+') {
+	    $toPrint .= $i+1;
+	}
+	else {
+	    $toPrint .= $numExons - $i;
+	}
 	$toPrint .= "\\$numExons\t";
 	# end-start+1 is the exon length, add 10 bases on each side
 	my $lengthExon = $ends[$i] - $starts[$i] + 21;
