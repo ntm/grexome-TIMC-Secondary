@@ -1,7 +1,7 @@
 
 
 ############################################################################################
-# Copyright (C) Nicolas Thierry-Mieg, 2019-2022
+# Copyright (C) Nicolas Thierry-Mieg, 2019-2024
 #
 # This file is part of grexome-TIMC-Secondary, written by Nicolas Thierry-Mieg
 # (CNRS, France) Nicolas.Thierry-Mieg@univ-grenoble-alpes.fr
