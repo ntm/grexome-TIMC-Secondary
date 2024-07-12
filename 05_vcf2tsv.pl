@@ -71,7 +71,7 @@ warn "I $now: $0 - starting to run\n";
 # Some of these are hard-coded in the "missense" and "splice"
 # upgrade-to-MODHIGH code, make sure they get fixed there as
 # well if they change names.
-# Current available annotations produced by runVEP.pl (26/01/2024) are:
+# Current available annotations produced by runVEP.pl (12/07/2024) are:
 # Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|EXON|INTRON|
 # HGVSc|HGVSp|cDNA_position|CDS_position|Protein_position|Amino_acids|Codons|
 # Existing_variation|ALLELE_NUM|DISTANCE|STRAND|FLAGS|VARIANT_CLASS|SYMBOL_SOURCE|
@@ -81,8 +81,9 @@ warn "I $now: $0 - starting to run\n";
 # gnomADg_AF|gnomADg_AFR_AF|gnomADg_AMI_AF|gnomADg_AMR_AF|gnomADg_ASJ_AF|gnomADg_EAS_AF|
 # gnomADg_FIN_AF|gnomADg_MID_AF|gnomADg_NFE_AF|gnomADg_OTH_AF|gnomADg_SAS_AF|
 # CLIN_SIG|SOMATIC|PHENO|
-# CADD_PHRED|CADD_RAW|CADD_raw_rankscore|MetaRNN_pred|MetaRNN_rankscore|MutationTaster_pred|
-# REVEL_rankscore|ada_score|rf_score|
+# CADD_PHRED|CADD_RAW|ALFA_Total_AF|
+# CADD_raw_rankscore|MetaRNN_pred|MetaRNN_rankscore|MutationTaster_pred|REVEL_rankscore|
+# ada_score|rf_score|
 # SpliceAI_pred_DP_AG|SpliceAI_pred_DP_AL|SpliceAI_pred_DP_DG|SpliceAI_pred_DP_DL|SpliceAI_pred_DS_AG|
 # SpliceAI_pred_DS_AL|SpliceAI_pred_DS_DG|SpliceAI_pred_DS_DL|SpliceAI_pred_SYMBOL|
 # am_class|am_pathogenicity
