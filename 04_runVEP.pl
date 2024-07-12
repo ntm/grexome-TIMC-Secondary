@@ -356,6 +356,8 @@ sub vepCommand {
     my $dbNsfpFields = "MutationTaster_pred,REVEL_rankscore,CADD_raw_rankscore";
     # MetaRNN: both MetaRNN_rankscore and MetaRNN_pred: T(olerated) or D(amaging)
     $dbNsfpFields .= ",MetaRNN_rankscore,MetaRNN_pred";
+    # pLI: could be useful for dominant variants, most recent in dbNSFP seems to be gnomAD_pLI
+    $dbNsfpFields .= ",gnomAD_pLI";
     $vepPlugins .= " --plugin dbNSFP,$dbNsfpPath/dbNSFP4.8a.gz,transcript_match=1,$dbNsfpFields";
     # dbscSNV (splicing), data is with dbNSFP (same authors), specify 
     # assembly GRCh38 as second param because the plugin can't figure it out
