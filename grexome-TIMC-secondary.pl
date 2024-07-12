@@ -292,6 +292,9 @@ if ($cnvs) {
 	$com = "cat $outDir/step2.out ";
     }
 }
+else {
+    warn "I $0: CNVs not provided, step02-collateVCFs skipped\n";
+}
 
 # step 3
 $com .= " | perl $RealBin/03_sampleData2genotypes.pl ";
