@@ -347,7 +347,7 @@ sub vepCommand {
     # splice site variants, but not for deeper intronic variants
     my $caddPath = "$dataDir/CADD/";
     (-d $caddPath) || die "E $0: CADD datadir doesn't exist: $caddPath\n";
-    $vepPlugins .= " --plugin CADD,$caddPath/whole_genome_SNVs.tsv.gz,$caddPath/gnomad.genomes.r3.0.indel.tsv.gz";
+    $vepPlugins .= " --plugin CADD,$caddPath/whole_genome_SNVs.tsv.gz,$caddPath/gnomad.genomes.r4.0.indel.tsv.gz";
     # dbNSFP
     my $dbNsfpPath = "$dataDir/dbNSFP/";
     (-d $dbNsfpPath) || die "E $0: dbNSFP datadir doesn't exist: $dbNsfpPath\n";
@@ -356,7 +356,7 @@ sub vepCommand {
     my $dbNsfpFields = "MutationTaster_pred,REVEL_rankscore,CADD_raw_rankscore";
     # MetaRNN: both MetaRNN_rankscore and MetaRNN_pred: T(olerated) or D(amaging)
     $dbNsfpFields .= ",MetaRNN_rankscore,MetaRNN_pred";
-    $vepPlugins .= " --plugin dbNSFP,$dbNsfpPath/dbNSFP4.3a.gz,transcript_match=1,$dbNsfpFields";
+    $vepPlugins .= " --plugin dbNSFP,$dbNsfpPath/dbNSFP4.8a.gz,transcript_match=1,$dbNsfpFields";
     # dbscSNV (splicing), data is with dbNSFP (same authors), specify 
     # assembly GRCh38 as second param because the plugin can't figure it out
     $vepPlugins .= " --plugin dbscSNV,$dbNsfpPath/dbscSNV1.1_GRCh38.txt.gz,GRCh38";
