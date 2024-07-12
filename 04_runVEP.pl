@@ -100,8 +100,8 @@ Arguments (all can be abbreviated to shortest unambiguous prefixes):
 		"dataDir=s" => \$dataDir,
 		"tmpDir=s" => \$tmpDir,
 		"debug" => \$debug,
-		"vep" => \$vepBin,
-		"jobs" => \$vepJobs,
+		"vep=s" => \$vepBin,
+		"jobs=i" => \$vepJobs,
 		"help" => \$help)
 	or die("E $0: Error in command line arguments\n$USAGE\n");
 
