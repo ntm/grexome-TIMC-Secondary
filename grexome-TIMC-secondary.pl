@@ -52,11 +52,12 @@ $0 = basename($0);
 ## hard-coded stuff that shouldn't change much
 
 # number of parallel jobs to run for the initial "bgzip -d",
-# and then for steps 1 and 9.
+# and then for steps 1, 4 and 9.
 # These defaults are good for us (dual Xeon 4114) but tweaking
 # could improve performance depending on your hardware.
 my $numJobsGunzip = 6;
 my $numJobs1 = 20;
+my $numJobs4 = 20;
 my $numJobs9 = 16;
 
 # name (+path if needed) of bash binary, needed for -o pipefail
@@ -306,7 +307,7 @@ if ($debug) {
 
 # step 4
 $com .= " | perl $RealBin/04_runVEP.pl --cacheFile=".&vepCacheFile()." --genome=".&refGenome().
-    " --dataDir=".&vepPluginDataPath()." --tmpDir=$tmpdir/runVepTmpDir/ ";
+    " --dataDir=".&vepPluginDataPath()." --tmpDir=$tmpdir/runVepTmpDir/ --jobs=$numJobs4";
 ($debugVep) && ($com .= "--debug ");
 if ($debug) {
     $com .= "2> $outDir/step4.err > $outDir/step4.out";
