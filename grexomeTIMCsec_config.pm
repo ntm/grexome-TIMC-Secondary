@@ -57,7 +57,7 @@ our @EXPORT_OK = qw(refGenome vepCacheFile vepPluginDataPath fastTmpPath
 sub refGenome {
     # return the first file that exists, so this works on all our servers
     foreach my $genome ("/home/nthierry/HumanGenome/hs38DH.fa",
-			"/data/HumanGenome/hs38DH.fa") {
+			"/home/nthierry/DATA/HumanGenome/hs38DH.fa") {
 	(-f $genome) && return($genome);
     }
     # if we get here no file was found...
@@ -76,8 +76,8 @@ sub refGenome {
 sub vepCacheFile {
     # you'll need to customize the array of possible values for $cachedir,
     # we use the first dir that exists (works on all our servers)
-    foreach my $cachedir ("/data/nthierry/PierreRay/RunSecondaryAnalyses/",
-			  "/home/nthierry/sshMounts/luxor/data/nthierry/PierreRay/RunSecondaryAnalyses/") {
+    foreach my $cachedir ("/home/nthierry/PierreRay_DATA/RunSecondaryAnalyses/",
+			  "/home/nthierry/sshMounts/mordor/PierreRay_DATA/RunSecondaryAnalyses/") {
 	if (-d $cachedir) {
 	    # the name of the file itself, can probably stay as-is
 	    my $cacheFile = "VEP_cache";
@@ -96,7 +96,7 @@ sub vepCacheFile {
 # the VEP plugins we use (seach for "plugin" in 04_runVEP.pl).
 sub vepPluginDataPath {
     # return first existing subdir
-    foreach my $dir ("/data/nthierry/", "/data/") {
+    foreach my $dir ("/home/nthierry/DATA/") {
 	(-d $dir) && return($dir);
     }
     # no dir found
@@ -125,7 +125,7 @@ sub fastTmpPath {
 # statistics to each sample's header line.
 sub coveragePath {
     # specify $covDir="" to disable this feature
-    my $covDir = "/data/nthierry/PierreRay/CoverageResults/Coverage_Rolling/";
+    my $covDir = "/home/nthierry/PierreRay_DATA/CoverageResults/Coverage_Rolling/";
     if (($covDir eq "") || (-d $covDir)) {
 	return($covDir);
     }
@@ -150,7 +150,7 @@ sub gtexDatafile {
     # actual file name should only change when we update our GTEX data
     my $gtex = "$secPath/GTEX_Data/E-MTAB-5214-query-results.tpms.tsv";
     (-f $gtex) && return($gtex);
-    die "E: no gtexDatafile found! unexpected since it should be part of the git repo...";
+    die "E: no gtexDatafile found. Please download the GTEx file, see $secPath/GTEX_Data/README";
 }
 
 # Return a comma-separated list of favorite tissues, these must match
