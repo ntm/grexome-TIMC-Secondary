@@ -98,7 +98,7 @@ my @goodVeps = ("SYMBOL","Gene","IMPACT","Consequence","Feature","CANONICAL",
 		"SpliceAI_pred_DS_AG","SpliceAI_pred_DP_AG","SpliceAI_pred_DS_AL",
 		"SpliceAI_pred_DP_AL","SpliceAI_pred_DS_DG","SpliceAI_pred_DP_DG",
 		"SpliceAI_pred_DS_DL","SpliceAI_pred_DP_DL",
-		"gnomADe_AF","gnomADg_AF","AF",
+		"gnomADe_AF","gnomADg_AF","AF","ALFA_Total_AC","ALFA_Total_AN","ALFA_Total_AF",
 		"Existing_variation");
 
 # VCF headers: ignore them but grab the:

@@ -54,6 +54,7 @@ my $canon = ''; # if enabled, only keep lines with CANONICAL==YES
 
 my $max_af_gnomad; # gnomADe_AF <= $x AND gnomADg_AF <= $x (if available)
 my $max_af_1kg; # AF <= $x, this is 1KG phase 3
+my $max_af_alfa; # ALFA_Total_AF <= $x
 
 # if true, print timestamped start-done log messages to stderr
 my $logTime = '';
@@ -69,6 +70,7 @@ GetOptions ("max_ctrl_hv=i" => \$max_ctrl_hv,
 	    "canonical" => \$canon,
 	    "max_af_gnomad=f" => \$max_af_gnomad,
 	    "max_af_1kg=f" => \$max_af_1kg,
+	    "max_af_alfa=f" => \$max_af_alfa,
 	    "logtime" => \$logTime)
     or die("E $0: Error in command line arguments\n");
 
@@ -90,6 +92,7 @@ my $filterString = "";
 ($canon) && ($filterString .= "canonical ");
 ($max_af_gnomad) && ($filterString .= "max_af_gnomad=$max_af_gnomad ");
 ($max_af_1kg) && ($filterString .= "max_af_1kg=$max_af_1kg ");
+($max_af_alfa) && ($filterString .= "max_af_alfa=$max_af_alfa ");
 # remove trailing space and add leading tab if any filters are applied
 if ($filterString) {
     $filterString = "\t$filterString";
@@ -170,7 +173,7 @@ while(my $line = <STDIN>) {
 	# only filter if all values are high
 	my $keep = 0;
 	foreach my $gnomad (split(/&/, $fields[$title2index{"gnomADe_AF"}])) {
-	    ($gnomad <= $max_af_gnomad) && ($keep = 1);
+	    ($gnomad <= $max_af_gnomad) && ($keep = 1) && last;
 	}
 	($keep) || next;
     }
@@ -179,7 +182,7 @@ while(my $line = <STDIN>) {
 	# only filter if all values are high
 	my $keep = 0;
 	foreach my $gnomad (split(/&/, $fields[$title2index{"gnomADg_AF"}])) {
-	    ($gnomad <= $max_af_gnomad) && ($keep = 1);
+	    ($gnomad <= $max_af_gnomad) && ($keep = 1) && last;
 	}
 	($keep) || next;
     }
@@ -190,7 +193,15 @@ while(my $line = <STDIN>) {
 	    # VEP 104 sometimes returns aberrant large values for 1KG AFs,
 	    # if AF > 50% ignore it - see:
 	    # https://github.com/Ensembl/ensembl-vep/issues/1042
-	    (($af <= $max_af_1kg) || ($af >= 0.5)) && ($keep = 1);
+	    (($af <= $max_af_1kg) || ($af >= 0.5)) && ($keep = 1) && last;
+	}
+	($keep) || next;
+    }
+    if ((defined $max_af_alfa) && ($fields[$title2index{"ALFA_Total_AF"}])) {
+	#again several &-separated values
+	my $keep = 0;
+	foreach my $af (split(/&/, $fields[$title2index{"ALFA_Total_AF"}])) {
+	    ($af <= $max_af_alfa) && ($keep = 1) && last;
 	}
 	($keep) || next;
     }
