@@ -358,9 +358,9 @@ sub vepCommand {
     $dbNsfpFields .= ",MetaRNN_rankscore,MetaRNN_pred";
     # pLI: could be useful for dominant variants, most recent in dbNSFP seems to be gnomAD_pLI
     $dbNsfpFields .= ",gnomAD_pLI";
-    # ALFA minor allele counts & frequencies: grab from dbNSFP, it's not in VEP cache despite
+    # ALFA minor allele freq: grab from dbNSFP, it's not in VEP cache despite
     # https://github.com/Ensembl/ensembl-vep/issues/1043
-    $dbNsfpFields .= ",ALFA_Total_AC,ALFA_Total_AN,ALFA_Total_AF";
+    $dbNsfpFields .= ",ALFA_Total_AF";
     $vepPlugins .= " --plugin dbNSFP,$dbNsfpPath/dbNSFP4.8a.gz,transcript_match=1,$dbNsfpFields";
     # dbscSNV (splicing), data is with dbNSFP (same authors), specify 
     # assembly GRCh38 as second param because the plugin can't figure it out
