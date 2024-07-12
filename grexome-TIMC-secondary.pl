@@ -55,7 +55,7 @@ $0 = basename($0);
 # and then for steps 1, 4 and 9.
 # These defaults are good for us (dual Xeon 4114) but tweaking
 # could improve performance depending on your hardware.
-my $numJobsGunzip = 6;
+my $numJobsGunzip = 8;
 my $numJobs1 = 20;
 my $numJobs4 = 20;
 my $numJobs9 = 16;
