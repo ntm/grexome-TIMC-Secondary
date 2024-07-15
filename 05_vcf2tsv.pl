@@ -215,7 +215,7 @@ while (my $line =<STDIN>) {
 	    # - MutationTaster_pred -> contains at least one A or D
 	    # - REVEL_rankscore >= 0.7
 	    # - MetaRNN_pred -> contains at least one D(amaging)
-	    # - AlphaMissense class -> 'Likely pathogenic'
+	    # - AlphaMissense class -> 'likely_pathogenic'
 	    # 
 	    # NOTE: sometimes we don't have any prediction for some predictors,
 	    # due to dbNSFP using older transcripts and/or bugs in VEP or VEP plugins...
@@ -251,7 +251,7 @@ while (my $line =<STDIN>) {
 	    }
 	    if ($thisCsq{"am_class"}) {
 		$totalPreds++;
-		($thisCsq{"am_class"} =~ /Likely pathogenic/) && ($passed++);
+		($thisCsq{"am_class"} =~ /likely_pathogenic/) && ($passed++);
 	    }
 
 	    # require at least 2 predictors
