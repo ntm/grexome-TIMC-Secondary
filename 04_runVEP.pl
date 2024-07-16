@@ -60,9 +60,12 @@ $0 = basename($0);
     # our VEP cachefile, with path
     my $cacheFile;
 
-    # human genome fasta, filename with path, for VEP --hgvs
+    # genome fasta, filename with path, for VEP --hgvs
     my $genome;
 
+    # species for VEP --species
+    my $species = "homo_sapiens";
+    
     # dir containing subdirs with the data required by the VEP plugins 
     # we use (eg dbNSFP/)
     my $dataDir;
@@ -88,6 +91,7 @@ $0 = basename($0);
 Arguments (all can be abbreviated to shortest unambiguous prefixes):
 --cacheFile string : filename with path where this script stores its cachefile
 --genome string : ref genome fasta, with path
+--species string [default $species]: species, as expected by VEP (eg mus_musculus)
 --dataDir string : dir containing subdirs with the data required by the VEP plugins we use (eg dbNSFP)
 --tmpDir string : tmp dir, must not pre-exist, will be removed after running
 --debug : don't use the cacheFile, just report discrepancies between it and VEP
@@ -97,6 +101,7 @@ Arguments (all can be abbreviated to shortest unambiguous prefixes):
 
     GetOptions ("cacheFile=s" => \$cacheFile,
 		"genome=s" => \$genome,
+		"species=s" => \$species,
 		"dataDir=s" => \$dataDir,
 		"tmpDir=s" => \$tmpDir,
 		"debug" => \$debug,
@@ -152,7 +157,7 @@ Arguments (all can be abbreviated to shortest unambiguous prefixes):
     my $vepStats = "$tmpDir/vepStats.html";
 
     # construct full VEP command-line
-    my $vepCommand = &vepCommand($vepBin, $dataDir, $genome, $vepJobs, $vepStats);
+    my $vepCommand = &vepCommand($vepBin, $dataDir, $genome, $species, $vepJobs, $vepStats);
 
     # read $cacheFile if provided
     # $cache is a hashref. key=="chr:pos:ref:alt" (for SNVs/indels) or 
@@ -302,21 +307,22 @@ Arguments (all can be abbreviated to shortest unambiguous prefixes):
 #######################
 # construct and return the full VEP command-line
 sub vepCommand {
-    (@_ == 5) || die "E $0: vepCommand needs 5 args";
-    my ($vepBin, $dataDir, $genome, $vepJobs, $vepStats) = @_;
+    (@_ == 6) || die "E $0: vepCommand needs 6 args";
+    my ($vepBin, $dataDir, $genome, $species, $vepJobs, $vepStats) = @_;
 
     # --no_stats results in buggy VEP output (VEP git issue 1034), so we produce
     # stats in $vepStats and the caller must remove the file when done
 
     # VEP command, reading on stdin and printing to stdout
     my $vepCommand = $vepBin;
-    $vepCommand .= " --offline --format vcf --vcf" ;
+    $vepCommand .= " --offline --format vcf --vcf";
     # cache to use: refseq, merged, or ensembl (default)
-    # $vepCommand .= " --merged" ;
+    # $vepCommand .= " --merged";
+    $vepCommand .= " --species $species";
     $vepCommand .= " --force_overwrite";
     $vepCommand .= " --stats_file $vepStats";
     $vepCommand .= " --allele_number"; # for knowing which CSQ annotates which ALT
-    $vepCommand .= " --canonical --biotype --xref_refseq --symbol --mane";
+    $vepCommand .= " --canonical --biotype --xref_refseq --symbol";
     $vepCommand .= " --numbers --total_length  --variant_class";
     # report where the variant lies in the miRNA secondary structure
     $vepCommand .= " --mirna";
@@ -325,69 +331,123 @@ sub vepCommand {
     # right-align indels before consequence calculation, see:
     # https://www.ensembl.org/info/docs/tools/vep/script/vep_other.html#shifting
     $vepCommand .= " --shift_3prime 1";
-    $vepCommand .= " --sift b --polyphen b";
-    # --af is 1KG-phase3 global AF, --af_1kg is per continent AFs
-    $vepCommand .= " --af --af_1kg --af_gnomade --af_gnomadg";
-    $vepCommand .= " --check_existing";
-    # Don't URI escape HGVS strings
-    $vepCommand .= " --no_escape";
     # commenting out "--domains", it's a bit massive and in non-deterministic order
     # and we don't curently look at it
     # also removing --pubmed, don't think anyone looks at that either
     # I also tried out --regulatory but it's not really usable IMO, eg we obtain
     # ENSR and ENSM features but we can't know the target genes...
     ## other possibilities to consider: --tsl --appris 
-    $vepCommand .= " --fasta $genome --hgvs";
 
-    # plugins:
-    # full --plugin string with all VEP plugins we want to use and
-    # associated datafiles (with paths)
-    my $vepPlugins = "";
-    # CADD - dbNSFP provides it (among many other things) for coding and consensus
-    # splice site variants, but not for deeper intronic variants
-    my $caddPath = "$dataDir/CADD/";
-    (-d $caddPath) || die "E $0: CADD datadir doesn't exist: $caddPath\n";
-    $vepPlugins .= " --plugin CADD,$caddPath/whole_genome_SNVs.tsv.gz,$caddPath/gnomad.genomes.r4.0.indel.tsv.gz";
-    # dbNSFP
-    my $dbNsfpPath = "$dataDir/dbNSFP/";
-    (-d $dbNsfpPath) || die "E $0: dbNSFP datadir doesn't exist: $dbNsfpPath\n";
-    # comma-separated list of fields to retrieve from dbNSFP, there are MANY
-    # possibilities, check the README in $dbNsfpPath
-    my $dbNsfpFields = "MutationTaster_pred,REVEL_rankscore,CADD_raw_rankscore";
-    # MetaRNN: both MetaRNN_rankscore and MetaRNN_pred: T(olerated) or D(amaging)
-    $dbNsfpFields .= ",MetaRNN_rankscore,MetaRNN_pred";
-    # ALFA minor allele freq: grab from dbNSFP, it's not in VEP cache despite
-    # https://github.com/Ensembl/ensembl-vep/issues/1043
-    $dbNsfpFields .= ",ALFA_Total_AF";
-    $vepPlugins .= " --plugin dbNSFP,$dbNsfpPath/dbNSFP4.8a.gz,transcript_match=1,$dbNsfpFields";
-    # dbscSNV (splicing), data is with dbNSFP (same authors), specify 
-    # assembly GRCh38 as second param because the plugin can't figure it out
-    $vepPlugins .= " --plugin dbscSNV,$dbNsfpPath/dbscSNV1.1_GRCh38.txt.gz,GRCh38";
+    if (($species eq 'homo_sapiens') || ($species eq 'human')) {
+	# human-only options
+	$vepCommand .= " --mane --sift b --polyphen b";
+	# --af is 1KG-phase3 global AF, --af_1kg is per continent AFs
+	$vepCommand .= " --af --af_1kg --af_gnomade --af_gnomadg";
+	$vepCommand .= " --check_existing";
+	# Don't URI escape HGVS strings
+	$vepCommand .= " --no_escape";
+	$vepCommand .= " --fasta $genome --hgvs";
 
-    # spliceAI - I installed the plugin but it also needs data, to DL that data you
-    # have to create an account, provide your email and personal details... see:
-    # https://github.com/Ensembl/VEP_plugins/blob/release/105/SpliceAI.pm
-    my $spliceAIPath = "$dataDir/SpliceAI/";
-    $vepPlugins .= " --plugin SpliceAI,".
-	"snv=$spliceAIPath/spliceai_scores.raw.snv.hg38.vcf.gz,".
-	"indel=$spliceAIPath/spliceai_scores.raw.indel.hg38.vcf.gz";
+	# plugins: all are human-only
+	# full --plugin string with all VEP plugins we want to use and
+	# associated datafiles (with paths)
+	my $vepPlugins = "";
+	
+	# CADD - dbNSFP provides it (among many other things) for coding and consensus
+	# splice site variants, but not for deeper intronic variants
+	my $caddPath = "$dataDir/CADD/";
+	if (-d $caddPath) {
+	    my $caddSnvs = "$caddPath/whole_genome_SNVs.tsv.gz";
+	    my $caddIndels = "$caddPath/gnomad.genomes.r4.0.indel.tsv.gz";
+	    if (-f $caddSnvs) {
+		if (-f $caddIndels) {
+		    $vepPlugins .= " --plugin CADD,$caddSnvs,$caddIndels";
+		}
+		else {
+		    warn "W: $0 - not using CADD plugin: cannot find CADD indels file, looking for $caddIndels\n";
+		}
+	    }
+	    else {
+		warn "W: $0 - not using CADD plugin: cannot find CADD SNVs file, looking for $caddSnvs\n";
+	    }
+	}
+	else {
+	    warn "W $0 - not using CADD plugin: CADD datadir doesn't exist, looking for $caddPath\n";
+	}
+	
+	# dbNSFP and dbscSNV
+	my $dbNsfpPath = "$dataDir/dbNSFP/";
+	if (-d $dbNsfpPath) {
+	    my $dbNsfpFile = "$dbNsfpPath/dbNSFP4.8a.gz";
+	    if (-f $dbNsfpFile) {
+		# comma-separated list of fields to retrieve from dbNSFP, there are MANY
+		# possibilities, check the README in $dbNsfpPath
+		my $dbNsfpFields = "MutationTaster_pred,REVEL_rankscore,CADD_raw_rankscore";
+		# MetaRNN: both MetaRNN_rankscore and MetaRNN_pred: T(olerated) or D(amaging)
+		$dbNsfpFields .= ",MetaRNN_rankscore,MetaRNN_pred";
+		# ALFA minor allele freq: grab from dbNSFP, it's not in VEP cache despite
+		# https://github.com/Ensembl/ensembl-vep/issues/1043
+		$dbNsfpFields .= ",ALFA_Total_AF";
+		$vepPlugins .= " --plugin dbNSFP,$dbNsfpFile,transcript_match=1,$dbNsfpFields";
+	    }
+	    else {
+		warn "W: $0 - not using dbNSFP plugin: cannot find dbNSFP file, looking for $dbNsfpFile\n";
+	    }
 
-    # AlphaMissense, data file must be DL'd as $alphaMSfile and tabix-indexed, see:
-    # https://github.com/Ensembl/VEP_plugins/blob/release/111/AlphaMissense.pm
-    my $alphaMSfile = "$dataDir/AlphaMissense/AlphaMissense_hg38.tsv.gz";
-    if (-f $alphaMSfile) {
-	$vepPlugins .= " --plugin AlphaMissense,file=$alphaMSfile";
+	    # dbscSNV (splicing), data is with dbNSFP (same authors)
+	    my $dbscSNVfile = "$dbNsfpPath/dbscSNV1.1_GRCh38.txt.gz";
+	    if (-f $dbscSNVfile) {
+		# specify assembly GRCh38 as second param because the plugin can't figure it out
+		$vepPlugins .= " --plugin dbscSNV,$dbscSNVfile,GRCh38";
+	    }
+	    else {
+		warn "W: $0 - not using dbscSNV plugin: cannot find dbscSNV file, looking for $dbscSNVfile\n";
+	    }
+	}
+	else {
+	    warn "W $0 - not using dbNSFP and dbscSNV plugins: datadir doesn't exist, looking for $dbNsfpPath\n";
+	}
+
+	# spliceAI - data must be DL'd, for that you have to create an account, provide your email
+	# and personal details... see eg:
+	# https://github.com/Ensembl/VEP_plugins/blob/release/112/SpliceAI.pm
+	my $spliceAIPath = "$dataDir/SpliceAI/";
+	if (-d $spliceAIPath) {
+	    my $spliceAISnvs = "$spliceAIPath/spliceai_scores.raw.snv.hg38.vcf.gz";
+	    my $spliceAIIndels = "$spliceAIPath/spliceai_scores.raw.indel.hg38.vcf.gz";
+	    if (-f $spliceAISnvs) {
+		if (-f $spliceAIIndels) {
+		    $vepPlugins .= " --plugin SpliceAI,snv=$spliceAISnvs,indel=$spliceAIIndels";
+		}
+		else {
+		    warn "W: $0 - not using spliceAI plugin: cannot find spliceAI indels file, looking for $spliceAIIndels\n";
+		}
+	    }
+	    else {
+		warn "W: $0 - not using spliceAI plugin: cannot find spliceAI SNVs file, looking for $spliceAISnvs\n";
+	    }
+	}
+	else {
+	    warn "W $0 - not using spliceAI plugin: spliceAI datadir doesn't exist, looking for $spliceAIPath\n";
+	}
+	
+	# AlphaMissense, data file must be DL'd as $alphaMSfile and tabix-indexed, see:
+	# https://github.com/Ensembl/VEP_plugins/blob/release/111/AlphaMissense.pm
+	my $alphaMSfile = "$dataDir/AlphaMissense/AlphaMissense_hg38.tsv.gz";
+	if (-f $alphaMSfile) {
+	    $vepPlugins .= " --plugin AlphaMissense,file=$alphaMSfile";
+	}
+	else {
+	    warn "W: $0 - not using AlphaMissense plugin:cannot find alphaMissense file, looking for $alphaMSfile\n";
+	}
+
+	$vepCommand .= $vepPlugins;
     }
-    else {
-	warn "W: $0 - AlphaMissense VEP plugin won't be used because file $alphaMSfile doesn't exist\n";
-    }
-
-    $vepCommand .= $vepPlugins;
 
     # --fork borks when $vepJobs==1
-    ($vepJobs > 1) && ($vepCommand .= " --fork $vepJobs") ;
+    ($vepJobs > 1) && ($vepCommand .= " --fork $vepJobs");
     # write output to stdout so we can pipe it to another program
-    $vepCommand .= " -o STDOUT" ;
+    $vepCommand .= " -o STDOUT";
 
     return($vepCommand);
 }
