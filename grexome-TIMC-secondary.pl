@@ -96,6 +96,9 @@ my $cnvs;
 # and copies of all provided metadata files.
 my $outDir;
 
+# species, for 04_runVEP.pl
+my $species = "homo_sapiens";
+
 # path+file of the config file holding all install-specific params,
 # defaults to the distribution-povided file that you can edit but
 # you can also copy it elsewhere and customize it, then use --config
@@ -129,6 +132,7 @@ Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --pathologies : [optional] pathologies metadata xlsx file, with path
 --candidateGenes : [optional] known candidate genes in xlsx files, comma-separated, with paths
 --infile : bgzipped multi-sample GVCF or VCF file to parse
+--species string [default $species]: species, as expected by VEP (eg mus_musculus)
 --cnvs : [optional] multi-sample VCF file containing CNV calls, possibly (b)gzipped, conventions are:
        	 ALT is <DEL> or <DUP>, INFO contains END=, FORMAT must start with GT:RR and contain BF
 --outdir : subdir where results will be created, must not pre-exist
@@ -142,6 +146,7 @@ GetOptions ("samples=s" => \$samples,
 	    "pathologies=s" => \$pathologies,
 	    "candidateGenes=s" => \$candidateGenes,
 	    "infile=s" => \$inFile,
+	    "species=s" => \$species,
 	    "cnvs=s" => \$cnvs,
 	    "outdir=s" => \$outDir,
 	    "config=s" => \$config,
@@ -160,6 +165,8 @@ GetOptions ("samples=s" => \$samples,
 ($inFile) || die "E $0: you must provide an input bgzipped (G)VCF file\n";
 (-f $inFile) || die "E $0: the supplied infile doesn't exist\n";
 ($inFile =~ /\.gz$/) || die "E $0: the supplied infile doesn't seem bgzipped\n";
+
+($species =~ /^\w+$/) || die "E $0: VEP species must be alphanumeric+underscores\n";
 
 if ($cnvs) {
     (-f $cnvs) || die "E $0: the supplied cnvs file doesn't exist\n";
@@ -307,7 +314,7 @@ if ($debug) {
 
 # step 4
 $com .= " | perl $RealBin/04_runVEP.pl --cacheFile=".&vepCacheFile()." --genome=".&refGenome().
-    " --dataDir=".&vepPluginDataPath()." --tmpDir=$tmpdir/runVepTmpDir/ --jobs=$numJobs4";
+    " --dataDir=".&vepPluginDataPath()." --tmpDir=$tmpdir/runVepTmpDir/ --species=$species --jobs=$numJobs4";
 ($debugVep) && ($com .= "--debug ");
 if ($debug) {
     $com .= "2> $outDir/step4.err > $outDir/step4.out";

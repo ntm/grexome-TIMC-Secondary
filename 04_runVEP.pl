@@ -130,6 +130,8 @@ Arguments (all can be abbreviated to shortest unambiguous prefixes):
     ($genome) || die "E $0: you must provide a ref genome fasta file\n";
     (-f $genome) || die "E $0: provided genome fasta file doesn't exist\n";
 
+    ($species =~ /^\w+$/) || die "E $0: VEP species must be alphanumeric+underscores\n";
+
     ($dataDir) || 
 	die "E $0: you must provide a dataDir containing the data required by the VEP plugins we use\n";
     (-d $dataDir) ||
