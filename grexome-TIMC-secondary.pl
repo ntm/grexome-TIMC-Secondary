@@ -301,7 +301,7 @@ if ($cnvs) {
     }
 }
 else {
-    warn "I $0: CNVs not provided, step02-collateVCFs skipped\n";
+    warn "I $0: CNVs not provided, step 02-collateVCFs skipped\n";
 }
 
 # step 3
