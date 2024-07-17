@@ -331,11 +331,12 @@ while (my $inFile = readdir(INDIR)) {
 	my $transcript = $fields[$transCol];
 	if (! $transcript2start{$transcript}) {
 	    # first time we see $transcript, fill chr, coord, start and gtex
-	    # for sorting we want just the chrom number, replace X Y M by 1023-1025
+	    # for sorting we want just the chrom number, replace X Y M/MT by 1023-1025
 	    if ($chr eq "X") { $transcript2chr{$transcript} = "1023" }
 	    elsif ($chr eq "Y") { $transcript2chr{$transcript} = "1024" }
-	    elsif ($chr eq "M") { $transcript2chr{$transcript} = "1025" }
-	    else { $transcript2chr{$transcript} = $chr }
+	    elsif (($chr eq "M") || ($chr eq "MT")) { $transcript2chr{$transcript} = "1025" }
+	    elsif ($chr =~ /^\d+$/) { $transcript2chr{$transcript} = $chr }
+	    else { die "E $0: found unexpected chromosome $chr\n";]
 	    $transcript2coord{$transcript} = $coord;
 
 	    my @start = ();
