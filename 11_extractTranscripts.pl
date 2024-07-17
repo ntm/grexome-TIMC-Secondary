@@ -336,7 +336,7 @@ while (my $inFile = readdir(INDIR)) {
 	    elsif ($chr eq "Y") { $transcript2chr{$transcript} = "1024" }
 	    elsif (($chr eq "M") || ($chr eq "MT")) { $transcript2chr{$transcript} = "1025" }
 	    elsif ($chr =~ /^\d+$/) { $transcript2chr{$transcript} = $chr }
-	    else { die "E $0: found unexpected chromosome $chr\n";]
+	    else { die "E $0: found unexpected chromosome $chr\n" }
 	    $transcript2coord{$transcript} = $coord;
 
 	    my @start = ();
