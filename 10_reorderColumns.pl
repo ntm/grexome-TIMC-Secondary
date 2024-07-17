@@ -23,7 +23,8 @@
 # 18/09/2019
 # NTM
 
-# Takes a single argument: a comma-separated list of favorite GTEX tissues.
+# Takes two arguments: $verbose (0 or 1), and a comma-separated list of favorite
+# GTEX tissues.
 # Parse on stdin a TSV file produced by extractCohorts.pl,
 # preferably filtered by filterVariants.pl.
 # Print to stdout a similar file but where the order of
@@ -40,9 +41,10 @@ use File::Basename qw(basename);
 # the program name, not the path
 $0 = basename($0);
 
-(@ARGV == 1) || 
-    die "E $0: need a single argument: a comma-separated list of GTEX tissues\n";
-my $favoriteTissues = $ARGV[0];
+(@ARGV == 2) || 
+    die "E $0: needs two arguments: a boolean (verbose), and a comma-separated list of GTEX tissues\n";
+my $verbose = $ARGV[0];
+my $favoriteTissues = $ARGV[1];
 # no sanity checking, these favorite tissues should have been passed to 08_addGTEX.pl 
 # earlier and therefore already checked
 
@@ -80,7 +82,7 @@ my @titles = split(/\t/, $header);
 	    push(@newOrderMissing, $n);
 	}
     }
-    if (@newOrderMissing) {
+    if ($verbose && (@newOrderMissing)) {
 	warn "W $0: the following newOrder fields are missing: " . join(' ', @newOrderMissing) . "\n";
 	warn "W $0: with non-human data missing fields are expected (eg fields from human-only plugins),\n";
 	warn "W $0: but with human data this suggests that the code needs to be updated (open a github issue)\n";

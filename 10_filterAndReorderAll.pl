@@ -123,13 +123,19 @@ my $childFailed = 0;
 # Set up a callback so the parent knows if a child dies
 $pm->run_on_finish( sub { ($_[1]) && ($childFailed=1) });
 
+# verbose only for the first inFile
+my $verbose = 1;
+
 while (my $inFile = readdir(INDIR)) {
     ($inFile =~ /^\./) && next;
     if ($childFailed) {
 	$now = strftime("%F %T", localtime);
 	die "E $now: $0 FAILED - some child died, no point going on\n";
     }
-    $pm->start && next;
+    if ($pm->start) {
+	$verbose = 0;
+	next;
+    }
     my ($fileStart,$gz);
     if ($inFile =~ (/^(.+)\.csv$/)) {
 	$fileStart = $1;
@@ -163,7 +169,7 @@ while (my $inFile = readdir(INDIR)) {
     }
 
     # reorder columns if requested
-    ($reorder) && ($com .= " | perl $reorderBin $favoriteTissues ");
+    ($reorder) && ($com .= " | perl $reorderBin $verbose $favoriteTissues ");
 
     $com .= " > $outDir/$outFile";
 
