@@ -26,8 +26,8 @@
 # Take as args:
 # - a GTEX file with full path, eg E-MTAB-5214-query-results.tpms.tsv
 #   from the GTEX_Data/ subdir;
-# - a list of "favorite tissues", at least one, these should be 
-#   tissue names as they appear in the header of $gtexFile.
+# - a list of "favorite tissues", at least one, these should be tissue names
+#   as they appear in the header of $gtexFile but with spaces replaced with underscores.
 # Read on stdin a TSV file as produced by vcf2tsv.pl, 
 # print to stdout a TSV file with added columns holding
 # GTEX TPM values taken from $gtexFile.
@@ -125,6 +125,7 @@ my @tissues = split(/\t/, $line);
 my @favTissIndex = (-1) x @favoriteTissues;
 # improve tissue name strings, for our header line
 foreach my $i (0..$#tissues) {
+    $tissues[$i] =~ s/ /_/g ;
     foreach my $fti (0..$#favoriteTissues) {
 	if ($tissues[$i] eq $favoriteTissues[$fti]) {
 	    ($favTissIndex[$fti] != -1) && die "E $0: found favorite tissue $tissues[$i] twice, WTF!\n";
@@ -132,7 +133,6 @@ foreach my $i (0..$#tissues) {
 	    last;
 	}
     }
-    $tissues[$i] =~ s/ /_/g ;
     $tissues[$i] = "GTEX_".$tissues[$i];
 }
 

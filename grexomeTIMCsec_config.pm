@@ -153,11 +153,13 @@ sub gtexDatafile {
     die "E: no gtexDatafile found. Please download the GTEx file, see $secPath/GTEX_Data/README";
 }
 
-# Return a comma-separated list of favorite tissues, these must match
-# column headers from the gtexDatafile
+# Return a comma-separated list of favorite tissues, these must match column
+# headers from the gtexDatafile except spaces must be replaced with underscores
 sub gtexFavoriteTissues {
     # default: working on infertility here...
     my $favoriteTissues = "testis,ovary";
+    ($favoriteTissues =~ /\s/) &&
+	die "E: gtexFavoriteTissues cannot contain whitespace, replace with underscores";
     return($favoriteTissues);
 }
 
