@@ -39,7 +39,8 @@
 #
 # Also, in an attempt to make use of VEP's --regulatory switch, variants
 # affecting TFBS's and/or severely affecting regulatory regions are upgraded
-# from MODIFIER to LOW or MODHIGH (look for "TF").
+# from MODIFIER to LOW or MODHIGH (look for "TF") [ACTUALLY NOT DOING THIS YET,
+# --regulatory is too noisy for now].
 #
 # Overall for CNVs, VEP currently can produce 4 different consequences,
 # but they are now (release 110, 16/10/2023) all HIGH.
@@ -129,15 +130,28 @@ while (my $line = <STDIN>) {
 (@vepNames) || 
     die "E $0: done parsing headers but vepNames still empty!\n" ;
 
-# sanity: make sure all my @goodVeps fields exist
+# With non-human data some @goodVeps don't exist, purge them out
 {
     my %vepNames;
     foreach my $v (@vepNames) {
 	$vepNames{$v} = 1;
     }
+    my @missingVeps = ();
+    my @vepsFound = ();
     foreach my $v (@goodVeps) {
-	((defined $vepNames{$v}) && ($vepNames{$v} == 1)) ||
-	    die "E $0: the VEP field $v doesn't seem to exist anymore, update goodVeps and maybe other things!\n";
+	if ($vepNames{$v}) {
+	    push(@vepsFound, $v);
+	}
+	else {
+	    push(@missingVeps, $v);
+	}
+    }
+    if (@missingVeps) {
+	warn "W $0: the following VEP fields are missing: " . join(' ', @missingVeps) . "\n";
+	warn "W $0: with non-human data missing fields are expected (eg fields from human-only plugins),\n";
+	warn "W $0: but with human data this suggests that the code needs to be updated (open a github issue),\n";
+	warn "W $0: or that your installation of VEP is outdated or missing some plugins / data\n";
+	@goodVeps = @vepsFound;
     }
 }
 
@@ -218,7 +232,8 @@ while (my $line =<STDIN>) {
 	    # - AlphaMissense class -> 'likely_pathogenic'
 	    # 
 	    # NOTE: sometimes we don't have any prediction for some predictors,
-	    # due to dbNSFP using older transcripts and/or bugs in VEP or VEP plugins...
+	    # e.g. for non-human data, or due to dbNSFP using older transcripts
+	    # and/or bugs in VEP or VEP plugins...
 	    # -> $minPassedFracMissense allows to still upgrade variants, but we also
 	    # require that at least 2 predictors are available
 	    my $minPassedFracMissense = 0.5;
@@ -275,7 +290,7 @@ while (my $line =<STDIN>) {
 	    # for CADD_PHRED, 20-30 seems reasonable
 	    my $cadd_cutoff = 20;
 
-	    # some variants don't have ada_score or rf_score -> use a frac
+	    # non-human data and some variants for human data don't have scores -> use a frac
 	    my $minPassedFracSplicing = 0.5;
 	    my $passed = 0;
 	    my $totalPreds = 0;

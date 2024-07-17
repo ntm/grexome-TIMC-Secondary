@@ -28,7 +28,7 @@
 # preferably filtered by filterVariants.pl.
 # Print to stdout a similar file but where the order of
 # columns has been changed:
-# - columns from @newOrder are printed first, in that order;
+# - columns from @newOrder (if present) are printed first, in that order;
 # - all other columns are printed in the order they are seen.
 
 
@@ -58,6 +58,35 @@ foreach my $favTissue (split(/,/, $favoriteTissues)) {
 # some additional tissues that we like to see early, hard-coded
 push(@newOrder, qw(GTEX_blood GTEX_cerebellar_hemisphere GTEX_liver GTEX_lung));
 
+# grab STDIN header
+my $header = <STDIN>;
+chomp($header);
+my @titles = split(/\t/, $header);
+
+# purge from @newOrder any fields that are missing (ignoring *COHORT* fields,
+# these will be transformed and checked later)
+{
+    my %titles;
+    foreach my $t (@titles) {
+	$titles{$t} = 1;
+    }
+    my @newOrderMissing = ();
+    my @newOrderFound = ();
+    foreach my $n (@newOrder) {
+	if (($titles{$n}) || ($n =~ /COHORT/)) {
+	    push(@newOrderFound, $n);
+	}
+	else {
+	    push(@newOrderMissing, $n);
+	}
+    }
+    if (@newOrderMissing) {
+	warn "W $0: the following newOrder fields are missing: " . join(' ', @newOrderMissing) . "\n";
+	warn "W $0: with non-human data missing fields are expected (eg fields from human-only plugins),\n";
+	warn "W $0: but with human data this suggests that the code needs to be updated (open a github issue)\n";
+	@newOrder = @newOrderFound;
+    }
+}
 
 # build hash of @newOrder headers, value is the new column index
 # for that header
@@ -73,9 +102,6 @@ my @old2new;
 # index where we want the next not-newOrder column to go
 my $nextNotNewOrder = scalar(@newOrder);
 
-my $header = <STDIN>;
-chomp($header);
-my @titles = split(/\t/, $header);
 foreach my $i (0..$#titles) {
     my $title = $titles[$i];
     if (($title =~ /^COUNT_(\w+)_OTHERCAUSE_/) || ($title =~ /^(\w+)_OTHERCAUSE_/)) {
