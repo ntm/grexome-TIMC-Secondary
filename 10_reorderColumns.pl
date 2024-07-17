@@ -86,8 +86,8 @@ my @titles = split(/\t/, $header);
 	warn "W $0: the following newOrder fields are missing: " . join(' ', @newOrderMissing) . "\n";
 	warn "W $0: with non-human data missing fields are expected (eg fields from human-only plugins),\n";
 	warn "W $0: but with human data this suggests that the code needs to be updated (open a github issue)\n";
-	@newOrder = @newOrderFound;
     }
+    @newOrder = @newOrderFound;
 }
 
 # build hash of @newOrder headers, value is the new column index
