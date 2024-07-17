@@ -189,7 +189,7 @@ my %transcript2start;
 # %transcript2gtex: key==$transcript, value==GTEX data to print (starting with \t)
 my %transcript2gtex;
 # also remember CHR and POS (the smallest POS we see in any cohort for a variant
-#  affecting the transcript), replacing X Y M with 23-25 for easy sorting
+#  affecting the transcript), replacing X Y M with 1023-1025 for easy sorting
 my %transcript2chr;
 my %transcript2coord;
 
@@ -324,16 +324,17 @@ while (my $inFile = readdir(INDIR)) {
 
 	# grab chrom and coord
 	($fields[$posCol] =~ /^chr([^:]+):(\d+)$/) ||
+	    ($fields[$posCol] =~ /^([^:]+):(\d+)$/) ||
 	    die "E $0: cannot grab chrom:pos in line:\n$line\n";
 	my ($chr,$coord) = ($1,$2);
 
 	my $transcript = $fields[$transCol];
 	if (! $transcript2start{$transcript}) {
 	    # first time we see $transcript, fill chr, coord, start and gtex
-	    # for sorting we want just the chrom number, replace X Y M by 23-25
-	    if ($chr eq "X") { $transcript2chr{$transcript} = "23" }
-	    elsif ($chr eq "Y") { $transcript2chr{$transcript} = "24" }
-	    elsif ($chr eq "M") { $transcript2chr{$transcript} = "25" }
+	    # for sorting we want just the chrom number, replace X Y M by 1023-1025
+	    if ($chr eq "X") { $transcript2chr{$transcript} = "1023" }
+	    elsif ($chr eq "Y") { $transcript2chr{$transcript} = "1024" }
+	    elsif ($chr eq "M") { $transcript2chr{$transcript} = "1025" }
 	    else { $transcript2chr{$transcript} = $chr }
 	    $transcript2coord{$transcript} = $coord;
 

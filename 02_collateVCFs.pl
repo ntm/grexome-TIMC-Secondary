@@ -139,7 +139,7 @@ my @main2sec;
 # next data lines from each VCF
 my ($nextMain, $nextSec);
 # CHROM from each next line, removing leading 'chr' if present and replacing
-# X Y M/MT by 23-25 for easy sorting (undef if no more data)
+# X Y M/MT by large numbers for easy sorting (undef if no more data)
 my ($nextMainChr, $nextSecChr);
 # POS from each next line (undef if no more data)
 my ($nextMainPos, $nextSecPos);
@@ -222,20 +222,20 @@ warn "I $now: $0 - ALL DONE, completed successfully!\n";
 #######################
 # take as arg a CHROM string, possibly starting with 'chr' and non-numerical;
 # return an int representation of the chrom:
-# remove leading 'chr' if present and replace X Y M/MT by 90-92
+# remove leading 'chr' if present and replace X Y M/MT by 1023-1025
 # [TODO fix this so it's not broken on organisms with other naming conventions]
 sub chr2num {
     (@_ == 1) || die "E $0: chr2num needs one arg";
     my ($chr) = @_;
     $chr =~ s/^chr//;
     if ($chr eq 'X') {
-	$chr = 90;
+	$chr = 1023;
     }
     elsif ($chr eq 'Y') {
-	$chr = 91;
+	$chr = 1024;
     }
     elsif (($chr eq 'M') || ($chr eq 'MT')) {
-	$chr = 92;
+	$chr = 1025;
     }
     elsif ($chr !~ /^\d+$/) {
 	die "E $0 in chr2num: CHROM is not numeric or X/Y/M/MT, need to fix the code to deal with this";
