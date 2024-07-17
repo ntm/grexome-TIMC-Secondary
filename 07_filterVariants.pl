@@ -122,18 +122,41 @@ foreach my $i (0..$#titles) {
 	die "E $0: title $title defined twice\n";
     $title2index{$title} = $i;
 }
+
 # make sure all titles we need are present
-foreach my $t ("CANONICAL","IMPACT","BIOTYPE","gnomADe_AF","gnomADg_AF","AF") {
-    (defined $title2index{$t}) ||
-	die "E $0: title $t required by script but missing, some VEP columns changed?\n";
-}
-# only test for COUNT titles if needed, so we can filter early, eg on the output of vcf2tsv.pl
 if (($max_ctrl_hv) || ($max_ctrl_het) || ($min_cohort_hv) || ($min_hr)) {
     foreach my $t ("COUNT_NEGCTRL_HV","COUNT_NEGCTRL_HET","COUNT_COHORT_HV","COUNT_HR") {
 	(defined $title2index{$t}) ||
 	    die "E $0: title $t required by script but missing, some VEP columns changed?\n";
     }
 }
+if (($no_mod) || ($no_low)) {
+    (defined $title2index{"IMPACT"}) ||
+	die "E $0: IMPACT required by script but missing, some VEP columns changed?\n";
+}
+if (($no_pseudo) || ($no_nmd)) {
+    (defined $title2index{"BIOTYPE"}) ||
+	die "E $0: BIOTYPE required by script but missing, some VEP columns changed?\n";
+}
+if ($canon) {
+    (defined $title2index{"CANONICAL"}) ||
+	die "E $0: CANONICAL required by script but missing, some VEP columns changed?\n";
+}
+if ($max_af_gnomad) {
+    foreach my $t ("gnomADe_AF","gnomADg_AF") {
+	(defined $title2index{$t}) ||
+	    die "E $0: $t required by script but missing, some VEP columns changed?\n";
+    }
+}
+if ($max_af_1kg) {
+    (defined $title2index{"AF"}) ||
+	die "E $0: AF required by script but missing, some VEP columns changed?\n";
+}
+if ($max_af_alfa) {
+    (defined $title2index{"ALFA_Total_AF"}) ||
+	die "E $0: ALFA_Total_AF required by script but missing, some VEP columns changed?\n";
+}
+
 
 # parse data
 while(my $line = <STDIN>) {

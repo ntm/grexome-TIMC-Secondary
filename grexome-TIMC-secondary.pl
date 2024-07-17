@@ -339,10 +339,12 @@ if ($debug) {
     $com = "cat $outDir/step6.out ";
 }
 
-# step 7 - immediately filter variants on IMPACT, BIOTYPE, AFs and CANONICAL
-$com .= " | perl $RealBin/07_filterVariants.pl --logtime --no_mod --no_pseudo --no_nmd ".
-    "--max_af_gnomad 0.01 --max_af_1kg 0.03 --max_af_alfa 0.01 ";
+# step 7 - immediately filter variants on IMPACT, BIOTYPE, CANONICAL and AFs (human-only)
+$com .= " | perl $RealBin/07_filterVariants.pl --logtime --no_mod --no_pseudo --no_nmd ";
 ($canon) && ($com .= "--canonical ");
+if (($species eq 'homo_sapiens') || ($species eq 'human')) {
+    $com .= "--max_af_gnomad 0.01 --max_af_1kg 0.03 --max_af_alfa 0.01 ";
+}
 if ($debug) {
     $com .= "2> $outDir/step7.err > $outDir/step7.out";
     system($com) && die "E $0: debug mode on, step7 failed, examine step7.err\n";
