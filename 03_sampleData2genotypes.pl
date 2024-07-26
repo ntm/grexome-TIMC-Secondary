@@ -173,7 +173,7 @@ while(my $line = <STDIN>) {
 		# for CNVs we actually want everything starting at FR
 		(($dpCol) && ($thisData[$dpCol])) ||
 		    die "E $0: GQ is $af but couldn't find FR in $data[$i]\n$line\n";
-		$frBp = join(':', @thisData[$dpCol..$#thisData]);
+		my $frBp = join(':', @thisData[$dpCol..$#thisData]);
 		$geno2samples{$geno} .= "[$af:$frBp]";
 	    }
 	    else {
