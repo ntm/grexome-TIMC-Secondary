@@ -134,7 +134,7 @@ Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --infile : bgzipped multi-sample GVCF or VCF file to parse
 --species string [default $species]: species, as expected by VEP (eg mus_musculus)
 --cnvs : [optional] multi-sample VCF file containing CNV calls, possibly (b)gzipped, conventions are:
-       	 ALT is <DEL> or <DUP>, INFO contains END=, FORMAT must start with GT:RR and contain BF
+       	 ALT is <DEL> or <DUP>, INFO contains END=, FORMAT must start with GT:GQ:FR:BPR and possibly :BP
 --outdir : subdir where results will be created, must not pre-exist
 --config [defaults to grexomeTIMCsec_config.pm alongside this script] : your customized copy (with path) of the distributed *config.pm
 --canonical : restrict results to canonical transcripts

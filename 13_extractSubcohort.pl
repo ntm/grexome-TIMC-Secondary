@@ -147,7 +147,7 @@ print "$header\n";
 	     }
 	     foreach my $sample (split(/,/,$fields[$i])) {
 		 # valid sampleIDs cannot have '(' or '[' ,  so with the below regexp we're fine 
-		 # with [DP:AF] / [BF:RR] and/or if infile went through addPatientIDs.pl
+		 # with [DP:AF] / [GQ:FR:BPR:BR] and/or if infile went through addPatientIDs.pl
 		 ($sample =~ /^([^(\[]+)/) ||
 		     die "E $0: inFile has a genoData for a sample I can't recognize: $sample\n";
 		 if ($subcohort{$1}) {

@@ -68,9 +68,9 @@ Filenames in outDir will include patientID/specimenID.
 If covDir is provided, the global coverage data (ALL_CANDIDATES and ALL_SAMPLED)
 for each sample is grabbed from covDir and appended at the end of the header line.
 For a sample, we only print lines from its cohort file and where it has an HV or 
-HET genotype: this genotype is printed in new columns GENOTYPE and DP:AF/BF:RR,
+HET genotype: this genotype is printed in new columns GENOTYPE and DP:AF/GQ:FR:BPR:BP,
 inserted right after KNOWN_CANDIDATE_GENE.
-Immediately after DP:AF/BF:RR we insert a new column BIALLELIC, value is one of:
+Immediately after DP:AF/GQ:FR:BPR:BP we insert a new column BIALLELIC, value is one of:
   HIGH -> patient has >=2 HET or at >=1 HV HIGH variants;
   MODHIGH -> patient has >=2 HET or >=1 HV variants of impact HIGH or MODHIGH,
      but isn't in HIGH category;
@@ -238,7 +238,7 @@ while (my $inFile = readdir(INDIR)) {
 	if ($header[$i] eq "KNOWN_CANDIDATE_GENE") {
 	    $knownCandidateCol = $i;
 	    $header[$i] .= "\tGENOTYPE";
-	    $header[$i] .= "\tDP:AF/BF:RR";
+	    $header[$i] .= "\tDP:AF/GQ:FR:BPR:BP";
 	    $header[$i] .= "\tBIALLELIC";
 	}
 	elsif ($header[$i] eq "Feature") {
@@ -357,9 +357,8 @@ while (my $inFile = readdir(INDIR)) {
 		($i == 0) && ($geno = "HV");
 		($i == 1) && ($geno = "HET");
 		foreach my $sampleData (split(/,/,$genoData[$i])) {
-		    # grab sample and [DP:AF] / [BF:RR], we know it must be there
-		    # (allowing AF > 1 for Strelka bug)
-		    ($sampleData =~ /^([^\[\s]+)\[(\d+:\d+\.\d\d?)\]$/) ||
+		    # grab sample and [DP:AF] / [GQ:FR:BPR:BP], we know it must be there
+		    ($sampleData =~ /^([^\[\s]+)\[(\d+:[^\]]+\]$/) ||
 			die  "E $0: inFile $inFile has a sampleData (in a genoData) that I can't parse: $sampleData\n";
 		    my ($sample,$dpaf) = ($1,$2);
 
