@@ -120,24 +120,31 @@ while(my $line = <STDIN>) {
     }
 
     # from FORMAT we need GT:AF+DP (assumption: filterBadCalls.pl already ran
-    # and created/updated AF and DP with correct values), or GT:GQ+FR+BPR+BP for CNVs.
+    # and created/updated AF and DP with correct values), or GT:GQ+FR (and BP
+    # if it exists) for CNVs.
     my $format = shift(@data);
-    # GT and AF/GQ should always be first, check it
-    # Also disguise FR as DP since it's syntactically identical
-    if ($format =~ /^GT:GQ:/) {
-	($format =~ s/:FR/:DP/) ||
-	    die "E $0: FORMAT starts with GT:GQ but doesn't contain FR in:\n$line\n";
-    }
-    elsif ($format !~ /^GT:AF:/) {
-	die "E $0: FORMAT doesn't begin with 'GT:AF:' or 'GT:GQ:' in:\n$line\n";
-    }
-    # find DP index
+    # GT and AF/GQ should always be first, check it and detect whether this is
+    # a SNV/short-indel (isCnv==0), or a CNV without or with BP (isCnv==1 or 2)
+    my $isCnv = 0;
+    # for SNVs we will need the index of DP in FORMAT
     my $dpCol = 0;
-    my @format = split(/:/, $format);
-    foreach my $i (2..$#format) {
-	($format[$i] eq "DP") && ($dpCol = $i) && last;
+
+    if ($format eq "GT:GQ:FR:BPR:BP") {
+	$isCnv = 2;
     }
-    ($dpCol==0) && die "E $0: DP/FR not found in format:\n$line\n";
+    elsif ($format eq "GT:GQ:FR:BPR") {
+	$isCnv = 1;
+    }
+    elsif ($format =~ /^GT:AF:/) {
+	my @format = split(/:/, $format);
+	foreach my $i (2..$#format) {
+	    ($format[$i] eq "DP") && ($dpCol = $i) && last;
+	}
+	($dpCol==0) && die "E $0: SNV line but DP not found in format:\n$line\n";
+    }
+    else {
+	die "E $0: FORMAT doesn't begin with 'GT:AF:' or 'GT:GQ:FR:BPR' in:\n$line\n";
+    }
     # print new FORMAT
     $lineToPrint .= "\tGENOS";
 
@@ -148,43 +155,58 @@ while(my $line = <STDIN>) {
     my %geno2samples = ();
 
     foreach my $i (0..$#data) {
-	# add trailing ':' so we know GT is followed by : (eg for NOCALLS)
-	$data[$i] .= ':';
 	# ignore NOCALLs
-	($data[$i] eq './.:') && next;
-	my ($geno,$af);
-	if ($data[$i] eq '0/0:') {
-	    # HR at a CNV, disguise as normal HR ie set $af='.'
-	    ($geno,$af) = ('0/0','.');
-	}
-	else {
-	    ($data[$i] =~ m~^(\d+/\d+):([^:]+):~) || 
-		die "E $0: cannot grab genotype and AF/GQ for sample $i in $data[$i] in line:\n$line\n";
-	    ($geno,$af) = ($1,$2);
-	}
+	($data[$i] eq './.') && next;
 
-	if (defined $geno2samples{$geno}) { $geno2samples{$geno} .= ","; }
-	else { $geno2samples{$geno} = ""; }
-	$geno2samples{$geno} .= $samples[$i];
-	if ($af ne '.') {
-	    # if we have an AF this is a HET or HV call (possibly a CNV), find DP/FR
-	    my @thisData = split(/:/, $data[$i]);
-	    if ($format =~ /^GT:GQ:/) {
-		# for CNVs we actually want everything starting at FR
-		(($dpCol) && ($thisData[$dpCol])) ||
-		    die "E $0: GQ is $af but couldn't find FR in $data[$i]\n$line\n";
-		my $frBp = join(':', @thisData[$dpCol..$#thisData]);
-		$geno2samples{$geno} .= "[$af:$frBp]";
+	my $geno;
+	# $callInfo: stays "" for HRs, else [$dp:$af] for SNVs, [$gq:$fr:$bp] or [$gq:$fr] for CNVs
+	my $callInfo = "";
+
+	if ($isCnv) {
+	    # CNV
+	    if ($data[$i] eq '0/0') {
+		$geno = '0/0';
 	    }
 	    else {
-		my $dp = 0;
-		($dpCol) && ($thisData[$dpCol]) && ($thisData[$dpCol] ne '.') && ($dp = $thisData[$dpCol]);
-		($dp) || die "E $0: AF/GQ is $af but couldn't find DP/FR in $data[$i]\n$line\n";
-		$geno2samples{$geno} .= "[$dp:$af]";
+		($data[$i] =~ m~^(\d+/\d+):([^:]+:[^:]+):~) || 
+		    die "E $0: cannot grab GT:GQ:FR for sample $i in $data[$i] in line:\n$line\n";
+		($geno,$callInfo) = ($1,$2);
+		if ($isCnv == 2) {
+		    # grab :BP == last field
+		    ($data[$i] =~ m~(:[^:]+)$~) ||
+			die "cannot grab BP in $data[$i]\n";
+		    my $bp = $1;
+		    # we can have several comma-separated BPs, but commas are used to separate
+		    # samples -> substitute with _
+		    $bp =~ s/,/_/g;
+		    $callInfo .= $bp;
+		}
+		$callInfo = "[$callInfo]";
 	    }
 	}
+	else {
+	    # SNV/short-indel
+	    if ($data[$i] =~ m~^0/0:~) {
+		$geno = '0/0';
+	    }
+	    else {
+		($data[$i] =~ m~^(\d+/\d+):([^:]+):~) || 
+		    die "E $0: cannot grab genotype and AF for sample $i in $data[$i] in line:\n$line\n";
+		($geno,$callInfo) = ($1,$2);
+		my @thisData = split(/:/, $data[$i]);
+		my $dp = 0;
+		($dpCol) && ($thisData[$dpCol]) && ($thisData[$dpCol] ne '.') && ($dp = $thisData[$dpCol]);
+		($dp) || die "E $0: AF is $af but couldn't find DP in $data[$i]\n$line\n";
+		# we want [$DP:$AF]
+		$callInfo = "[$dp:$callInfo]";
+	    }
+	}
+	
+	if (defined $geno2samples{$geno}) { $geno2samples{$geno} .= ","; }
+	else { $geno2samples{$geno} = ""; }
+	$geno2samples{$geno} .= $samples[$i].$callInfo;
     }
-
+    
     # now print data for each genotype, removing data from %geno2samples as we go
     # format is: genotype1~sample1,sample2|genotype2~sample3|genotype3~sample4,sample5
     # HV
