@@ -407,7 +407,7 @@ while (my $inFile = readdir(INDIR)) {
 	    $samples =~ s/^\d+\/\d+~//;
 	    
 	    foreach my $sample (split(/,/,$samples)) {
-		# ignore [DP:AF] and possibly patientIDs
+		# ignore [DP:AF] / [GQ:FR:BP] and possibly patientIDs
 		($sample =~ /^([^(\[]+)/) ||
 		    die "E $0: cannot grab sampleID from sample $sample\n";
 		my $sampleID = $1;

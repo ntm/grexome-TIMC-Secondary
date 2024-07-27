@@ -37,7 +37,7 @@
 # - all other genotypes (ie VAR1/VAR2) will appear in OTHER column.
 # For HV and HET genos at SNVs/short-indels, "sample" actually 
 # becomes: $sample[$dp:$af].
-# Similarly for CNV calls "sample" becomes $sample[$GQ:$FR:$BPR:$BP] (without :$BP if
+# Similarly for CNV calls "sample" becomes $sample[$GQ:$FR:$BP] (without :$BP if
 # it doesn't exist).
 #
 # <NON_REF> is removed from ALTs if it was present, apart from that
@@ -97,7 +97,7 @@ while(my $line = <STDIN>) {
 	$com .= " 2> ".`readlink -f /proc/$$/fd/2` ;
 	chomp($com);
 	print "##sampleData2genotypes=<commandLine=\"$com\">\n";
-	print "##FORMAT=<ID=GENOS,Number=.,Type=String,Description=\"pipe-separated list of genotypes called at this position, with all corresponding sample identifiers for each genotype (with [DP:AF] for HET and HV SNVs/short-indels, and [GQ:FR:BPR:BP] for CNVs (no BP if unavailable)\">\n";
+	print "##FORMAT=<ID=GENOS,Number=.,Type=String,Description=\"pipe-separated list of genotypes called at this position, with all corresponding sample identifiers for each genotype (with [DP:AF] for HET and HV SNVs/short-indels, and [GQ:FR:BP] for CNVs (no BP if unavailable)\">\n";
 	print $lineToPrint;
 	last;
     }

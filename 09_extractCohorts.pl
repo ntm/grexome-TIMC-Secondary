@@ -503,8 +503,8 @@ sub processBatch {
 	    my @samples = split(/,/,$2);
 	    foreach my $sample (@samples) {
 		my $sampleID = $sample;
-		# remove trailing [DP:AF] / [GQ:FR:BPR:BP] if it's there (allowing AF > 1 for Strelka bug)
-		$sampleID =~ s/\[\d+:[^\]]+\]$//;
+		# remove trailing [DP:AF] / [GQ:FR:BP] if it's there
+		$sampleID =~ s/\[[^\]]+\]$//;
 		# sanity check
 		(defined $sample2cohortR->{$sampleID}) ||
 		    die "E $0: sampleID $sampleID doesn't exist, sample was $sample\n";
