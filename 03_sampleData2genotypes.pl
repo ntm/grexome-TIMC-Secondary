@@ -196,7 +196,7 @@ while(my $line = <STDIN>) {
 		my @thisData = split(/:/, $data[$i]);
 		my $dp = 0;
 		($dpCol) && ($thisData[$dpCol]) && ($thisData[$dpCol] ne '.') && ($dp = $thisData[$dpCol]);
-		($dp) || die "E $0: AF is $af but couldn't find DP in $data[$i]\n$line\n";
+		($dp) || die "E $0: AF is $callInfo but couldn't find DP in $data[$i]\n$line\n";
 		# we want [$DP:$AF]
 		$callInfo = "[$dp:$callInfo]";
 	    }
