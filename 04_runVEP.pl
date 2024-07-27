@@ -592,8 +592,13 @@ sub mergeAndPrint {
 	    $nextVepEnd = $1;
 	    $key .= ":$1";
 	}
-	($f[7] =~ /CSQ=([^;]+)/) || die "E $0: cannot grab CSQ in nextVep line:\n$nextVep";
-	my $csq = $1;
+	my $csq = "";
+	if ($f[7] =~ /CSQ=([^;]+)/) {
+	    $csq = $1;
+	}
+	else {
+	    warn "I $0: cannot grab CSQ in nextVep line, this is expected for huge SVs only:\n$nextVep";
+	}
 	$cacheUpdate->{$key} = $csq;
     }
 
@@ -648,8 +653,13 @@ sub mergeAndPrint {
 		    $nextVepEnd = $1;
 		    $key .= ":$1";
 		}
-		($f[7] =~ /CSQ=([^;]+)/) || die "E $0: cannot grab CSQ in nextVep line:\n$nextVep";
-		my $csq = $1;
+		my $csq = "";
+		if ($f[7] =~ /CSQ=([^;]+)/) {
+		    $csq = $1;
+		}
+		else {
+		    warn "I $0: cannot grab CSQ in nextVep line, this is expected for huge SVs only:\n$nextVep";
+		}
 		$cacheUpdate->{$key} = $csq;
 	    }
 	}
