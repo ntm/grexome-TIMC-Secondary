@@ -363,7 +363,7 @@ sub vepCommand {
 	    my $caddIndels = "$caddPath/gnomad.genomes.r4.0.indel.tsv.gz";
 	    if (-f $caddSnvs) {
 		if (-f $caddIndels) {
-		    $vepPlugins .= " --plugin CADD,$caddSnvs,$caddIndels";
+		    $vepPlugins .= " --plugin CADD,snv=$caddSnvs,indels=$caddIndels";
 		}
 		else {
 		    warn "W: $0 - not using CADD plugin: cannot find CADD indels file, looking for $caddIndels\n";
