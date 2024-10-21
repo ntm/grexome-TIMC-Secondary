@@ -334,7 +334,7 @@ sub vepCommand {
     # https://www.ensembl.org/info/docs/tools/vep/script/vep_other.html#shifting
     $vepCommand .= " --shift_3prime 1";
     # commenting out "--domains", it's a bit massive and in non-deterministic order
-    # and we don't curently look at it
+    # and we don't currently look at it
     # also removing --pubmed, don't think anyone looks at that either
     # I also tried out --regulatory but it's not really usable IMO, eg we obtain
     # ENSR and ENSM features but we can't know the target genes...
@@ -412,7 +412,7 @@ sub vepCommand {
 
 	# spliceAI - data must be DL'd, for that you have to create an account, provide your email
 	# and personal details... see eg:
-	# https://github.com/Ensembl/VEP_plugins/blob/release/112/SpliceAI.pm
+	# https://github.com/Ensembl/VEP_plugins/blob/release/113/SpliceAI.pm
 	my $spliceAIPath = "$dataDir/SpliceAI/";
 	if (-d $spliceAIPath) {
 	    my $spliceAISnvs = "$spliceAIPath/spliceai_scores.raw.snv.hg38.vcf.gz";
@@ -434,7 +434,7 @@ sub vepCommand {
 	}
 	
 	# AlphaMissense, data file must be DL'd as $alphaMSfile and tabix-indexed, see:
-	# https://github.com/Ensembl/VEP_plugins/blob/release/111/AlphaMissense.pm
+	# https://github.com/Ensembl/VEP_plugins/blob/release/113/AlphaMissense.pm
 	my $alphaMSfile = "$dataDir/AlphaMissense/AlphaMissense_hg38.tsv.gz";
 	if (-f $alphaMSfile) {
 	    $vepPlugins .= " --plugin AlphaMissense,file=$alphaMSfile";
