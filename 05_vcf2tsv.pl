@@ -87,7 +87,8 @@ warn "I $now: $0 - starting to run\n";
 # ada_score|rf_score|
 # SpliceAI_pred_DP_AG|SpliceAI_pred_DP_AL|SpliceAI_pred_DP_DG|SpliceAI_pred_DP_DL|SpliceAI_pred_DS_AG|
 # SpliceAI_pred_DS_AL|SpliceAI_pred_DS_DG|SpliceAI_pred_DS_DL|SpliceAI_pred_SYMBOL|
-# am_class|am_pathogenicity
+# am_class|am_pathogenicity|
+# pLI_gene_value
 my @goodVeps = ("SYMBOL","Gene","IMPACT","Consequence","Feature","CANONICAL",
 		"BIOTYPE","VARIANT_CLASS","RefSeq","MANE_SELECT","MANE_PLUS_CLINICAL",
 		"ALLELE_NUM","EXON","INTRON",
@@ -101,7 +102,7 @@ my @goodVeps = ("SYMBOL","Gene","IMPACT","Consequence","Feature","CANONICAL",
 		"SpliceAI_pred_DP_AL","SpliceAI_pred_DS_DG","SpliceAI_pred_DP_DG",
 		"SpliceAI_pred_DS_DL","SpliceAI_pred_DP_DL",
 		"gnomADe_AF","gnomADg_AF","AF","ALFA_Total_AF",
-		"Existing_variation");
+		"Existing_variation","pLI_gene_value");
 
 # VCF headers: ignore them but grab the:
 # - VEP CSQ field names and store them in @vepNames;

@@ -443,6 +443,16 @@ sub vepCommand {
 	    warn "W: $0 - not using AlphaMissense plugin:cannot find alphaMissense file, looking for $alphaMSfile\n";
 	}
 
+	# pLI, data file must be DL'd as $pLIfile, see:
+	# https://github.com/Ensembl/VEP_plugins/blob/release/113/pLI.pm
+	my $pLIfile = "$dataDir/pLI/pLI_values.txt";
+	if (-f $pLIfile) {
+	    $vepPlugins .= " --plugin pLI,$pLIfile";
+	}
+	else {
+	    warn "W: $0 - not using pLI plugin:cannot find pLI file, looking for $pLIfile\n";
+	}
+
 	$vepCommand .= $vepPlugins;
     }
 
