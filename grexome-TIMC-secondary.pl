@@ -62,12 +62,12 @@ my $numJobs9 = 16;
 
 # name (+path if needed) of bash binary, needed for -o pipefail
 my $bash = "bash";
-(`which $bash` =~ /$bash$/) ||
+system("which $bash &> /dev/null") &&
     die "E $0: the bash executable $bash can't be found\n";
 
 # name (+path if needed) of gzip-like binary, we like bgzip (multi-threaded)
 my $bgzip = "bgzip";
-(`which $bgzip` =~ /$bgzip/) ||
+system("which $bgzip &> /dev/null") &&
     die "E $0: the bgzip executable $bgzip can't be found\n";
 # full command. If you don't have bgzip you could use gzip but without --threads
 $bgzip = "$bgzip -cd --threads $numJobsGunzip ";

@@ -142,7 +142,7 @@ Arguments (all can be abbreviated to shortest unambiguous prefixes):
 	die "E $0: tmpDir $tmpDir exists, please rm -r $tmpDir or use another tmpDir as arg\n";
     mkdir($tmpDir) || die "E $0: cannot create tmpDir $tmpDir\n";
 
-    (`which $vepBin` =~ /$vepBin$/) ||
+    system("which $vepBin &> /dev/null") &&
 	die "E $0: the VEP executable $vepBin can't be found\n";
 
     ($vepJobs =~ /^\d+$/) || die "E $0: --jobs must be an int, you provided $vepJobs\n";
