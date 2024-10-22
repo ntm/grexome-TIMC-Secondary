@@ -76,32 +76,31 @@ warn "I $now: $0 - starting to run\n";
 # Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|EXON|INTRON|
 # HGVSc|HGVSp|cDNA_position|CDS_position|Protein_position|Amino_acids|Codons|
 # Existing_variation|ALLELE_NUM|DISTANCE|STRAND|FLAGS|VARIANT_CLASS|SYMBOL_SOURCE|
-# HGNC_ID|CANONICAL|MANE|MANE_SELECT|MANE_PLUS_CLINICAL|RefSeq|SIFT|PolyPhen|miRNA|HGVS_OFFSET|
-# AF|AFR_AF|AMR_AF|EAS_AF|EUR_AF|SAS_AF|gnomADe_AF|gnomADe_AFR_AF|gnomADe_AMR_AF|
-# gnomADe_ASJ_AF|gnomADe_EAS_AF|gnomADe_FIN_AF|gnomADe_MID_AF|gnomADe_NFE_AF|gnomADe_REMAINING_AF|gnomADe_SAS_AF|
+# HGNC_ID|CANONICAL|MANE|MANE_SELECT|MANE_PLUS_CLINICAL|SIFT|PolyPhen|miRNA|HGVS_OFFSET|
+# AF|gnomADe_AF|gnomADe_AFR_AF|gnomADe_AMR_AF|gnomADe_ASJ_AF|gnomADe_EAS_AF|
+# gnomADe_FIN_AF|gnomADe_MID_AF|gnomADe_NFE_AF|gnomADe_REMAINING_AF|gnomADe_SAS_AF|
 # gnomADg_AF|gnomADg_AFR_AF|gnomADg_AMI_AF|gnomADg_AMR_AF|gnomADg_ASJ_AF|gnomADg_EAS_AF|
 # gnomADg_FIN_AF|gnomADg_MID_AF|gnomADg_NFE_AF|gnomADg_REMAINING_AF|gnomADg_SAS_AF|
 # CLIN_SIG|SOMATIC|PHENO|
 # CADD_PHRED|CADD_RAW|ALFA_Total_AF|
 # CADD_raw_rankscore|MetaRNN_pred|MetaRNN_rankscore|MutationTaster_pred|REVEL_rankscore|
 # ada_score|rf_score|
-# SpliceAI_pred_DP_AG|SpliceAI_pred_DP_AL|SpliceAI_pred_DP_DG|SpliceAI_pred_DP_DL|SpliceAI_pred_DS_AG|
-# SpliceAI_pred_DS_AL|SpliceAI_pred_DS_DG|SpliceAI_pred_DS_DL|SpliceAI_pred_SYMBOL|
-# am_class|am_pathogenicity|pLI_gene_value
+# SpliceAI_pred_DP_AG|SpliceAI_pred_DP_AL|SpliceAI_pred_DP_DG|SpliceAI_pred_DP_DL|
+# SpliceAI_pred_DS_AG|SpliceAI_pred_DS_AL|SpliceAI_pred_DS_DG|SpliceAI_pred_DS_DL|
+# SpliceAI_pred_SYMBOL|am_class|am_pathogenicity|pLI_gene_value
 my @goodVeps = ("SYMBOL","Gene","IMPACT","Consequence","Feature","CANONICAL",
-		"BIOTYPE","VARIANT_CLASS","RefSeq","MANE_SELECT","MANE_PLUS_CLINICAL",
-		"ALLELE_NUM","EXON","INTRON",
-		"HGVSc","HGVSp","cDNA_position","CDS_position","Protein_position","miRNA",
-		"SIFT","PolyPhen",
-		"am_class","am_pathogenicity",
+		"BIOTYPE","MANE_SELECT","pLI_gene_value","Existing_variation",
+		"HGVSc","HGVSp","ALLELE_NUM","EXON","INTRON",
+		"cDNA_position","CDS_position","Protein_position",
+		"miRNA","VARIANT_CLASS",
+		"gnomADe_AF","gnomADg_AF","AF","ALFA_Total_AF",
+		"SIFT","PolyPhen","am_class","am_pathogenicity",
 		"MetaRNN_pred","MetaRNN_rankscore","CADD_raw_rankscore",
 		"MutationTaster_pred","REVEL_rankscore",
 		"ada_score","rf_score","CADD_PHRED",
 		"SpliceAI_pred_DS_AG","SpliceAI_pred_DP_AG","SpliceAI_pred_DS_AL",
 		"SpliceAI_pred_DP_AL","SpliceAI_pred_DS_DG","SpliceAI_pred_DP_DG",
-		"SpliceAI_pred_DS_DL","SpliceAI_pred_DP_DL",
-		"gnomADe_AF","gnomADg_AF","AF","ALFA_Total_AF",
-		"Existing_variation","pLI_gene_value");
+		"SpliceAI_pred_DS_DL","SpliceAI_pred_DP_DL");
 
 # VCF headers: ignore them but grab the:
 # - VEP CSQ field names and store them in @vepNames;

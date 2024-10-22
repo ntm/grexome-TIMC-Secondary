@@ -83,7 +83,7 @@ $0 = basename($0);
 ## hard-coded stuff that shouldn't change much
 
 # columns we want to keep, in this order:
-my @keptColumns = qw(SYMBOL KNOWN_CANDIDATE_GENE Feature CANONICAL BIOTYPE Gene RefSeq);
+my @keptColumns = qw(SYMBOL KNOWN_CANDIDATE_GENE Feature CANONICAL BIOTYPE Gene MANE_SELECT);
 # in addition we insert the new COUNTSAMPLES* columns right after the last @keptColumns
 # and immediately followed by the HV_HIGH et al colums, and we then copy all 
 # the GTEX_* columns (in the same order as in infile)

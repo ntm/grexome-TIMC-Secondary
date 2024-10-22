@@ -324,7 +324,7 @@ sub vepCommand {
     $vepCommand .= " --force_overwrite";
     $vepCommand .= " --stats_file $vepStats";
     $vepCommand .= " --allele_number"; # for knowing which CSQ annotates which ALT
-    $vepCommand .= " --canonical --biotype --xref_refseq --symbol";
+    $vepCommand .= " --canonical --biotype --symbol";
     $vepCommand .= " --numbers --total_length  --variant_class";
     # report where the variant lies in the miRNA secondary structure
     $vepCommand .= " --mirna";
@@ -344,7 +344,7 @@ sub vepCommand {
 	# human-only options
 	$vepCommand .= " --mane --sift b --polyphen b";
 	# --af is 1KG-phase3 global AF, --af_1kg is per continent AFs
-	$vepCommand .= " --af --af_1kg --af_gnomade --af_gnomadg";
+	$vepCommand .= " --af --af_gnomade --af_gnomadg";
 	$vepCommand .= " --check_existing";
 	# Don't URI escape HGVS strings
 	$vepCommand .= " --no_escape";
