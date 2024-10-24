@@ -13,7 +13,7 @@ We try to keep external dependencies to a minimum. The only required perl module
 Standard core modules: Exporter, File::Basename, File::Copy, File::Path, File::Temp, FindBin, Getopt::Long, POSIX, Storable.
 Other modules: Parallel::ForkManager, Spreadsheet::XLSX.
 
-In addition we use the excellent Ensembl Variant Effect Predictor (VEP [1]) for annotating variants. VEP must be installed along with the Ensembl cache (we use homo_sapiens_vep_109_GRCh38 cache as of 10/02/2023). We also use some VEP plugins (currently dbNSFP, dbscSNV, CADD, SpliceAI and AlphaMissense), they must be installed along with the associated datafiles. Plugins are easily installed via the VEP INSTALL.PL script, but you must follow each plugin's instructions for installing their datafiles. This can all be customized by editing &vepCommand() in 04_runVEP.pl and/or &vepPluginDataPath() in grexomeTIMCsec_config.pm.
+In addition we use the excellent Ensembl Variant Effect Predictor (VEP [1]) for annotating variants. VEP must be installed along with the Ensembl cache (we use homo_sapiens_vep_113_GRCh38 cache as of 24/10/2024). We also use some VEP plugins (currently dbNSFP, dbscSNV, CADD, SpliceAI, AlphaMissense and pLI), they must be installed along with the associated datafiles. Plugins are easily installed via the VEP INSTALL.PL script, but you must follow each plugin's instructions for installing their datafiles. This can all be customized by editing &vepCommand() in 04_runVEP.pl and/or &vepPluginDataPath() in grexomeTIMCsec_config.pm.
 
 [1] http://www.ensembl.org/info/docs/tools/vep/script
 
@@ -21,7 +21,7 @@ In addition we use the excellent Ensembl Variant Effect Predictor (VEP [1]) for 
 REQUIRED DATA:
 **************
 Step 04_runVEP.pl relies on VEP for annotating variants and therefore requires a working VEP installation, including the VEP Ensembl cache and plugin data (see DEPENDENCIES above). VEP also needs the reference genome in fasta format for HGVS annotations, we use the same file as in our primary pipeline [2] (see REQUIRED DATA there).
-In adition, the pipeline (step 08_addGTEX.pl) uses gene expression data produced by the GTEx consortium, but the required file is included in the GTEX_Data/ of this git repo.
+In adition, the pipeline (step 08_addGTEX.pl) uses gene expression data produced by the GTEx consortium, but the required file for Homo sapiens is included in the GTEX_Data/ of this git repo. If you work with another species, you need to download an appropriate expression data file adapting instructions in GTEX_Data/README, and update gtexDatafile() in grexomeTIMCsec_config.pm .
 
 [2] https://github.com/ntm/grexome-TIMC-Primary
 
