@@ -342,6 +342,10 @@ sub vepCommand {
 
     if (($species eq 'homo_sapiens') || ($species eq 'human')) {
 	# human-only options
+	# limit to "GENCODE basic" transcripts ("removes fragmented or problematic transcripts")
+	# in v113 this is 158k transcripts, including all 19k MANE, almost all 41k "GENCODE Primary",
+	# and 72.7k/78.7k "Ensembl canonical"
+	$vepCommand .= " --gencode_basic";
 	$vepCommand .= " --mane --sift b --polyphen b";
 	# --af is 1KG-phase3 global AF, --af_1kg is per continent AFs
 	$vepCommand .= " --af --af_gnomade --af_gnomadg";
