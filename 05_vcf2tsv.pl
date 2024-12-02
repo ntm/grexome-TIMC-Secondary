@@ -68,10 +68,11 @@ warn "I $now: $0 - starting to run\n";
 # stuff we grab from INFO:
 # CSQ==VEP, but we only want some VEP fields
 
-# @goodVeps: VEP fields we want, in the order we want them printed.
-# Some of these are hard-coded in the "missense" and "splice"
-# upgrade-to-MODHIGH code, make sure they get fixed there as
-# well if they change names.
+# @goodVeps: VEP fields we want, in the order we want them printed (exception for
+# SpliceAI_* fields, which we will replace by a single SpliceAI_DS containing
+# the max delta score).
+# Some of these are hard-coded in the "missense" and "splice" upgrade-to-MODHIGH
+# code, make sure they get fixed there as well if they change names.
 # Current available annotations produced by runVEP.pl (21/10/2024) are:
 # Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|EXON|INTRON|
 # HGVSc|HGVSp|cDNA_position|CDS_position|Protein_position|Amino_acids|Codons|
@@ -98,9 +99,8 @@ my @goodVeps = ("SYMBOL","Gene","IMPACT","Consequence","Feature","CANONICAL",
 		"MetaRNN_pred","MetaRNN_rankscore","CADD_raw_rankscore",
 		"MutationTaster_pred","REVEL_rankscore",
 		"ada_score","rf_score","CADD_PHRED",
-		"SpliceAI_pred_DS_AG","SpliceAI_pred_DP_AG","SpliceAI_pred_DS_AL",
-		"SpliceAI_pred_DP_AL","SpliceAI_pred_DS_DG","SpliceAI_pred_DP_DG",
-		"SpliceAI_pred_DS_DL","SpliceAI_pred_DP_DL");
+		"SpliceAI_pred_DS_AG","SpliceAI_pred_DS_AL","SpliceAI_pred_DS_DG",
+		"SpliceAI_pred_DS_DL");
 
 # VCF headers: ignore them but grab the:
 # - VEP CSQ field names and store them in @vepNames;
@@ -129,7 +129,8 @@ while (my $line = <STDIN>) {
 (@vepNames) || 
     die "E $0: done parsing headers but vepNames still empty!\n" ;
 
-# With non-human data some @goodVeps don't exist, purge them out
+# With non-human data some @goodVeps don't exist, purge them out. Also replace
+# the 4 SpliceAI* scores with a single SpliceAI_DS
 {
     my %vepNames;
     foreach my $v (@vepNames) {
@@ -139,7 +140,15 @@ while (my $line = <STDIN>) {
     my @vepsFound = ();
     foreach my $v (@goodVeps) {
 	if ($vepNames{$v}) {
-	    push(@vepsFound, $v);
+	    if ($v eq "SpliceAI_pred_DS_AG") {
+		push(@vepsFound, "SpliceAI_DS");
+	    }
+	    elsif ($v =~ /^SpliceAI_pred/) {
+		# ignore, we only want one SpliceAI_DS column
+	    }
+	    else {
+		push(@vepsFound, $v);
+	    }
 	}
 	else {
 	    push(@missingVeps, $v);
@@ -150,8 +159,8 @@ while (my $line = <STDIN>) {
 	warn "W $0: with non-human data missing fields are expected (eg fields from human-only plugins),\n";
 	warn "W $0: but with human data this suggests that the code needs to be updated (open a github issue),\n";
 	warn "W $0: or that your installation of VEP is outdated or missing some plugins / data\n";
-	@goodVeps = @vepsFound;
     }
+    @goodVeps = @vepsFound;
 }
 
 # Make our own headers for the TSV
@@ -159,7 +168,7 @@ my $headerTsv = "POSITION\tREF\tALT";
 # POSITION will be chrom:pos
 
 # selected VEP fields will be printed in @goodVeps order
-$headerTsv .= "\t".join("\t",@goodVeps);
+$headerTsv .= "\t".join("\t", @goodVeps);
 # finally we print the sample IDs for each GENO, just copied from infile
 $headerTsv .= "\t$dataHeaders";
 # sanity: below we assume GENOS are HV,HET,OTHER,HR in that order
@@ -215,6 +224,14 @@ while (my $line =<STDIN>) {
 	    # replace all slashes by backslashes, for excel :(
 	    $csqTmp[$i] =~ s~/~\\~g ;
 	    $thisCsq{$vepNames[$i]} = $csqTmp[$i] ;
+	}
+
+	# create SpliceAI_DS with max of the 4 SpliceAI* scores
+	if ($thisCsq{"SpliceAI_pred_DS_AG"} ne "") {
+	    $thisCsq{"SpliceAI_DS"} = $thisCsq{"SpliceAI_pred_DS_AG"};
+	    foreach my $f ("SpliceAI_pred_DS_AL", "SpliceAI_pred_DS_DG", "SpliceAI_pred_DS_DL") {
+		($thisCsq{$f} > $thisCsq{"SpliceAI_DS"}) && ($thisCsq{"SpliceAI_DS"} = $thisCsq{$f});
+	    }
 	}
 
 	# upgrade putatively deleterious missense variants:
@@ -294,25 +311,21 @@ while (my $line =<STDIN>) {
 	    my $passed = 0;
 	    my $totalPreds = 0;
 	    # SpliceAI
-	    my @DS_headers = ("SpliceAI_pred_DS_AG","SpliceAI_pred_DS_AL",
-			      "SpliceAI_pred_DS_DG","SpliceAI_pred_DS_DL");
-	    foreach my $ds (@DS_headers) {
-		($thisCsq{$ds}) && (++$totalPreds) && last;
-	    }
-	    foreach my $ds (@DS_headers) {
-		($thisCsq{$ds}) && ($thisCsq{$ds} > $spliceAI_cutoff) && (++$passed) && last;
+	    if (defined $thisCsq{"SpliceAI_DS"}) {
+		$totalPreds++;
+		($thisCsq{"SpliceAI_DS"} > $spliceAI_cutoff) && ($passed++);
 	    }
 	    # CADD-Splice
-	    if ($thisCsq{"CADD_PHRED"}) {
+	    if ($thisCsq{"CADD_PHRED"} ne "") {
 		$totalPreds++;
 		($thisCsq{"CADD_PHRED"} > $cadd_cutoff) && ($passed++);
 	    }
 	    # dbscSNV
-	    if ($thisCsq{"ada_score"}) {
+	    if ($thisCsq{"ada_score"} ne "") {
 		$totalPreds++;
 		($thisCsq{"ada_score"} > 0.6) && ($passed++);
 	    }
-	    if ($thisCsq{"rf_score"}) {
+	    if ($thisCsq{"rf_score"} ne "") {
 		$totalPreds++;
 		($thisCsq{"rf_score"} > 0.6) && ($passed++);
 	    }
