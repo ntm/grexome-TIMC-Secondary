@@ -67,7 +67,8 @@ sub parsePathologies {
     (defined $workbook) ||
 	die "E in $subName: no workbook\n";
     ($workbook->worksheet_count() == 1) ||
-	die "E in $subName: expecting a single worksheet, got ".$workbook->worksheet_count()."\n";
+	warn "W in $subName: expecting a single worksheet, got ".$workbook->worksheet_count().
+	", ignoring all worksheets except the first\n";
     my $worksheet = $workbook->worksheet(0);
     my ($colMin, $colMax) = $worksheet->col_range();
     my ($rowMin, $rowMax) = $worksheet->row_range();
@@ -201,7 +202,8 @@ sub parseSamples {
     (defined $workbook) ||
 	die "E in $subName: no workbook\n";
     ($workbook->worksheet_count() == 1) ||
-	die "E in $subName: expecting a single worksheet, got ".$workbook->worksheet_count()."\n";
+	warn "W in $subName: expecting a single worksheet, got ".$workbook->worksheet_count().
+	", ignoring all worksheets except the first\n";
     my $worksheet = $workbook->worksheet(0);
     my ($colMin, $colMax) = $worksheet->col_range();
     my ($rowMin, $rowMax) = $worksheet->row_range();
@@ -431,7 +433,8 @@ sub parseCandidateGenes {
 	(defined $workbook) ||
 	    die "E in $subName: no workbook\n";
 	($workbook->worksheet_count() == 1) ||
-	    die "E in $subName: expecting a single worksheet, got ".$workbook->worksheet_count()."\n";
+	    warn "W in $subName: expecting a single worksheet, got ".$workbook->worksheet_count().
+	    ", ignoring all worksheets except the first\n";
 	my $worksheet = $workbook->worksheet(0);
 	my ($colMin, $colMax) = $worksheet->col_range();
 	my ($rowMin, $rowMax) = $worksheet->row_range();
