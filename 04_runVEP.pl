@@ -330,6 +330,8 @@ sub vepCommand {
     $vepCommand .= " --mirna";
     # reduce default distance (5000) for annotating [upstream|downstream]_gene_variant
     $vepCommand .= " --distance 1000";
+    # increase default max SV size 10M -> 20M
+    $vepCommand .= " --max_sv_size 20000000";
     # right-align indels before consequence calculation, see:
     # https://www.ensembl.org/info/docs/tools/vep/script/vep_other.html#shifting
     $vepCommand .= " --shift_3prime 1";
