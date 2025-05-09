@@ -26,7 +26,7 @@ use warnings;
 
 my $TOIs = shift(@ARGV);
 
-# precise string to search for in last data column if Ensembl GTF
+# precise string to search for in last data column of Ensembl GTF
 my $toiDef;
 if ($TOIs eq 'canon') {
     $toiDef = 'tag "Ensembl_canonical";'
