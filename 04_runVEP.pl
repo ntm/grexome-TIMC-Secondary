@@ -349,8 +349,9 @@ sub vepCommand {
 	# and 72.7k/78.7k "Ensembl canonical"
 	$vepCommand .= " --gencode_basic";
 	$vepCommand .= " --mane --sift b --polyphen b";
-	# --af is 1KG-phase3 global AF, --af_1kg is per continent AFs
-	$vepCommand .= " --af --af_gnomade --af_gnomadg";
+	# --af_gnomade and --af_gnomadg are gnomad v4.1 frequencies since v113
+	# (see https://github.com/Ensembl/ensembl-vep/issues/1574#issuecomment-2298281150 )
+	$vepCommand .= " --af_gnomade --af_gnomadg";
 	$vepCommand .= " --check_existing";
 	# Don't URI escape HGVS strings
 	$vepCommand .= " --no_escape";
@@ -396,6 +397,13 @@ sub vepCommand {
 		# ALFA minor allele freq: grab from dbNSFP, it's not in VEP cache despite
 		# https://github.com/Ensembl/ensembl-vep/issues/1043
 		$dbNsfpFields .= ",ALFA_Total_AF";
+		# "All of Us" (250k genomes) alt allele freq for all data, and max over all populations
+		$dbNsfpFields .= ",AllofUs_ALL_AF,AllofUs_POPMAX_AF";
+		# alt allele freq of the whole Regeneron Genetics Center Million Exome (RGC-ME)
+		$dbNsfpFields .= ",RegeneronME_ALL_AF";
+		# max alt allele freq across all populations in dbNSFP, and corresponding pop(s)
+		$dbNsfpFields .= ",dbNSFP_POPMAX_AF,dbNSFP_POPMAX_POP";
+
 		$vepPlugins .= " --plugin dbNSFP,$dbNsfpFile,transcript_match=1,$dbNsfpFields";
 	    }
 	    else {
