@@ -52,9 +52,10 @@ my $no_pseudo = ''; # if enabled, filter out all *pseudogene BIOTYPEs
 my $no_nmd = ''; # if enabled, filter out nonsense_mediated_decay BIOTYPE
 my $canon = ''; # if enabled, only keep lines with CANONICAL==YES
 
-my $max_af_gnomad; # gnomADe_AF <= $x AND gnomADg_AF <= $x (if available)
-my $max_af_1kg; # AF <= $x, this is 1KG phase 3
-my $max_af_alfa; # ALFA_Total_AF <= $x
+# max global alt allele freqs in gnomADe, gnomADg, RegeneronME, AllofUs, ALFA (if available)
+my $max_af_global;
+# max per-population alt allele freqs in AllofUs and dbNSFP (if available)
+my $max_af_perPop;
 
 # if true, print timestamped start-done log messages to stderr
 my $logTime = '';
@@ -68,9 +69,8 @@ GetOptions ("max_ctrl_hv=i" => \$max_ctrl_hv,
 	    "no_pseudo" => \$no_pseudo,
 	    "no_nmd" => \$no_nmd,
 	    "canonical" => \$canon,
-	    "max_af_gnomad=f" => \$max_af_gnomad,
-	    "max_af_1kg=f" => \$max_af_1kg,
-	    "max_af_alfa=f" => \$max_af_alfa,
+	    "max_af_global=f" => \$max_af_global,
+	    "max_af_perPop=f" => \$max_af_perPop,
 	    "logtime" => \$logTime)
     or die("E $0: Error in command line arguments\n");
 
@@ -90,9 +90,8 @@ my $filterString = "";
 ($no_pseudo) && ($filterString .= "no_pseudo ");
 ($no_nmd) && ($filterString .= "no_nmd ");
 ($canon) && ($filterString .= "canonical ");
-($max_af_gnomad) && ($filterString .= "max_af_gnomad=$max_af_gnomad ");
-($max_af_1kg) && ($filterString .= "max_af_1kg=$max_af_1kg ");
-($max_af_alfa) && ($filterString .= "max_af_alfa=$max_af_alfa ");
+($max_af_global) && ($filterString .= "max_af_global=$max_af_global ");
+($max_af_perPop) && ($filterString .= "max_af_perPop=$max_af_perPop ");
 # remove trailing space and add leading tab if any filters are applied
 if ($filterString) {
     $filterString = "\t$filterString";
@@ -142,21 +141,18 @@ if ($canon) {
     (defined $title2index{"CANONICAL"}) ||
 	die "E $0: CANONICAL required by script but missing, some VEP columns changed?\n";
 }
-if ($max_af_gnomad) {
-    foreach my $t ("gnomADe_AF","gnomADg_AF") {
+if ($max_af_global) {
+    foreach my $t ("gnomADe_AF","gnomADg_AF","RegeneronME_ALL_AF","AllofUs_ALL_AF","ALFA_Total_AF") {
 	(defined $title2index{$t}) ||
 	    die "E $0: $t required by script but missing, some VEP columns changed?\n";
     }
 }
-if ($max_af_1kg) {
-    (defined $title2index{"AF"}) ||
-	die "E $0: AF required by script but missing, some VEP columns changed?\n";
+if ($max_af_perPop) {
+    foreach my $t ("AllofUs_POPMAX_AF","dbNSFP_POPMAX_AF") {
+	(defined $title2index{$t}) ||
+	    die "E $0: $t required by script but missing, some VEP columns changed?\n";
+    }
 }
-if ($max_af_alfa) {
-    (defined $title2index{"ALFA_Total_AF"}) ||
-	die "E $0: ALFA_Total_AF required by script but missing, some VEP columns changed?\n";
-}
-
 
 # parse data
 while(my $line = <STDIN>) {
@@ -191,40 +187,31 @@ while(my $line = <STDIN>) {
     if  ((defined $min_hr) && ($fields[$title2index{"COUNT_HR"}]  < $min_hr)) {
 	next;
     }
-    if ((defined $max_af_gnomad) && ($fields[$title2index{"gnomADe_AF"}])) {
-	# sometimes we have several &-separated values, in this case
-	# only filter if all values are high
-	my $keep = 0;
-	foreach my $gnomad (split(/&/, $fields[$title2index{"gnomADe_AF"}])) {
-	    ($gnomad <= $max_af_gnomad) && ($keep = 1) && last;
+    if (defined $max_af_global) {
+	my $keep = 1;
+	foreach my $title ("gnomADe_AF","gnomADg_AF","RegeneronME_ALL_AF",
+			   "AllofUs_ALL_AF","ALFA_Total_AF") {
+	    if ($fields[$title2index{$title}]) {
+		# sometimes we have several &-separated values, filter if any is high
+		foreach my $af (split(/&/, $fields[$title2index{$title}])) {
+		    if ($af > $max_af_global) {
+			$keep = 0;
+			last;
+		    }
+		}
+		# if AF was too high, don't even look at other sources
+		($keep) || last;
+	    }
 	}
 	($keep) || next;
     }
-    if ((defined $max_af_gnomad) && ($fields[$title2index{"gnomADg_AF"}])) {
-	# sometimes we have several &-separated values, in this case
-	# only filter if all values are high
-	my $keep = 0;
-	foreach my $gnomad (split(/&/, $fields[$title2index{"gnomADg_AF"}])) {
-	    ($gnomad <= $max_af_gnomad) && ($keep = 1) && last;
-	}
-	($keep) || next;
-    }
-    if ((defined $max_af_1kg) && ($fields[$title2index{"AF"}])) {
-	#again several &-separated values
-	my $keep = 0;
-	foreach my $af (split(/&/, $fields[$title2index{"AF"}])) {
-	    # VEP 104 sometimes returns aberrant large values for 1KG AFs,
-	    # if AF > 50% ignore it - see:
-	    # https://github.com/Ensembl/ensembl-vep/issues/1042
-	    (($af <= $max_af_1kg) || ($af >= 0.5)) && ($keep = 1) && last;
-	}
-	($keep) || next;
-    }
-    if ((defined $max_af_alfa) && ($fields[$title2index{"ALFA_Total_AF"}])) {
-	#again several &-separated values
-	my $keep = 0;
-	foreach my $af (split(/&/, $fields[$title2index{"ALFA_Total_AF"}])) {
-	    ($af <= $max_af_alfa) && ($keep = 1) && last;
+    if (defined $max_af_perPop) {
+	my $keep = 1;
+	foreach my $title ("AllofUs_POPMAX_AF","dbNSFP_POPMAX_AF") {
+	    if (($fields[$title2index{$title}]) && ($fields[$title2index{$title}] > $max_af_perPop)) {
+		$keep = 0;
+		last;
+	    }
 	}
 	($keep) || next;
     }

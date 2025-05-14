@@ -343,7 +343,8 @@ if ($debug) {
 $com .= " | perl $RealBin/07_filterVariants.pl --logtime --no_mod --no_pseudo --no_nmd ";
 ($canon) && ($com .= "--canonical ");
 if (($species eq 'homo_sapiens') || ($species eq 'human')) {
-    $com .= "--max_af_gnomad 0.01 --max_af_1kg 0.03 --max_af_alfa 0.01 ";
+    # global freq <= 5e-4 in each dataset, and per-population freq <= 1e-3
+    $com .= "--max_af_global 0.0005 --max_af_perPop 0.001 ";
 }
 if ($debug) {
     $com .= "2> $outDir/step7.err > $outDir/step7.out";
