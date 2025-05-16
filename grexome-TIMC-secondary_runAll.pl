@@ -33,37 +33,29 @@
 use strict;
 use warnings;
 
-my $primDate = "220517";
-my $secDate =  "220518";
+my $primDate = "250511";
+my $secDate =  "250515";
 
-my $cnvFile = "/data/septiera/InfertilityCohort_Results/Calling_results_ExomeDepth_220427_574pat/CNVResults_ExomeDepth_574samples_220428.vcf";
-my $canon = "";
+my $cnvFile = "/home/nthierry/PierreRay_DATA/RunJACNEx/JACNEx_canonical_114/VCFs/CNVs_2025-05-12_15-54-14_NODUPs.vcf.gz";
+
 # set to "--canonical" to limit to canonical transcripts
-# $canon = "--canonical";
+#my $canon = "";
+my $canon = "--canonical";
 
 
 ($canon) || ($secDate .= "_AllTranscripts");
-my $metaPath = "/home/nthierry/VariantCalling/GrexomeFauve/Grexome_Metadata/";
+my $metaPath = "/home/nthierry/GrexomeZoufris/WES/";
 my $binPath = "/home/nthierry/Software/Grexome-TIMC/grexome-TIMC-Secondary/";
 
 foreach my $caller ("Strelka", "GATK") {
     my $callerLow = lc($caller);
     my $com = "perl $binPath/grexome-TIMC-secondary.pl --samples=$metaPath/patient_summary.xlsx ";
-    $com .= "--pathologies=$metaPath/3-CandidateGenes/pathologies.xlsx ";
-
-    $com .= "--candidateGenes=";
-    foreach my $pathos ("NOA-OA-OMD-POF-DSD", "preprm2", "MMAF-PCD-AST-Necro",
-			"Globo-Macro-Headless-FF-PreImpA-OATS-Terato", "OG") {
-	$com .= "$metaPath/3-CandidateGenes/candidateGenes_$pathos.xlsx,";
-    }
-    ($com =~ s/,$/ /) ||
-	die "E adding pathos to com: cannot replace trailing comma with space in:\n$com\n";
-
+    $com .= "--pathologies=$metaPath/MetaData/pathologies.xlsx ";
+    $com .= "--candidateGenes=$metaPath/MetaData/candidateGenes_allPhenotypes.xlsx ";
     $com .= "--infile=../GVCFs_grexome/GVCFs_${caller}_Filtered_Merged/grexomes_${callerLow}_merged_$primDate.g.vcf.gz ";
     ($cnvFile) && ($com .= "--cnvs=$cnvFile ");
     $com .= "--outDir=SecondaryAnalyses_${secDate}_$caller ";
     $com .= "$canon ";
-    #$com .= "--debugVep ";
     $com .= "2> grexomeTIMCsec_${secDate}_$caller.log ";
     # move log into caller results subdir
     $com .= "; mv grexomeTIMCsec_${secDate}_$caller.log SecondaryAnalyses_${secDate}_$caller/ ";
