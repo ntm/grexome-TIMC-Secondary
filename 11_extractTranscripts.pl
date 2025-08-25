@@ -224,8 +224,8 @@ while (my $inFile = readdir(INDIR)) {
 	next;
     }
 
-    open(INFILE, "$inDir/$inFile") ||
-	die "E $0: cannot open infile $inDir/$inFile\n";
+    open(INFILE, "gunzip -c $inDir/$inFile |") ||
+	die "E $0: cannot gunzip-open infile $inDir/$inFile\n";
 
     ###################################
     # header line
