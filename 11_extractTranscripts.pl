@@ -306,7 +306,7 @@ while (my $inFile = readdir(INDIR)) {
     }
     # sanity check
     (($hvCol >= 0) && ($hvColOC >= 0) && ($hetCol >= 0) && ($hetColOC >= 0)) || 
-	die "E $0: couldn't find one of HV/HET/OCHV/OCHET for $cohort\n";
+	die "E $0: couldn't find one of HV/HET/OCHV/OCHET for $cohort: $hvCol $hetCol $hvColOC $hetColOC\n";
 
     # add filter params at the end and store
     $cohort2header{$cohort} = "$newHeaders\t$headers[$#headers]";
