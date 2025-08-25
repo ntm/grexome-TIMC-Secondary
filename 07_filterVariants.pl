@@ -162,7 +162,7 @@ while(my $line = <STDIN>) {
     if (($canon) && ($fields[$title2index{"CANONICAL"}] ne 'YES')) {
 	next;
     }
-   if (($no_mod) && ($fields[$title2index{"IMPACT"}] eq "MODIFIER")) {
+    if (($no_mod) && ($fields[$title2index{"IMPACT"}] eq "MODIFIER")) {
 	next;
     }
     if (($no_low) && ($fields[$title2index{"IMPACT"}] eq "LOW")) {

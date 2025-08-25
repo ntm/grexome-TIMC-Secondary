@@ -380,6 +380,18 @@ else {
 ######################
 # subsequent steps work on the individual CohortFiles
 
+# STEP 10 - TRANSCRIPTS , BEFORE FILTERING on max_ctrl*, adding patientIDs
+$com = "perl $RealBin/11_extractTranscripts.pl --indir $tmpdir/Cohorts/ --outdir $tmpdir/Transcripts_noIDs/ ";
+($pathologies) && ($com .= "--pathologies=$pathologies ");
+($debug) && ($com .= "2> $outDir/step10t.err");
+system($com) && die "E $0: step10-transcripts failed\n";
+
+$com = "perl $RealBin/12_addPatientIDs.pl $samples $tmpdir/Transcripts_noIDs/ $outDir/Transcripts/ ";
+($debug) && ($com .= "2>> $outDir/step10t.err");
+system($com) && die "E $0: step10-transcripts-addPatientIDs failed\n";
+(! $debug) && remove_tree("$tmpdir/Transcripts_noIDs/");
+
+
 # STEP 10: filter variants on COUNTs and reorder columns, clean up unfiltered CohortFiles
 $com = "perl $RealBin/10_filterAndReorderAll.pl --indir $tmpdir/Cohorts/ --outdir $tmpdir/Cohorts_Filtered/ ";
 $com .= "--reorder --favoriteTissues=".&gtexFavoriteTissues()." ";
@@ -392,10 +404,11 @@ my $max_ctrl_hv = 3;
 my $max_ctrl_het = int($numSamples * 0.02);
 ($max_ctrl_het < 2 * $max_ctrl_hv) && ($max_ctrl_het = 2 * $max_ctrl_hv);
 $com .= "--max_ctrl_hv=$max_ctrl_hv --max_ctrl_het=$max_ctrl_het ";
-($debug) && ($com .= "2> $outDir/step10.err");
-system($com) && die "E $0: step10 failed\n";
+($debug) && ($com .= "2> $outDir/step10f.err");
+system($com) && die "E $0: step10-filter failed\n";
 # remove unfiltered results in non-debug mode
 (! $debug) && remove_tree("$tmpdir/Cohorts/");
+
 
 # STEP 11 - SAMPLES
 $com = "perl $RealBin/11_extractSamples.pl --samples $samples ";
@@ -403,18 +416,6 @@ $com .= "--indir $tmpdir/Cohorts_Filtered/ --outdir $outDir/Samples/ ";
 (&coveragePath()) && ($com .= "--covdir ".&coveragePath());
 ($debug) && ($com .= " 2> $outDir/step11s.err");
 system($com) && die "E $0: step11-samples failed\n";
-
-# STEP 11 - TRANSCRIPTS , adding patientIDs
-$com = "perl $RealBin/11_extractTranscripts.pl --indir $tmpdir/Cohorts_Filtered/ --outdir $tmpdir/Transcripts_noIDs/ ";
-($pathologies) && ($com .= "--pathologies=$pathologies ");
-($debug) && ($com .= "2> $outDir/step11t.err");
-system($com) && die "E $0: step11-transcripts failed\n";
-
-$com = "perl $RealBin/12_addPatientIDs.pl $samples $tmpdir/Transcripts_noIDs/ $outDir/Transcripts/ ";
-($debug) && ($com .= "2>> $outDir/step11t.err");
-system($com) && die "E $0: step11-transcripts-addPatientIDs failed\n";
-
-(! $debug) && remove_tree("$tmpdir/Transcripts_noIDs/");
 
 
 # STEP 11 - FINAL COHORTFILES , require at least one HV or HET sample and add patientIDs
