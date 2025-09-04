@@ -387,7 +387,7 @@ sub vepCommand {
 	# dbNSFP and dbscSNV
 	my $dbNsfpPath = "$dataDir/dbNSFP/";
 	if (-d $dbNsfpPath) {
-	    my $dbNsfpFile = "$dbNsfpPath/dbNSFP5.1a_grch38.gz";
+	    my $dbNsfpFile = "$dbNsfpPath/dbNSFP5.2a_grch38.gz";
 	    if (-f $dbNsfpFile) {
 		# comma-separated list of fields to retrieve from dbNSFP, there are MANY
 		# possibilities, check the README in $dbNsfpPath
