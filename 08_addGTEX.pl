@@ -160,21 +160,18 @@ while ($line=<GTEX>) {
     # for calculating GTEX_*_RATIO:
     # sum of all gtex values
     my $sumOfGtex = 0;
-    # number of defined gtex values
-    my $numberOfGtex = 0;
     foreach my $i (0..$#data) {
-	($data[$i]) || next;
-	$thisGtex[$i] = $data[$i];
-	$sumOfGtex += $data[$i] ;
-	$numberOfGtex++;
+		($data[$i]) || next;
+		$thisGtex[$i] = $data[$i];
+		$sumOfGtex += $data[$i] ;
     }
 
-    # favExp / averageExp == favExp / (sumExp / numberGtex) == favExp * numberGtex / sumExp
+    # favExp / averageExp == favExp / (sumExp / nbTissues) == favExp * nbTissues / sumExp
     # so make sure we can divide by $sumOfGtex
     ($sumOfGtex) || die "E $0: Sum of GTEX values is zero for gene $ensg, impossible?\n$line\n";
     foreach my $ii (0..$#favTissIndex) {
-	($thisGtex[$favTissIndex[$ii]]) && 
-	    ($favTissRatios[$ii] = $thisGtex[$favTissIndex[$ii]] * $numberOfGtex / $sumOfGtex) ;
+		($thisGtex[$favTissIndex[$ii]]) && 
+			($favTissRatios[$ii] = $thisGtex[$favTissIndex[$ii]] * @tissues / $sumOfGtex) ;
     }
     
     # OK build array of strings with GTEX_RATIOs first, then favorites, then others
