@@ -134,7 +134,7 @@ Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --infile : bgzipped multi-sample GVCF or VCF file to parse
 --species string [default $species]: species, as expected by VEP (eg mus_musculus)
 --cnvs : [optional] multi-sample VCF file containing CNV calls, possibly (b)gzipped, conventions are:
-       	 ALT is <DEL> or <DUP>, INFO contains END=, FORMAT must start with GT:GQ:FR:BPR and possibly :BP
+                ALT is <DEL> or <DUP>, INFO contains END=, FORMAT must start with GT:GQ:FR:BPR and possibly :BP
 --outdir : subdir where results will be created, must not pre-exist
 --config [defaults to grexomeTIMCsec_config.pm alongside this script] : your customized copy (with path) of the distributed *config.pm
 --canonical : restrict results to canonical transcripts
@@ -143,17 +143,17 @@ Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --help : print this USAGE";
 
 GetOptions ("samples=s" => \$samples,
-	    "pathologies=s" => \$pathologies,
-	    "candidateGenes=s" => \$candidateGenes,
-	    "infile=s" => \$inFile,
-	    "species=s" => \$species,
-	    "cnvs=s" => \$cnvs,
-	    "outdir=s" => \$outDir,
-	    "config=s" => \$config,
-	    "canonical" => \$canon,
- 	    "debug" => \$debug,
- 	    "debugVep" => \$debugVep,
-	    "help" => \$help)
+            "pathologies=s" => \$pathologies,
+            "candidateGenes=s" => \$candidateGenes,
+            "infile=s" => \$inFile,
+            "species=s" => \$species,
+            "cnvs=s" => \$cnvs,
+            "outdir=s" => \$outDir,
+            "config=s" => \$config,
+            "canonical" => \$canon,
+            "debug" => \$debug,
+            "debugVep" => \$debugVep,
+            "help" => \$help)
     or die("E $0: Error in command line arguments\n$USAGE\n");
 
 # make sure required options were provided and sanity check them
@@ -179,7 +179,7 @@ if ($cnvs) {
 (-f $config) ||  die "E $0: the supplied config.pm doesn't exist: $config\n";
 require($config);
 grexomeTIMCsec_config->import(qw(refGenome vepCacheFile vepPluginDataPath fastTmpPath), 
-			      qw(coveragePath gtexDatafile gtexFavoriteTissues subCohorts));
+                              qw(coveragePath gtexDatafile gtexFavoriteTissues subCohorts));
 
 ($outDir) || die "E $0: you must provide an outDir\n";
 (-e $outDir) && 
@@ -196,19 +196,19 @@ $samples = "$outDir/".basename($samples);
 if ($pathologies) {
     (-f $pathologies) || die "E $0: the supplied pathologies file doesn't exist\n";
     copy($pathologies, $outDir) ||
-	die "E $0: cannot copy pathologies metadata to outDir: $!\n";
+        die "E $0: cannot copy pathologies metadata to outDir: $!\n";
     $pathologies = "$outDir/".basename($pathologies);
 }
 
 my @candNew = ();
 if ($candidateGenes) {
     foreach my $candFile (split(/,/, $candidateGenes)) {
-	(-f $candFile) ||
-	    die "E $0: the supplied candidateGenes file $candFile doesn't exist\n";
-	copy($candFile, $outDir) ||
-	    die "E $0: cannot copy candidateGenes file $candFile to outDir: $!\n";
-	# use the copies in script
-	push(@candNew, "$outDir/".basename($candFile));
+        (-f $candFile) ||
+            die "E $0: the supplied candidateGenes file $candFile doesn't exist\n";
+        copy($candFile, $outDir) ||
+            die "E $0: cannot copy candidateGenes file $candFile to outDir: $!\n";
+        # use the copies in script
+        push(@candNew, "$outDir/".basename($candFile));
     }
     $candidateGenes = join(',', @candNew);
 }
@@ -222,13 +222,13 @@ if ($pathologies) {
     &parsePathologies($pathologies);
     &parseSamples($samples, $pathologies);
     if ($candidateGenes) {
-	&parseCandidateGenes($candidateGenes, $samples, 1, $pathologies);
+        &parseCandidateGenes($candidateGenes, $samples, 1, $pathologies);
     }
 }
 else {
     &parseSamples($samples);
     if ($candidateGenes) {
-	&parseCandidateGenes($candidateGenes, $samples, 1);
+        &parseCandidateGenes($candidateGenes, $samples, 1);
     }
 }
 
@@ -244,7 +244,7 @@ my $numSamples = 0;
     # key == sampleID present in $inFile, value==1
     my %samplesFromIn = ();
     foreach my $sample (@samplesFromInFile) {
-	$samplesFromIn{$sample} = 1;
+        $samplesFromIn{$sample} = 1;
     }
 
     # grab the samples listed in $samplesFile: just use the first hashref from
@@ -252,8 +252,8 @@ my $numSamples = 0;
     my ($samplesFromMetadataR) = &parseSamples($samples);
     $numSamples = scalar(keys(%$samplesFromMetadataR));
     foreach my $s (sort keys(%$samplesFromMetadataR)) {
-	(defined $samplesFromIn{$s}) ||
-	    die "E $0: every sample defined in samples file $samples MUST be present in inFile $inFile, sample $s isn't.\n";
+        (defined $samplesFromIn{$s}) ||
+            die "E $0: every sample defined in samples file $samples MUST be present in inFile $inFile, sample $s isn't.\n";
     }
 }
 
@@ -262,9 +262,9 @@ my $caller;
 # try to find the caller name in $inFile
 foreach my $c ("Strelka", "GATK", "ElPrep", "DeepVariant") {
     if ($inFile =~ /$c/i) {
-	$caller = $c;
-	warn "I $0: variant-caller id $caller will be appended to all filenames\n";
-	last;
+        $caller = $c;
+        warn "I $0: variant-caller id $caller will be appended to all filenames\n";
+        last;
     }
 }
 ($caller) ||
@@ -295,9 +295,9 @@ if ($debug) {
 if ($cnvs) {
     $com .= " | perl $RealBin/02_collateVCFs.pl --vcf=$cnvs ";
     if ($debug) {
-	$com .= "2> $outDir/step2.err > $outDir/step2.out";
-	system($com) && die "E $0: debug mode on, step2 failed, examine step2.err\n";
-	$com = "cat $outDir/step2.out ";
+        $com .= "2> $outDir/step2.err > $outDir/step2.out";
+        system($com) && die "E $0: debug mode on, step2 failed, examine step2.err\n";
+        $com = "cat $outDir/step2.out ";
     }
 }
 else {
@@ -456,34 +456,34 @@ my $subCohortsR = &subCohorts();
 my $doSubCs = 0;
 foreach my $subC (keys(%$subCohortsR)) {
     if (-e $subC) {
-	$doSubCs=1;
+        $doSubCs=1;
     }
     else {
-	warn "W $0: sub-cohort file $subC defined in \&subCohorts() but this file doesn't exist. Skipping this sub-cohort.\n";
+        warn "W $0: sub-cohort file $subC defined in \&subCohorts() but this file doesn't exist. Skipping this sub-cohort.\n";
     }
 }
 if ($doSubCs) {
     mkdir("$outDir/SubCohorts") || die "E $0: cannot mkdir $outDir/SubCohorts\n";
     $com = "";
     foreach my $subC (keys(%$subCohortsR)) {
-	my $patho = $subCohortsR->{$subC};
-	# grab filename from $subC and remove leading "subCohort_" and trailing .txt
-	my $outFileRoot = basename($subC);
-	($outFileRoot =~ s/^subCohort_//) || die "E $0: cannot remove leading subCohort_ from subCohortFile $outFileRoot\n";
-	($outFileRoot =~ s/\.txt$//) || die "E $0: cannot remove .txt from subCohortFile $outFileRoot\n";
-	$outFileRoot = "$outDir/SubCohorts/$outFileRoot";
-	($com) && ($com .= '&& ');
-	$com .= "( perl $RealBin/13_extractSubcohort.pl $subC < $outDir/Cohorts/$patho.final.patientIDs.csv > $outFileRoot.cohort.csv ";
-	($debug) && ($com .= "2>> $outDir/step13-subCohorts.err ");
-	$com .= ") && ";
-	if (! $canon) {
-	    $com .= "( perl $RealBin/13_extractSubcohort.pl $subC < $outDir/Cohorts_Canonical/$patho.final.patientIDs.canon.csv > $outFileRoot.cohort.canon.csv ";
-	    ($debug) && ($com .= "2>> $outDir/step13-subCohorts.err ");
-	    $com .= ") && ";
-	}
-	$com .= "( perl $RealBin/13_extractSubcohort.pl $subC < $outDir/Transcripts/$patho.Transcripts.patientIDs.csv > $outFileRoot.transcripts.csv ";
-	($debug) && ($com .= "2>> $outDir/step13-subCohorts.err ");
-	$com .= ") ";
+        my $patho = $subCohortsR->{$subC};
+        # grab filename from $subC and remove leading "subCohort_" and trailing .txt
+        my $outFileRoot = basename($subC);
+        ($outFileRoot =~ s/^subCohort_//) || die "E $0: cannot remove leading subCohort_ from subCohortFile $outFileRoot\n";
+        ($outFileRoot =~ s/\.txt$//) || die "E $0: cannot remove .txt from subCohortFile $outFileRoot\n";
+        $outFileRoot = "$outDir/SubCohorts/$outFileRoot";
+        ($com) && ($com .= '&& ');
+        $com .= "( perl $RealBin/13_extractSubcohort.pl $subC < $outDir/Cohorts/$patho.final.patientIDs.csv > $outFileRoot.cohort.csv ";
+        ($debug) && ($com .= "2>> $outDir/step13-subCohorts.err ");
+        $com .= ") && ";
+        if (! $canon) {
+            $com .= "( perl $RealBin/13_extractSubcohort.pl $subC < $outDir/Cohorts_Canonical/$patho.final.patientIDs.canon.csv > $outFileRoot.cohort.canon.csv ";
+            ($debug) && ($com .= "2>> $outDir/step13-subCohorts.err ");
+            $com .= ") && ";
+        }
+        $com .= "( perl $RealBin/13_extractSubcohort.pl $subC < $outDir/Transcripts/$patho.Transcripts.patientIDs.csv > $outFileRoot.transcripts.csv ";
+        ($debug) && ($com .= "2>> $outDir/step13-subCohorts.err ");
+        $com .= ") ";
     }
     system($com) && die "E $0: step13-subCohorts failed\n";
 }
@@ -497,16 +497,16 @@ else {
 # APPENDVC: append $caller (if it was auto-detected) to all final filenames
 if ($caller) {
     open (FILES, "find $outDir/ -name \'*csv\' |") ||
-	die "E $0: step14-appendVC cannot find final csv files with find\n";
+        die "E $0: step14-appendVC cannot find final csv files with find\n";
     while (my $f = <FILES>) {
-	chomp($f);
-	my $new = $f; 
-	($new =~ s/\.csv$/.$caller.csv/) || 
-	    die "E $0: step14-appendVC cannot add $caller as suffix to $new\n";
-	(-e $new) && 
-	    die "E $0: step14-appendVC want to rename to new $new but it already exists?!\n";
-	rename($f,$new) ||
-	    die "E $0: step14-appendVC cannot rename $f $new\n";
+        chomp($f);
+        my $new = $f; 
+        ($new =~ s/\.csv$/.$caller.csv/) || 
+            die "E $0: step14-appendVC cannot add $caller as suffix to $new\n";
+        (-e $new) && 
+            die "E $0: step14-appendVC want to rename to new $new but it already exists?!\n";
+        rename($f,$new) ||
+            die "E $0: step14-appendVC cannot rename $f $new\n";
     }
     close(FILES);
 }
@@ -520,7 +520,7 @@ while (my $f = <FILES>) {
     my $wc = `head -n 2 $f | wc -l`;
     # there's always 1 header line
     ($wc > 1) || unlink($f) ||
-	die "E $0: step14-removeEmpty cannot unlink $f: $!\n";
+        die "E $0: step14-removeEmpty cannot unlink $f: $!\n";
 }
 close(FILES);
 

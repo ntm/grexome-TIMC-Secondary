@@ -61,8 +61,8 @@ Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --help : print this USAGE";
 
 GetOptions ("samples=s" => \$samplesFile,
-	    "candidateGenes=s" => \$candidatesFiles,
-	    "help" => \$help)
+            "candidateGenes=s" => \$candidatesFiles,
+            "help" => \$help)
     or die("E $0: Error in command line arguments\n$USAGE\n");
 
 # make sure required options were provided and sanity check them
@@ -91,15 +91,15 @@ my %knownCandidateGenes;
     my $knownCandsR = &parseCandidateGenes($candidatesFiles, $samplesFile, 0);
 
     foreach my $c (sort keys(%$knownCandsR)) {
-	foreach my $gene (keys(%{$knownCandsR->{$c}})) {
-	    my $score = $knownCandsR->{$c}->{$gene};
-	    if ($knownCandidateGenes{$gene}) {
-		$knownCandidateGenes{$gene} .= ",$c:$score";
-	    }
-	    else {
-		$knownCandidateGenes{$gene} = "$c:$score";
-	    }
-	}
+        foreach my $gene (keys(%{$knownCandsR->{$c}})) {
+            my $score = $knownCandsR->{$c}->{$gene};
+            if ($knownCandidateGenes{$gene}) {
+                $knownCandidateGenes{$gene} .= ",$c:$score";
+            }
+            else {
+                $knownCandidateGenes{$gene} = "$c:$score";
+            }
+        }
     }
 }
 
@@ -132,7 +132,7 @@ while (my $line = <STDIN>) {
     chomp($line);
     my @fields = split(/\t/, $line, $maxSplit) ;
     ($#fields >= $symbolCol) ||
-	die "E $0: data line doesn't have enough fields:\n$line\n";
+        die "E $0: data line doesn't have enough fields:\n$line\n";
     my $gene = $fields[$symbolCol];
     (defined $knownCandidateGenes{$gene}) && (delete $knownCandidateGenes{$gene});
 }
@@ -141,7 +141,7 @@ while (my $line = <STDIN>) {
 # any remaining key of %knownCandidateGenes was never seen
 foreach my $gene (sort(keys(%knownCandidateGenes))) {
     warn "W $0: \"known candidate/causal gene\" $gene for ".$knownCandidateGenes{$gene}.
-	" was never seen! typo in samples or candidateGenes xlsx files?\n";
+        " was never seen! typo in samples or candidateGenes xlsx files?\n";
 }
 
 $now = strftime("%F %T", localtime);

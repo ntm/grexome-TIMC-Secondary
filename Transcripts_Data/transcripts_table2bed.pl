@@ -22,10 +22,10 @@ while(my $line = <STDIN>) {
     (@exonsS == @exonsE) || die "E: different numbers of exon starts and ends in:\n$line\n";
 
     foreach my $i (0..$#exonsS) {
-	# if on '+' strand increment so we start at 1
-	my $exonNum = $i + 1;
-	# if transcript is on - strand we count down
-	($strand eq '-') && ($exonNum = scalar(@exonsS) - $i);
-	print "$chr\t$exonsS[$i]\t$exonsE[$i]\t$transcript"."_$exonNum\n";
+        # if on '+' strand increment so we start at 1
+        my $exonNum = $i + 1;
+        # if transcript is on - strand we count down
+        ($strand eq '-') && ($exonNum = scalar(@exonsS) - $i);
+        print "$chr\t$exonsS[$i]\t$exonsE[$i]\t$transcript"."_$exonNum\n";
     }
 }

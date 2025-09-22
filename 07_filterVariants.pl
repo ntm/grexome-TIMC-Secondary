@@ -61,17 +61,17 @@ my $max_af_perPop;
 my $logTime = '';
 
 GetOptions ("max_ctrl_hv=i" => \$max_ctrl_hv,
-	    "max_ctrl_het=i" => \$max_ctrl_het,
-	    "min_cohort_hv=i" => \$min_cohort_hv,
-	    "min_hr=i" => \$min_hr,
-	    "no_mod" => \$no_mod,
-	    "no_low" => \$no_low,
-	    "no_pseudo" => \$no_pseudo,
-	    "no_nmd" => \$no_nmd,
-	    "canonical" => \$canon,
-	    "max_af_global=f" => \$max_af_global,
-	    "max_af_perPop=f" => \$max_af_perPop,
-	    "logtime" => \$logTime)
+            "max_ctrl_het=i" => \$max_ctrl_het,
+            "min_cohort_hv=i" => \$min_cohort_hv,
+            "min_hr=i" => \$min_hr,
+            "no_mod" => \$no_mod,
+            "no_low" => \$no_low,
+            "no_pseudo" => \$no_pseudo,
+            "no_nmd" => \$no_nmd,
+            "canonical" => \$canon,
+            "max_af_global=f" => \$max_af_global,
+            "max_af_perPop=f" => \$max_af_perPop,
+            "logtime" => \$logTime)
     or die("E $0: Error in command line arguments\n");
 
 if ($logTime) {
@@ -108,49 +108,49 @@ my @titles = split(/\t/, $header);
 foreach my $i (0..$#titles) {
     my $title = $titles[$i];
     if (($max_ctrl_hv) || ($max_ctrl_het) || ($min_cohort_hv) || ($min_hr)) {
-	# if filtering on COUNTs we will need COUNT_$cohort_HV , we want a uniform hash
-	# key COUNT_COHORT_HV in %title2index but we must ignore the other COUNT_*_HV columns
-	if (($title !~ /_NEGCTRL_/) && ($title !~ /_COMPAT_/) && ($title !~ /_OTHERCAUSE_/) &&
-	    ($title =~ /^COUNT_(\w+)_HV/)) {
-	    # OK replace cohort name with COHORT as hash key
-	    $title = "COUNT_COHORT_HV";
-	}
+        # if filtering on COUNTs we will need COUNT_$cohort_HV , we want a uniform hash
+        # key COUNT_COHORT_HV in %title2index but we must ignore the other COUNT_*_HV columns
+        if (($title !~ /_NEGCTRL_/) && ($title !~ /_COMPAT_/) && ($title !~ /_OTHERCAUSE_/) &&
+            ($title =~ /^COUNT_(\w+)_HV/)) {
+            # OK replace cohort name with COHORT as hash key
+            $title = "COUNT_COHORT_HV";
+        }
     }
     # sanity
     (defined $title2index{$title}) &&
-	die "E $0: title $title defined twice\n";
+        die "E $0: title $title defined twice\n";
     $title2index{$title} = $i;
 }
 
 # make sure all titles we need are present
 if (($max_ctrl_hv) || ($max_ctrl_het) || ($min_cohort_hv) || ($min_hr)) {
     foreach my $t ("COUNT_NEGCTRL_HV","COUNT_NEGCTRL_HET","COUNT_COHORT_HV","COUNT_HR") {
-	(defined $title2index{$t}) ||
-	    die "E $0: title $t required by script but missing, some VEP columns changed?\n";
+        (defined $title2index{$t}) ||
+            die "E $0: title $t required by script but missing, some VEP columns changed?\n";
     }
 }
 if (($no_mod) || ($no_low)) {
     (defined $title2index{"IMPACT"}) ||
-	die "E $0: IMPACT required by script but missing, some VEP columns changed?\n";
+        die "E $0: IMPACT required by script but missing, some VEP columns changed?\n";
 }
 if (($no_pseudo) || ($no_nmd)) {
     (defined $title2index{"BIOTYPE"}) ||
-	die "E $0: BIOTYPE required by script but missing, some VEP columns changed?\n";
+        die "E $0: BIOTYPE required by script but missing, some VEP columns changed?\n";
 }
 if ($canon) {
     (defined $title2index{"CANONICAL"}) ||
-	die "E $0: CANONICAL required by script but missing, some VEP columns changed?\n";
+        die "E $0: CANONICAL required by script but missing, some VEP columns changed?\n";
 }
 if ($max_af_global) {
     foreach my $t ("gnomADe_AF","gnomADg_AF","RegeneronME_ALL_AF","AllofUs_ALL_AF","ALFA_Total_AF") {
-	(defined $title2index{$t}) ||
-	    die "E $0: $t required by script but missing, some VEP columns changed?\n";
+        (defined $title2index{$t}) ||
+            die "E $0: $t required by script but missing, some VEP columns changed?\n";
     }
 }
 if ($max_af_perPop) {
     foreach my $t ("AllofUs_POPMAX_AF","dbNSFP_POPMAX_AF") {
-	(defined $title2index{$t}) ||
-	    die "E $0: $t required by script but missing, some VEP columns changed?\n";
+        (defined $title2index{$t}) ||
+            die "E $0: $t required by script but missing, some VEP columns changed?\n";
     }
 }
 
@@ -160,60 +160,60 @@ while(my $line = <STDIN>) {
     my @fields = split(/\t/, $line, -1);
     # apply all filters
     if (($canon) && ($fields[$title2index{"CANONICAL"}] ne 'YES')) {
-	next;
+        next;
     }
     if (($no_mod) && ($fields[$title2index{"IMPACT"}] eq "MODIFIER")) {
-	next;
+        next;
     }
     if (($no_low) && ($fields[$title2index{"IMPACT"}] eq "LOW")) {
-	next;
+        next;
     }
     if (($no_pseudo) && ($fields[$title2index{"BIOTYPE"}] =~ /pseudogene$/)) {
-	# there are a bunch of pseudogene biotypes but they all end with 'pseudogene'
-	next;
+        # there are a bunch of pseudogene biotypes but they all end with 'pseudogene'
+        next;
     }
     if (($no_nmd) && ($fields[$title2index{"BIOTYPE"}] eq "nonsense_mediated_decay")) {
-	next;
+        next;
     }
     if ((defined $max_ctrl_hv) && ($fields[$title2index{"COUNT_NEGCTRL_HV"}] > $max_ctrl_hv)) {
-	next;
+        next;
     }
     if ((defined $max_ctrl_het) && ($fields[$title2index{"COUNT_NEGCTRL_HET"}] > $max_ctrl_het)) {
-	next;
+        next;
     }
     if ((defined $min_cohort_hv) && ($fields[$title2index{"COUNT_COHORT_HV"}] < $min_cohort_hv)) {
-	next;
+        next;
     }
     if  ((defined $min_hr) && ($fields[$title2index{"COUNT_HR"}]  < $min_hr)) {
-	next;
+        next;
     }
     if (defined $max_af_global) {
-	my $keep = 1;
-	foreach my $title ("gnomADe_AF","gnomADg_AF","RegeneronME_ALL_AF",
-			   "AllofUs_ALL_AF","ALFA_Total_AF") {
-	    if ($fields[$title2index{$title}]) {
-		# sometimes we have several &-separated values, filter if any is high
-		foreach my $af (split(/&/, $fields[$title2index{$title}])) {
-		    if ($af > $max_af_global) {
-			$keep = 0;
-			last;
-		    }
-		}
-		# if AF was too high, don't even look at other sources
-		($keep) || last;
-	    }
-	}
-	($keep) || next;
+        my $keep = 1;
+        foreach my $title ("gnomADe_AF","gnomADg_AF","RegeneronME_ALL_AF",
+                           "AllofUs_ALL_AF","ALFA_Total_AF") {
+            if ($fields[$title2index{$title}]) {
+                # sometimes we have several &-separated values, filter if any is high
+                foreach my $af (split(/&/, $fields[$title2index{$title}])) {
+                    if ($af > $max_af_global) {
+                        $keep = 0;
+                        last;
+                    }
+                }
+                # if AF was too high, don't even look at other sources
+                ($keep) || last;
+            }
+        }
+        ($keep) || next;
     }
     if (defined $max_af_perPop) {
-	my $keep = 1;
-	foreach my $title ("AllofUs_POPMAX_AF","dbNSFP_POPMAX_AF") {
-	    if (($fields[$title2index{$title}]) && ($fields[$title2index{$title}] > $max_af_perPop)) {
-		$keep = 0;
-		last;
-	    }
-	}
-	($keep) || next;
+        my $keep = 1;
+        foreach my $title ("AllofUs_POPMAX_AF","dbNSFP_POPMAX_AF") {
+            if (($fields[$title2index{$title}]) && ($fields[$title2index{$title}] > $max_af_perPop)) {
+                $keep = 0;
+                last;
+            }
+        }
+        ($keep) || next;
     }
 
     # passed all filters

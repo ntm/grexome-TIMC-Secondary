@@ -94,7 +94,7 @@ my %candidateGenes = ();
 my $knownCandidateGenesR = &parseCandidateGenes($candidatesFiles, $samplesFile, 0);
 foreach my $patho (keys(%$knownCandidateGenesR)) {
     foreach my $gene (keys(%{$knownCandidateGenesR->{$patho}})) {
-	$candidateGenes{$gene} = 1;
+        $candidateGenes{$gene} = 1;
     }
 }
 
@@ -119,13 +119,13 @@ foreach my $i (0..$#samples) {
     my $sample = $samples[$i];
     my $outFile = "$outDir/coverage_$sample.csv";
     if (-e $outFile) {
-	$samplesIgnored[$i] = 1;
+        $samplesIgnored[$i] = 1;
     }
     else {
-	open(my $FH, "> $outFile") || die "E $0: cannot open $outFile for writing\n";
-	$outFHs[$i] = $FH;
-	# print header
-	print $FH "Gene\tKNOWN_CANDIDATE_GENE\tTranscript\tExon\tBases examined (+-10 around each exon)\tPercentage covered >= 50x\tPercentage covered >= 20x\tPercentage covered >= 10x\n";
+        open(my $FH, "> $outFile") || die "E $0: cannot open $outFile for writing\n";
+        $outFHs[$i] = $FH;
+        # print header
+        print $FH "Gene\tKNOWN_CANDIDATE_GENE\tTranscript\tExon\tBases examined (+-10 around each exon)\tPercentage covered >= 50x\tPercentage covered >= 20x\tPercentage covered >= 10x\n";
     }
 }
 
@@ -158,20 +158,20 @@ while (my $line = <GENES>) {
     chomp($line);
     my @fields = split(/\t/,$line);
     (@fields == 9) || 
-	die "E $0: wrong number of fields in line:\n$line\n";
+        die "E $0: wrong number of fields in line:\n$line\n";
     my ($transcript,$gene,$ensg,$chr,$strand,$cdsStart,$cdsEnd,$starts,$ends) = @fields;
 
     # skip non-coding transcripts
     if ($cdsStart == $cdsEnd) {
-	next;
+        next;
     }
 
     # if gene is a candidate mark it as seen, or warn if it was seen earlier
     if (($candidateGenes{$gene}) && ($candidateGenes{$gene} == 1)) {
-	$candidateGenes{$gene} = 2;
+        $candidateGenes{$gene} = 2;
     }
     elsif ($candidateGenes{$gene}) {
-	warn "W $0: found several transcripts for candidate gene $gene, is this expected?\n";
+        warn "W $0: found several transcripts for candidate gene $gene, is this expected?\n";
     }
     # else not a candidate gene, nothing to do
 
@@ -179,7 +179,7 @@ while (my $line = <GENES>) {
     my $numExons = @starts;
     my @ends = split(/,/,$ends);
     ($numExons == @ends) || 
-	die "E $0: mismatch between numbers of starts and ends in line:\n$line\n";
+        die "E $0: mismatch between numbers of starts and ends in line:\n$line\n";
 
     # we will print one line per exon for candidate genes, but also a final 
     # line for the whole gene/transcript
@@ -192,139 +192,139 @@ while (my $line = <GENES>) {
     my @bases0Gene = (0) x scalar(@samples);
 
     foreach my $i (0..$#starts) {
-	# ignore 5'-UTR (if + strand) / 3'-UTR (if - strand)
-	($ends[$i] < $cdsStart) && next;
-	($starts[$i] < $cdsStart) && ($starts[$i] = $cdsStart);
-	# ignore 3'-UTR on + strand / 5'-UTR on - strand
-	($starts[$i] > $cdsEnd) && next;
-	($ends[$i] > $cdsEnd) && ($ends[$i] = $cdsEnd);
+        # ignore 5'-UTR (if + strand) / 3'-UTR (if - strand)
+        ($ends[$i] < $cdsStart) && next;
+        ($starts[$i] < $cdsStart) && ($starts[$i] = $cdsStart);
+        # ignore 3'-UTR on + strand / 5'-UTR on - strand
+        ($starts[$i] > $cdsEnd) && next;
+        ($ends[$i] > $cdsEnd) && ($ends[$i] = $cdsEnd);
 
-	# apostrophe-space before gene name so excel doesn't corrupt file
-	my $toPrint = "\' $gene\t";
-	if ($candidateGenes{$gene}) {
-	    $toPrint .= "1\t";
-	}
-	else {
-	    $toPrint .= "0\t";
-	}
-	$toPrint .= "$transcript\t";
-	# for Exon use eg 3\12 (so excel doesn't corrupt my file)
-	if ($strand eq '+') {
-	    $toPrint .= $i+1;
-	}
-	else {
-	    $toPrint .= $numExons - $i;
-	}
-	$toPrint .= "\\$numExons\t";
-	# end-start+1 is the exon length, add 10 bases on each side
-	my $lengthExon = $ends[$i] - $starts[$i] + 21;
-	$toPrint .= "$lengthExon\t";
-	$lengthGene += $lengthExon;
+        # apostrophe-space before gene name so excel doesn't corrupt file
+        my $toPrint = "\' $gene\t";
+        if ($candidateGenes{$gene}) {
+            $toPrint .= "1\t";
+        }
+        else {
+            $toPrint .= "0\t";
+        }
+        $toPrint .= "$transcript\t";
+        # for Exon use eg 3\12 (so excel doesn't corrupt my file)
+        if ($strand eq '+') {
+            $toPrint .= $i+1;
+        }
+        else {
+            $toPrint .= $numExons - $i;
+        }
+        $toPrint .= "\\$numExons\t";
+        # end-start+1 is the exon length, add 10 bases on each side
+        my $lengthExon = $ends[$i] - $starts[$i] + 21;
+        $toPrint .= "$lengthExon\t";
+        $lengthGene += $lengthExon;
 
-	# count the bases of this exon covered at 50x / 20x / 10x / 0x for each sample
-	my @bases50Exon = (0) x scalar(@samples);
-	my @bases20Exon = (0) x scalar(@samples);
-	my @bases10Exon = (0) x scalar(@samples);
-	my @bases0Exon = (0) x scalar(@samples);
+        # count the bases of this exon covered at 50x / 20x / 10x / 0x for each sample
+        my @bases50Exon = (0) x scalar(@samples);
+        my @bases20Exon = (0) x scalar(@samples);
+        my @bases10Exon = (0) x scalar(@samples);
+        my @bases0Exon = (0) x scalar(@samples);
 
-	# range of interest: start at -10 and end at +10
-	my $range = "$chr:".($starts[$i]-10)."-".($ends[$i]+10);
-	# grab GVCF lines in our range of interest
-	my $tabixIter = $tabix->query($range);
-	while (my $gvcfLine = $tabixIter->next) {
-	    chomp($gvcfLine);
-	    my @gvcfFields = split(/\t/,$gvcfLine);
-	    my ($pos,$info,$format,@sampleData) = @gvcfFields[1,7..$#gvcfFields];
-	    my $end = $pos;
-	    # if this is a non-var block...
-	    if ($info =~ /END=(\d+)/) {
-		$end = $1;
-	    }
-	    # this line must overlap $range but it may go beyond, adjust if needed
-	    if ($pos < $starts[$i]-10) {
-		# tabix can return a line with a deletion that actually precedes 
-		# $range, skip these lines
-		($end >= $starts[$i]-10) || next;
-		$pos = $starts[$i]-10;
-	    }
-	    if ($end > $ends[$i]+10) {
-		#sanity
-		($pos <= $ends[$i]+10) ||
-		    die "E $0: tabix gave a line for $range that doesn't overlap it (after):\n$gvcfLine\n";
-		$end = $ends[$i]+10;
-	    }
-	    # number of bases overlapping range in this line
-	    my $numBases = $end - $pos + 1;
+        # range of interest: start at -10 and end at +10
+        my $range = "$chr:".($starts[$i]-10)."-".($ends[$i]+10);
+        # grab GVCF lines in our range of interest
+        my $tabixIter = $tabix->query($range);
+        while (my $gvcfLine = $tabixIter->next) {
+            chomp($gvcfLine);
+            my @gvcfFields = split(/\t/,$gvcfLine);
+            my ($pos,$info,$format,@sampleData) = @gvcfFields[1,7..$#gvcfFields];
+            my $end = $pos;
+            # if this is a non-var block...
+            if ($info =~ /END=(\d+)/) {
+                $end = $1;
+            }
+            # this line must overlap $range but it may go beyond, adjust if needed
+            if ($pos < $starts[$i]-10) {
+                # tabix can return a line with a deletion that actually precedes 
+                # $range, skip these lines
+                ($end >= $starts[$i]-10) || next;
+                $pos = $starts[$i]-10;
+            }
+            if ($end > $ends[$i]+10) {
+                #sanity
+                ($pos <= $ends[$i]+10) ||
+                    die "E $0: tabix gave a line for $range that doesn't overlap it (after):\n$gvcfLine\n";
+                $end = $ends[$i]+10;
+            }
+            # number of bases overlapping range in this line
+            my $numBases = $end - $pos + 1;
 
-	    # %format: key is a FORMAT key (eg MIN_DP), value is the index of that key in $format
-	    my %format;
-	    { 
-		my @format = split(/:/, $format);
-		foreach my $i (0..$#format) {
-		    $format{$format[$i]} = $i ;
-		}
-	    }
+            # %format: key is a FORMAT key (eg MIN_DP), value is the index of that key in $format
+            my %format;
+            { 
+                my @format = split(/:/, $format);
+                foreach my $i (0..$#format) {
+                    $format{$format[$i]} = $i ;
+                }
+            }
 
-	    foreach my $i (0..$#samples) {
-		# skip ignored samples
-		($samplesIgnored[$i]) && next;
-		# what's the coverage for this sample?
-		my $coverage = 0;
+            foreach my $i (0..$#samples) {
+                # skip ignored samples
+                ($samplesIgnored[$i]) && next;
+                # what's the coverage for this sample?
+                my $coverage = 0;
 
-		my @data = split(/:/,$sampleData[$i]);
-		# if MIN_DP exists, use that
-		if ((defined $format{"MIN_DP"}) && ($data[$format{"MIN_DP"}]) && ($data[$format{"MIN_DP"}] ne '.')) {
-		    $coverage = $data[$format{"MIN_DP"}];
-		}
-		else {
-		    # grab the depth (DP or DPI or sumOfADs, whichever is defined and higher)
-		    if ((defined $format{"DP"}) && ($data[$format{"DP"}]) && ($data[$format{"DP"}] ne '.')) {
-			$coverage = $data[$format{"DP"}];
-		    }
-		    if ((defined $format{"DPI"}) && ($data[$format{"DPI"}]) && ($data[$format{"DPI"}] ne '.')) {
-			($coverage < $data[$format{"DPI"}]) && ($coverage = $data[$format{"DPI"}]);
-		    }
-		    if ((defined $format{"AD"}) && ($data[$format{"AD"}]) && ($data[$format{"AD"}] =~ /^[\d,]+$/)) {
-			my $sumOfADs = 0;
-			foreach my $ad (split(/,/,$data[$format{"AD"}])) {
-			    $sumOfADs += $ad;
-			}
-			($coverage < $sumOfADs) && ($coverage = $sumOfADs);
-		    }
-		}
-		if ($coverage >= 50) {
-		    $bases50Exon[$i] += $numBases;
-		}
-		elsif ($coverage >= 20) {
-		    $bases20Exon[$i] += $numBases;
-		}
-		elsif ($coverage >= 10) {
-		    $bases10Exon[$i] += $numBases;
-		}
-		else {
-		    $bases0Exon[$i] += $numBases;
-		}
-	    }		
-	}
+                my @data = split(/:/,$sampleData[$i]);
+                # if MIN_DP exists, use that
+                if ((defined $format{"MIN_DP"}) && ($data[$format{"MIN_DP"}]) && ($data[$format{"MIN_DP"}] ne '.')) {
+                    $coverage = $data[$format{"MIN_DP"}];
+                }
+                else {
+                    # grab the depth (DP or DPI or sumOfADs, whichever is defined and higher)
+                    if ((defined $format{"DP"}) && ($data[$format{"DP"}]) && ($data[$format{"DP"}] ne '.')) {
+                        $coverage = $data[$format{"DP"}];
+                    }
+                    if ((defined $format{"DPI"}) && ($data[$format{"DPI"}]) && ($data[$format{"DPI"}] ne '.')) {
+                        ($coverage < $data[$format{"DPI"}]) && ($coverage = $data[$format{"DPI"}]);
+                    }
+                    if ((defined $format{"AD"}) && ($data[$format{"AD"}]) && ($data[$format{"AD"}] =~ /^[\d,]+$/)) {
+                        my $sumOfADs = 0;
+                        foreach my $ad (split(/,/,$data[$format{"AD"}])) {
+                            $sumOfADs += $ad;
+                        }
+                        ($coverage < $sumOfADs) && ($coverage = $sumOfADs);
+                    }
+                }
+                if ($coverage >= 50) {
+                    $bases50Exon[$i] += $numBases;
+                }
+                elsif ($coverage >= 20) {
+                    $bases20Exon[$i] += $numBases;
+                }
+                elsif ($coverage >= 10) {
+                    $bases10Exon[$i] += $numBases;
+                }
+                else {
+                    $bases0Exon[$i] += $numBases;
+                }
+            }
+        }
 
-	foreach my $i (0..$#samples) {
-	    ($samplesIgnored[$i]) && next;
-	    # only print per-exon stats for candidate genes
-	    if ($candidateGenes{$gene}) {
-		my $frac = $bases50Exon[$i] / $lengthExon;
-		my $toPrintEnd = sprintf("%.2f",$frac)."\t";
-		$frac = ($bases50Exon[$i] + $bases20Exon[$i]) / $lengthExon;
-		$toPrintEnd .= sprintf("%.2f",$frac)."\t";
-		$frac = ($bases50Exon[$i] + $bases20Exon[$i] + $bases10Exon[$i]) / $lengthExon;
-		$toPrintEnd .= sprintf("%.2f",$frac)."\n";
-		print {$outFHs[$i]} $toPrint.$toPrintEnd;
-	    }
-	    # done with this exon but also record stats for the gene
-	    $bases50Gene[$i] += $bases50Exon[$i];
-	    $bases20Gene[$i] += $bases20Exon[$i];
-	    $bases10Gene[$i] += $bases10Exon[$i];
-	    $bases0Gene[$i] += $bases0Exon[$i];
-	}
+        foreach my $i (0..$#samples) {
+            ($samplesIgnored[$i]) && next;
+            # only print per-exon stats for candidate genes
+            if ($candidateGenes{$gene}) {
+                my $frac = $bases50Exon[$i] / $lengthExon;
+                my $toPrintEnd = sprintf("%.2f",$frac)."\t";
+                $frac = ($bases50Exon[$i] + $bases20Exon[$i]) / $lengthExon;
+                $toPrintEnd .= sprintf("%.2f",$frac)."\t";
+                $frac = ($bases50Exon[$i] + $bases20Exon[$i] + $bases10Exon[$i]) / $lengthExon;
+                $toPrintEnd .= sprintf("%.2f",$frac)."\n";
+                print {$outFHs[$i]} $toPrint.$toPrintEnd;
+            }
+            # done with this exon but also record stats for the gene
+            $bases50Gene[$i] += $bases50Exon[$i];
+            $bases20Gene[$i] += $bases20Exon[$i];
+            $bases10Gene[$i] += $bases10Exon[$i];
+            $bases0Gene[$i] += $bases0Exon[$i];
+        }
     }
 
     # done printing data for each exon of this gene (if it's a candidate),
@@ -335,34 +335,34 @@ while (my $line = <GENES>) {
     $toPrint .= "$transcript\tALL\t$lengthGene\t";
 
     foreach my $i (0..$#samples) {
-	($samplesIgnored[$i]) && next;
-	my $frac = $bases50Gene[$i] / $lengthGene;
-	my $toPrintEnd = sprintf("%.2f",$frac)."\t";
-	$frac = ($bases50Gene[$i] + $bases20Gene[$i]) / $lengthGene;
-	$toPrintEnd .= sprintf("%.2f",$frac)."\t";
-	$frac = ($bases50Gene[$i] + $bases20Gene[$i] + $bases10Gene[$i]) / $lengthGene;
-	$toPrintEnd .= sprintf("%.2f",$frac)."\n";
-	print {$outFHs[$i]} $toPrint.$toPrintEnd;
+        ($samplesIgnored[$i]) && next;
+        my $frac = $bases50Gene[$i] / $lengthGene;
+        my $toPrintEnd = sprintf("%.2f",$frac)."\t";
+        $frac = ($bases50Gene[$i] + $bases20Gene[$i]) / $lengthGene;
+        $toPrintEnd .= sprintf("%.2f",$frac)."\t";
+        $frac = ($bases50Gene[$i] + $bases20Gene[$i] + $bases10Gene[$i]) / $lengthGene;
+        $toPrintEnd .= sprintf("%.2f",$frac)."\n";
+        print {$outFHs[$i]} $toPrint.$toPrintEnd;
 
-	# finally, update global stats
-	if ($candidateGenes{$gene}) {
-	    $bases50Candidates[$i] += $bases50Gene[$i];
-	    $bases20Candidates[$i] += $bases20Gene[$i];
-	    $bases10Candidates[$i] += $bases10Gene[$i];
-	    $bases0Candidates[$i] += $bases0Gene[$i];
-	}
-	else {
-	    $bases50Sampled[$i] += $bases50Gene[$i];
-	    $bases20Sampled[$i] += $bases20Gene[$i];
-	    $bases10Sampled[$i] += $bases10Gene[$i];
-	    $bases0Sampled[$i] += $bases0Gene[$i];
-	}
+        # finally, update global stats
+        if ($candidateGenes{$gene}) {
+            $bases50Candidates[$i] += $bases50Gene[$i];
+            $bases20Candidates[$i] += $bases20Gene[$i];
+            $bases10Candidates[$i] += $bases10Gene[$i];
+            $bases0Candidates[$i] += $bases0Gene[$i];
+        }
+        else {
+            $bases50Sampled[$i] += $bases50Gene[$i];
+            $bases20Sampled[$i] += $bases20Gene[$i];
+            $bases10Sampled[$i] += $bases10Gene[$i];
+            $bases0Sampled[$i] += $bases0Gene[$i];
+        }
     }
     if ($candidateGenes{$gene}) {
-	$lengthCandidates += $lengthGene;
+        $lengthCandidates += $lengthGene;
     }
     else {
-	$lengthSampled += $lengthGene;
+        $lengthSampled += $lengthGene;
     }
 }
 
@@ -398,7 +398,7 @@ foreach my $fh (@outFHs) {
 
 foreach my $gene (sort keys %candidateGenes) {
     if ($candidateGenes{$gene} == 1) {
-	warn "W $0: all done but candidate gene $gene was never seen!\n";
+        warn "W $0: all done but candidate gene $gene was never seen!\n";
     }
 }
 

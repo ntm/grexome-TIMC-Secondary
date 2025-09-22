@@ -76,19 +76,19 @@ warn "I $now: $0 - starting to run\n";
 # Current available annotations produced by runVEP.pl (14/05/2025) are:
 # Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|EXON|INTRON|HGVSc|HGVSp|cDNA_position|CDS_position|Protein_position|Amino_acids|Codons|Existing_variation|ALLELE_NUM|DISTANCE|STRAND|FLAGS|VARIANT_CLASS|SYMBOL_SOURCE|HGNC_ID|CANONICAL|MANE|MANE_SELECT|MANE_PLUS_CLINICAL|SIFT|PolyPhen|miRNA|HGVS_OFFSET|gnomADe_AF|gnomADe_AFR_AF|gnomADe_AMR_AF|gnomADe_ASJ_AF|gnomADe_EAS_AF|gnomADe_FIN_AF|gnomADe_MID_AF|gnomADe_NFE_AF|gnomADe_REMAINING_AF|gnomADe_SAS_AF|gnomADg_AF|gnomADg_AFR_AF|gnomADg_AMI_AF|gnomADg_AMR_AF|gnomADg_ASJ_AF|gnomADg_EAS_AF|gnomADg_FIN_AF|gnomADg_MID_AF|gnomADg_NFE_AF|gnomADg_REMAINING_AF|gnomADg_SAS_AF|CLIN_SIG|SOMATIC|PHENO|CADD_PHRED|CADD_RAW|ALFA_Total_AF|AllofUs_ALL_AF|AllofUs_POPMAX_AF|CADD_raw_rankscore|MetaRNN_pred|MetaRNN_rankscore|MutationTaster_pred|REVEL_rankscore|RegeneronME_ALL_AF|dbNSFP_POPMAX_AF|dbNSFP_POPMAX_POP|ada_score|rf_score|SpliceAI_pred_DP_AG|SpliceAI_pred_DP_AL|SpliceAI_pred_DP_DG|SpliceAI_pred_DP_DL|SpliceAI_pred_DS_AG|SpliceAI_pred_DS_AL|SpliceAI_pred_DS_DG|SpliceAI_pred_DS_DL|SpliceAI_pred_SYMBOL|am_class|am_pathogenicity|pLI_gene_value
 my @goodVeps = ("SYMBOL","Gene","IMPACT","Consequence","Feature","CANONICAL",
-		"BIOTYPE","MANE_SELECT","pLI_gene_value","Existing_variation",
-		"HGVSc","HGVSp","ALLELE_NUM","EXON","INTRON",
-		"cDNA_position","CDS_position","Protein_position",
-		"miRNA","VARIANT_CLASS","CLIN_SIG",
-		"gnomADe_AF","gnomADg_AF",
-		"RegeneronME_ALL_AF","AllofUs_ALL_AF","AllofUs_POPMAX_AF",
-		"ALFA_Total_AF","dbNSFP_POPMAX_AF","dbNSFP_POPMAX_POP",
-		"SIFT","PolyPhen","am_class","am_pathogenicity",
-		"MetaRNN_pred","MetaRNN_rankscore","CADD_raw_rankscore",
-		"MutationTaster_pred","REVEL_rankscore",
-		"ada_score","rf_score","CADD_PHRED",
-		"SpliceAI_pred_DS_AG","SpliceAI_pred_DS_AL","SpliceAI_pred_DS_DG",
-		"SpliceAI_pred_DS_DL");
+                "BIOTYPE","MANE_SELECT","pLI_gene_value","Existing_variation",
+                "HGVSc","HGVSp","ALLELE_NUM","EXON","INTRON",
+                "cDNA_position","CDS_position","Protein_position",
+                "miRNA","VARIANT_CLASS","CLIN_SIG",
+                "gnomADe_AF","gnomADg_AF",
+                "RegeneronME_ALL_AF","AllofUs_ALL_AF","AllofUs_POPMAX_AF",
+                "ALFA_Total_AF","dbNSFP_POPMAX_AF","dbNSFP_POPMAX_POP",
+                "SIFT","PolyPhen","am_class","am_pathogenicity",
+                "MetaRNN_pred","MetaRNN_rankscore","CADD_raw_rankscore",
+                "MutationTaster_pred","REVEL_rankscore",
+                "ada_score","rf_score","CADD_PHRED",
+                "SpliceAI_pred_DS_AG","SpliceAI_pred_DS_AL","SpliceAI_pred_DS_DG",
+                "SpliceAI_pred_DS_DL");
 
 # VCF headers: ignore them but grab the:
 # - VEP CSQ field names and store them in @vepNames;
@@ -98,20 +98,20 @@ my $dataHeaders;
 while (my $line = <STDIN>) {
     chomp($line);
     ($line =~ /^#/) ||
-	die "E $0: parsing header but found non-header line:\n$line\n" ;
+        die "E $0: parsing header but found non-header line:\n$line\n" ;
 
     # VEP CSQ header
     if ($line =~ /^##INFO=<ID=CSQ/) {
-	($line =~ /Format: ([^"]+)">$/) ||
-	    die "E $0: found CSQ header line but can't find Format:\n$line\n" ;
-	@vepNames = split(/\|/,$1);
+        ($line =~ /Format: ([^"]+)">$/) ||
+            die "E $0: found CSQ header line but can't find Format:\n$line\n" ;
+        @vepNames = split(/\|/,$1);
     }
     #CHROM == last header line
     elsif ($line =~ /^#CHROM/) {
-	my @headers = split(/\t/,$line);
-	(@headers == 13) || die "E $0: CHROM header line has wrong number of fields\n";
-	$dataHeaders = join("\t",@headers[9..12]);
-	last;
+        my @headers = split(/\t/,$line);
+        (@headers == 13) || die "E $0: CHROM header line has wrong number of fields\n";
+        $dataHeaders = join("\t",@headers[9..12]);
+        last;
     }
 }
 (@vepNames) || 
@@ -122,31 +122,31 @@ while (my $line = <STDIN>) {
 {
     my %vepNames;
     foreach my $v (@vepNames) {
-	$vepNames{$v} = 1;
+        $vepNames{$v} = 1;
     }
     my @missingVeps = ();
     my @vepsFound = ();
     foreach my $v (@goodVeps) {
-	if ($vepNames{$v}) {
-	    if ($v eq "SpliceAI_pred_DS_AG") {
-		push(@vepsFound, "SpliceAI_DS");
-	    }
-	    elsif ($v =~ /^SpliceAI_pred/) {
-		# ignore, we only want one SpliceAI_DS column
-	    }
-	    else {
-		push(@vepsFound, $v);
-	    }
-	}
-	else {
-	    push(@missingVeps, $v);
-	}
+        if ($vepNames{$v}) {
+            if ($v eq "SpliceAI_pred_DS_AG") {
+                push(@vepsFound, "SpliceAI_DS");
+            }
+            elsif ($v =~ /^SpliceAI_pred/) {
+                # ignore, we only want one SpliceAI_DS column
+            }
+            else {
+                push(@vepsFound, $v);
+            }
+        }
+        else {
+            push(@missingVeps, $v);
+        }
     }
     if (@missingVeps) {
-	warn "W $0: the following VEP fields are missing: " . join(' ', @missingVeps) . "\n";
-	warn "W $0: with non-human data missing fields are expected (eg fields from human-only plugins),\n";
-	warn "W $0: but with human data this suggests that the code needs to be updated (open a github issue),\n";
-	warn "W $0: or that your installation of VEP is outdated or missing some plugins / data\n";
+        warn "W $0: the following VEP fields are missing: " . join(' ', @missingVeps) . "\n";
+        warn "W $0: with non-human data missing fields are expected (eg fields from human-only plugins),\n";
+        warn "W $0: but with human data this suggests that the code needs to be updated (open a github issue),\n";
+        warn "W $0: or that your installation of VEP is outdated or missing some plugins / data\n";
     }
     @goodVeps = @vepsFound;
 }
@@ -175,18 +175,18 @@ while (my $line =<STDIN>) {
 
     # VEP removed trailing empty fields (did it? nvm), fill them if needed
     while (@dataCols < 4) {
-	push(@dataCols, "");
+        push(@dataCols, "");
     }
 
     # for CNVs, append the END= value to $alt
     if (($alt eq '<DUP>') || ($alt eq '<DEL>')) {
-	foreach my $thisInfo (split(/;/,$info)) {
-	    ($thisInfo =~ /^END=(\d+)$/) || next;
-	    # remove trailing '>', we'll add it back after $end
-	    chop($alt);
-	    $alt .= ":$1>";
-	    last;
-	}
+        foreach my $thisInfo (split(/;/,$info)) {
+            ($thisInfo =~ /^END=(\d+)$/) || next;
+            # remove trailing '>', we'll add it back after $end
+            chop($alt);
+            $alt .= ":$1>";
+            last;
+        }
     }
     
     # line to print
@@ -195,223 +195,223 @@ while (my $line =<STDIN>) {
     # grab CSQs from $info
     my @csqs;
     foreach my $thisInfo (split(/;/,$info)) {
-	# we only want the CSQ=
-	($thisInfo =~ /^CSQ=(.+)$/) || next;
-	my $csqs = $1;
-	@csqs = split(/,/, $csqs) ;
+        # we only want the CSQ=
+        ($thisInfo =~ /^CSQ=(.+)$/) || next;
+        my $csqs = $1;
+        @csqs = split(/,/, $csqs) ;
     }
 
     foreach my $thisCsq (@csqs) {
-	# third arg to split, -1, to generate elements even if last ones are empty
-	my @csqTmp = split(/\|/, $thisCsq, -1) ;
-	# store in hash: key is VEP key, value is value in this CSQ
-	my %thisCsq;
-	(@csqTmp == @vepNames) || 
-	    die "E $0: wrong number of fields in CSQ (full line is below): $thisCsq\n$line\n" ;
-	foreach my $i (0..$#vepNames) {
-	    # replace all slashes by backslashes, for excel :(
-	    $csqTmp[$i] =~ s~/~\\~g ;
-	    $thisCsq{$vepNames[$i]} = $csqTmp[$i] ;
-	}
+        # third arg to split, -1, to generate elements even if last ones are empty
+        my @csqTmp = split(/\|/, $thisCsq, -1) ;
+        # store in hash: key is VEP key, value is value in this CSQ
+        my %thisCsq;
+        (@csqTmp == @vepNames) || 
+            die "E $0: wrong number of fields in CSQ (full line is below): $thisCsq\n$line\n" ;
+        foreach my $i (0..$#vepNames) {
+            # replace all slashes by backslashes, for excel :(
+            $csqTmp[$i] =~ s~/~\\~g ;
+            $thisCsq{$vepNames[$i]} = $csqTmp[$i] ;
+        }
 
-	# create SpliceAI_DS with max of the 4 SpliceAI* scores
-	if ($thisCsq{"SpliceAI_pred_DS_AG"} ne "") {
-	    $thisCsq{"SpliceAI_DS"} = $thisCsq{"SpliceAI_pred_DS_AG"};
-	    foreach my $f ("SpliceAI_pred_DS_AL", "SpliceAI_pred_DS_DG", "SpliceAI_pred_DS_DL") {
-		($thisCsq{$f} > $thisCsq{"SpliceAI_DS"}) && ($thisCsq{"SpliceAI_DS"} = $thisCsq{$f});
-	    }
-	}
+        # create SpliceAI_DS with max of the 4 SpliceAI* scores
+        if ($thisCsq{"SpliceAI_pred_DS_AG"} ne "") {
+            $thisCsq{"SpliceAI_DS"} = $thisCsq{"SpliceAI_pred_DS_AG"};
+            foreach my $f ("SpliceAI_pred_DS_AL", "SpliceAI_pred_DS_DG", "SpliceAI_pred_DS_DL") {
+                ($thisCsq{$f} > $thisCsq{"SpliceAI_DS"}) && ($thisCsq{"SpliceAI_DS"} = $thisCsq{$f});
+            }
+        }
 
-	# upgrade putatively deleterious missense variants:
-	if (($thisCsq{"IMPACT"} eq "MODERATE") && ($thisCsq{"Consequence"}) &&
-	    ($thisCsq{"Consequence"} =~ /missense_variant/)) {
-	    # upgrade to MODHIGH if more than $minPassedFracMissense criteria are
-	    # passed among the following:
-	    # - SIFT -> deleterious
-	    # - Polyphen -> probably_damaging
-	    # - CADD_raw_rankscore >= 0.7
-	    # - MutationTaster_pred -> contains at least one A or D
-	    # - REVEL_rankscore >= 0.7
-	    # - MetaRNN_pred -> contains at least one D(amaging)
-	    # - AlphaMissense class -> 'likely_pathogenic'
-	    # 
-	    # NOTE: sometimes we don't have any prediction for some predictors,
-	    # e.g. for non-human data, or due to dbNSFP using older transcripts
-	    # and/or bugs in VEP or VEP plugins...
-	    # -> $minPassedFracMissense allows to still upgrade variants, but we also
-	    # require that at least 2 predictors are available
-	    my $minPassedFracMissense = 0.5;
-	    my $passed = 0;
-	    my $totalPreds = 0;
-	    if ($thisCsq{"SIFT"}) {
-		$totalPreds++;
-		# deleterious\( so we don't get deleterious_low_confidence
-		($thisCsq{"SIFT"} =~ /deleterious\(/) && ($passed++);
-	    }
-	    if ($thisCsq{"PolyPhen"}) {
-		$totalPreds++;
-		($thisCsq{"PolyPhen"} =~ /probably_damaging/) && ($passed++);
-	    }
-	    if ($thisCsq{"CADD_raw_rankscore"}) {
-		$totalPreds++;
-		($thisCsq{"CADD_raw_rankscore"} >= 0.7) && ($passed++);
-	    }
-	    if ($thisCsq{"MutationTaster_pred"}) {
-		$totalPreds++;
-		($thisCsq{"MutationTaster_pred"} =~ /[AD]/) && ($passed++);
-	    }
-	    if ($thisCsq{"REVEL_rankscore"}) {
-		$totalPreds++;
-		($thisCsq{"REVEL_rankscore"} >= 0.7) && ($passed++);
-	    }
-	    if ($thisCsq{"MetaRNN_pred"}) {
-		$totalPreds++;
-		($thisCsq{"MetaRNN_pred"} =~ /D/) && ($passed++);
-	    }
-	    if ($thisCsq{"am_class"}) {
-		$totalPreds++;
-		($thisCsq{"am_class"} =~ /likely_pathogenic/) && ($passed++);
-	    }
+        # upgrade putatively deleterious missense variants:
+        if (($thisCsq{"IMPACT"} eq "MODERATE") && ($thisCsq{"Consequence"}) &&
+            ($thisCsq{"Consequence"} =~ /missense_variant/)) {
+            # upgrade to MODHIGH if more than $minPassedFracMissense criteria are
+            # passed among the following:
+            # - SIFT -> deleterious
+            # - Polyphen -> probably_damaging
+            # - CADD_raw_rankscore >= 0.7
+            # - MutationTaster_pred -> contains at least one A or D
+            # - REVEL_rankscore >= 0.7
+            # - MetaRNN_pred -> contains at least one D(amaging)
+            # - AlphaMissense class -> 'likely_pathogenic'
+            # 
+            # NOTE: sometimes we don't have any prediction for some predictors,
+            # e.g. for non-human data, or due to dbNSFP using older transcripts
+            # and/or bugs in VEP or VEP plugins...
+            # -> $minPassedFracMissense allows to still upgrade variants, but we also
+            # require that at least 2 predictors are available
+            my $minPassedFracMissense = 0.5;
+            my $passed = 0;
+            my $totalPreds = 0;
+            if ($thisCsq{"SIFT"}) {
+                $totalPreds++;
+                # deleterious\( so we don't get deleterious_low_confidence
+                ($thisCsq{"SIFT"} =~ /deleterious\(/) && ($passed++);
+            }
+            if ($thisCsq{"PolyPhen"}) {
+                $totalPreds++;
+                ($thisCsq{"PolyPhen"} =~ /probably_damaging/) && ($passed++);
+            }
+            if ($thisCsq{"CADD_raw_rankscore"}) {
+                $totalPreds++;
+                ($thisCsq{"CADD_raw_rankscore"} >= 0.7) && ($passed++);
+            }
+            if ($thisCsq{"MutationTaster_pred"}) {
+                $totalPreds++;
+                ($thisCsq{"MutationTaster_pred"} =~ /[AD]/) && ($passed++);
+            }
+            if ($thisCsq{"REVEL_rankscore"}) {
+                $totalPreds++;
+                ($thisCsq{"REVEL_rankscore"} >= 0.7) && ($passed++);
+            }
+            if ($thisCsq{"MetaRNN_pred"}) {
+                $totalPreds++;
+                ($thisCsq{"MetaRNN_pred"} =~ /D/) && ($passed++);
+            }
+            if ($thisCsq{"am_class"}) {
+                $totalPreds++;
+                ($thisCsq{"am_class"} =~ /likely_pathogenic/) && ($passed++);
+            }
 
-	    # require at least 2 predictors
-	    if (($totalPreds>1) && ($passed / $totalPreds > $minPassedFracMissense)) {
-		$thisCsq{"IMPACT"} = "MODHIGH";
-	    }
-	}
+            # require at least 2 predictors
+            if (($totalPreds>1) && ($passed / $totalPreds > $minPassedFracMissense)) {
+                $thisCsq{"IMPACT"} = "MODHIGH";
+            }
+        }
 
-	# upgrade any variant to MODHIGH if it putatively alters splicing:
-	if (($thisCsq{"IMPACT"} ne "HIGH") && ($thisCsq{"IMPACT"} ne "MODHIGH")) {
-	    # upgrade to MODHIGH if at least $minPassedFracSplicing criteria (and at 
-	    # least 2) are passed, among the following:
-	    # - SpliceAI max(DS_AG, DS_AL, DS_DG, DS_DL) > cutoff
-	    # - CADD-PHRED > cutoff (presumably via CADD-Splice AKA CADD 1.6) 
-	    # - ada_score > 0.6 (dbscSNV author-recommended cutoff)
-	    # - rf_score > 0.6 (dbscSNV author-recommended cutoff)
+        # upgrade any variant to MODHIGH if it putatively alters splicing:
+        if (($thisCsq{"IMPACT"} ne "HIGH") && ($thisCsq{"IMPACT"} ne "MODHIGH")) {
+            # upgrade to MODHIGH if at least $minPassedFracSplicing criteria (and at 
+            # least 2) are passed, among the following:
+            # - SpliceAI max(DS_AG, DS_AL, DS_DG, DS_DL) > cutoff
+            # - CADD-PHRED > cutoff (presumably via CADD-Splice AKA CADD 1.6) 
+            # - ada_score > 0.6 (dbscSNV author-recommended cutoff)
+            # - rf_score > 0.6 (dbscSNV author-recommended cutoff)
 
-	    # cutoffs:
-	    # SpliceAI authors recommend 0.5 and say 0.8 is high-precision
-	    my $spliceAI_cutoff = 0.5;
-	    # for CADD_PHRED, 20-30 seems reasonable
-	    my $cadd_cutoff = 20;
+            # cutoffs:
+            # SpliceAI authors recommend 0.5 and say 0.8 is high-precision
+            my $spliceAI_cutoff = 0.5;
+            # for CADD_PHRED, 20-30 seems reasonable
+            my $cadd_cutoff = 20;
 
-	    # non-human data and some variants for human data don't have scores -> use a frac
-	    my $minPassedFracSplicing = 0.5;
-	    my $passed = 0;
-	    my $totalPreds = 0;
-	    # SpliceAI
-	    if (defined $thisCsq{"SpliceAI_DS"}) {
-		$totalPreds++;
-		($thisCsq{"SpliceAI_DS"} > $spliceAI_cutoff) && ($passed++);
-	    }
-	    # CADD-Splice
-	    if ($thisCsq{"CADD_PHRED"} ne "") {
-		$totalPreds++;
-		($thisCsq{"CADD_PHRED"} > $cadd_cutoff) && ($passed++);
-	    }
-	    # dbscSNV
-	    if ($thisCsq{"ada_score"} ne "") {
-		$totalPreds++;
-		($thisCsq{"ada_score"} > 0.6) && ($passed++);
-	    }
-	    if ($thisCsq{"rf_score"} ne "") {
-		$totalPreds++;
-		($thisCsq{"rf_score"} > 0.6) && ($passed++);
-	    }
+            # non-human data and some variants for human data don't have scores -> use a frac
+            my $minPassedFracSplicing = 0.5;
+            my $passed = 0;
+            my $totalPreds = 0;
+            # SpliceAI
+            if (defined $thisCsq{"SpliceAI_DS"}) {
+                $totalPreds++;
+                ($thisCsq{"SpliceAI_DS"} > $spliceAI_cutoff) && ($passed++);
+            }
+            # CADD-Splice
+            if ($thisCsq{"CADD_PHRED"} ne "") {
+                $totalPreds++;
+                ($thisCsq{"CADD_PHRED"} > $cadd_cutoff) && ($passed++);
+            }
+            # dbscSNV
+            if ($thisCsq{"ada_score"} ne "") {
+                $totalPreds++;
+                ($thisCsq{"ada_score"} > 0.6) && ($passed++);
+            }
+            if ($thisCsq{"rf_score"} ne "") {
+                $totalPreds++;
+                ($thisCsq{"rf_score"} > 0.6) && ($passed++);
+            }
 
-	    # require at least 2 predictors
-	    if (($totalPreds > 1) && ($passed / $totalPreds > $minPassedFracSplicing)) {
-		$thisCsq{"IMPACT"} = "MODHIGH";
-	    }
-	}
+            # require at least 2 predictors
+            if (($totalPreds > 1) && ($passed / $totalPreds > $minPassedFracSplicing)) {
+                $thisCsq{"IMPACT"} = "MODHIGH";
+            }
+        }
 
-	if (($thisCsq{"IMPACT"} eq "MODIFIER") && ($thisCsq{"Consequence"})) {
-	    # upgrade some miRNA and other ncRNA IMPACTs to LOW:
-	    # non_coding_transcript_variant (except deep intronic ones), 
-	    # non_coding_transcript_exon_variant, and mature_miRNA_variant
-	    if ($thisCsq{"Consequence"} =~ /non_coding_transcript_exon_variant|mature_miRNA_variant/) {
-		$thisCsq{"IMPACT"} = "LOW";
-	    }
-	    elsif (($thisCsq{"Consequence"} =~ /non_coding_transcript_variant/) &&
-		   ($thisCsq{"Consequence"} ne 'intron_variant&non_coding_transcript_variant')) {
-		# deepish intronic variants affecting ncRNAs should stay MODIFIER, but we do want
-		# to upgrade eg 'splice_donor_region_variant&intron_variant&non_coding_transcript_variant'
-		$thisCsq{"IMPACT"} = "LOW";
-	    }
+        if (($thisCsq{"IMPACT"} eq "MODIFIER") && ($thisCsq{"Consequence"})) {
+            # upgrade some miRNA and other ncRNA IMPACTs to LOW:
+            # non_coding_transcript_variant (except deep intronic ones), 
+            # non_coding_transcript_exon_variant, and mature_miRNA_variant
+            if ($thisCsq{"Consequence"} =~ /non_coding_transcript_exon_variant|mature_miRNA_variant/) {
+                $thisCsq{"IMPACT"} = "LOW";
+            }
+            elsif (($thisCsq{"Consequence"} =~ /non_coding_transcript_variant/) &&
+                   ($thisCsq{"Consequence"} ne 'intron_variant&non_coding_transcript_variant')) {
+                # deepish intronic variants affecting ncRNAs should stay MODIFIER, but we do want
+                # to upgrade eg 'splice_donor_region_variant&intron_variant&non_coding_transcript_variant'
+                $thisCsq{"IMPACT"} = "LOW";
+            }
 
-	    ###############
-	    # tried upgrading some TFBS and regulatory region variants but it's
-	    # very noisy and doesn't seem usable (yet) -> commenting out for now, 
-	    # keeping the code because I expect --regulatory to become useful some day...
-	    #
-	    # upgrade severe TFBS and regulatory region variants to LOW or MODHIGH:
-	    # TFBS_ablation and regulatory_region_ablation => MODHIGH 
-	    # TF_binding_site_variant with [HIGH_INF_POS==Y] => MODHIGH
-	    # TF_binding_site_variant without HIGH_INF_POS => LOW
-	    # TFBS_amplification => LOW
-	    # (regulatory_region_variant and regulatory_region_amplification stay MODIFIER)
-	    # elsif ($thisCsq{"Consequence"} =~ /TFBS_ablation|regulatory_region_ablation/) {
-	    # 	$thisCsq{"IMPACT"} = "MODHIGH";
-	    # }
-	    # elsif (($thisCsq{"Consequence"} =~ /TF_binding_site_variant/) && 
-	    # 	   ($thisCsq{"HIGH_INF_POS"}) && ($thisCsq{"HIGH_INF_POS"} eq "Y")) {
-	    # 	$thisCsq{"IMPACT"} = "MODHIGH";
-	    # }
-	    # elsif ($thisCsq{"Consequence"} =~ /TF_binding_site_variant/) {
-	    # 	# no HIGH_INF_POS
-	    # 	$thisCsq{"IMPACT"} = "LOW";
-	    # }
-	    # elsif ($thisCsq{"Consequence"} =~ /TFBS_amplification/) {
-	    # 	$thisCsq{"IMPACT"} = "LOW";
-	    # }
-	    ###############
-	}
+            ###############
+            # tried upgrading some TFBS and regulatory region variants but it's
+            # very noisy and doesn't seem usable (yet) -> commenting out for now, 
+            # keeping the code because I expect --regulatory to become useful some day...
+            #
+            # upgrade severe TFBS and regulatory region variants to LOW or MODHIGH:
+            # TFBS_ablation and regulatory_region_ablation => MODHIGH 
+            # TF_binding_site_variant with [HIGH_INF_POS==Y] => MODHIGH
+            # TF_binding_site_variant without HIGH_INF_POS => LOW
+            # TFBS_amplification => LOW
+            # (regulatory_region_variant and regulatory_region_amplification stay MODIFIER)
+            # elsif ($thisCsq{"Consequence"} =~ /TFBS_ablation|regulatory_region_ablation/) {
+            #         $thisCsq{"IMPACT"} = "MODHIGH";
+            # }
+            # elsif (($thisCsq{"Consequence"} =~ /TF_binding_site_variant/) && 
+            #            ($thisCsq{"HIGH_INF_POS"}) && ($thisCsq{"HIGH_INF_POS"} eq "Y")) {
+            #         $thisCsq{"IMPACT"} = "MODHIGH";
+            # }
+            # elsif ($thisCsq{"Consequence"} =~ /TF_binding_site_variant/) {
+            #         # no HIGH_INF_POS
+            #         $thisCsq{"IMPACT"} = "LOW";
+            # }
+            # elsif ($thisCsq{"Consequence"} =~ /TFBS_amplification/) {
+            #         $thisCsq{"IMPACT"} = "LOW";
+            # }
+            ###############
+        }
 
-	# build vepToPrint string based on @goodVeps
-	my $vepToPrint = "";
-	foreach my $vepName (@goodVeps) {
-	    if (! defined $thisCsq{$vepName}) {
-		$vepToPrint .= "\t";
-	    }
-	    else {
-		$vepToPrint .= "\t".$thisCsq{$vepName};
-	    }
-	}
+        # build vepToPrint string based on @goodVeps
+        my $vepToPrint = "";
+        foreach my $vepName (@goodVeps) {
+            if (! defined $thisCsq{$vepName}) {
+                $vepToPrint .= "\t";
+            }
+            else {
+                $vepToPrint .= "\t".$thisCsq{$vepName};
+            }
+        }
 
-	if ($alt !~ /,/) {
-	    # mono-allelic, print immediately
-	    print "$toPrintStart$vepToPrint\t".join("\t",@dataCols)."\n";
-	}
-	else {
-	    # multi-allelic, have to fix the GENOS
-	    my $allele = $thisCsq{"ALLELE_NUM"};
-	    ($allele =~ /^\d+$/) || 
-		die "E $0: ALLELE_NUM not a number or undefined? CSQ is $thisCsq\n";
-	    my ($hvs,$hets,$others,$hrs) = @dataCols;
-	    my @hvs = split(/\|/,$hvs);
-	    my @hets = split(/\|/,$hets);
-	    my @others = split(/\|/,$others);
+        if ($alt !~ /,/) {
+            # mono-allelic, print immediately
+            print "$toPrintStart$vepToPrint\t".join("\t",@dataCols)."\n";
+        }
+        else {
+            # multi-allelic, have to fix the GENOS
+            my $allele = $thisCsq{"ALLELE_NUM"};
+            ($allele =~ /^\d+$/) || 
+                die "E $0: ALLELE_NUM not a number or undefined? CSQ is $thisCsq\n";
+            my ($hvs,$hets,$others,$hrs) = @dataCols;
+            my @hvs = split(/\|/,$hvs);
+            my @hets = split(/\|/,$hets);
+            my @others = split(/\|/,$others);
 
-	    my ($goodHv,$goodHet) = ("","");
-	    # move HVs and HETs for other alleles to OTHER
-	    foreach my $hv (@hvs) {
-		if ($hv =~ /^$allele\/$allele~/) {
-		    $goodHv = $hv;
-		}
-		else {
-		    push(@others,$hv);
-		}
-	    }
-	    foreach my $het (@hets) {
-		if ($het =~ /^0\/$allele~/) {
-		    $goodHet = $het;
-		}
-		else {
-		    push(@others,$het);
-		}
-	    }
-	    my $fixedData = "$goodHv\t$goodHet\t".join('|',@others)."\t$hrs";
-	    print "$toPrintStart$vepToPrint\t$fixedData\n";
-	}
+            my ($goodHv,$goodHet) = ("","");
+            # move HVs and HETs for other alleles to OTHER
+            foreach my $hv (@hvs) {
+                if ($hv =~ /^$allele\/$allele~/) {
+                    $goodHv = $hv;
+                }
+                else {
+                    push(@others,$hv);
+                }
+            }
+            foreach my $het (@hets) {
+                if ($het =~ /^0\/$allele~/) {
+                    $goodHet = $het;
+                }
+                else {
+                    push(@others,$het);
+                }
+            }
+            my $fixedData = "$goodHv\t$goodHet\t".join('|',@others)."\t$hrs";
+            print "$toPrintStart$vepToPrint\t$fixedData\n";
+        }
     }
 }
 

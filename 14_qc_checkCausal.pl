@@ -71,8 +71,8 @@ Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --help : print this USAGE";
 
 GetOptions ("samplesFile=s" => \$samplesFile,
-	    "indir=s" => \$inDir,
-	    "help" => \$help)
+            "indir=s" => \$inDir,
+            "help" => \$help)
     or die("E $0: Error in command line arguments\n$USAGE\n");
 
 # make sure required options were provided and sanity check them
@@ -137,20 +137,20 @@ foreach my $inFile (sort(readdir(INDIR))) {
     ($inFile =~ /^\./) && next;
     my $sample;
     foreach my $s (keys(%$sample2cohortR)) {
-	if ($inFile =~ /^$sample2cohortR->{$s}\.$s\./) {
-	    $sample = $s;
-	    last;
-	}
+        if ($inFile =~ /^$sample2cohortR->{$s}\.$s\./) {
+            $sample = $s;
+            last;
+        }
     }
     ($sample) || 
-	((print "W: inFile $inFile doesn't seem to correspond to any sample, skipping it\n") && next);
+        ((print "W: inFile $inFile doesn't seem to correspond to any sample, skipping it\n") && next);
 
     my $patho = $sample2cohortR->{$sample};
     # empty $sample2cohortR as we go, for sanity testing and speed
     delete($sample2cohortR->{$sample});
 
     open(INFILE, "$inDir/$inFile") ||
-	die "E $0: cannot open inFile $inDir/$inFile\n";
+        die "E $0: cannot open inFile $inDir/$inFile\n";
     
     # if $sample has a causal gene: see if and how it is hit
     if (defined($sample2causalR->{$sample})) {
@@ -163,40 +163,40 @@ foreach my $inFile (sort(readdir(INDIR))) {
         chomp($header);
         my @header = split(/\t/,$header);
         foreach my $i (0..$#header) {
-	    ($header[$i] eq 'SYMBOL') && ($symbolCol = $i);
-	    ($header[$i] eq 'BIALLELIC') && ($biallelCol = $i);
-	    ($header[$i] eq 'CANONICAL') && ($canonCol = $i);
-	    ($biallelCol > -1) && ($symbolCol > -1) && ($canonCol > -1) && last;
+            ($header[$i] eq 'SYMBOL') && ($symbolCol = $i);
+            ($header[$i] eq 'BIALLELIC') && ($biallelCol = $i);
+            ($header[$i] eq 'CANONICAL') && ($canonCol = $i);
+            ($biallelCol > -1) && ($symbolCol > -1) && ($canonCol > -1) && last;
         }
         (($biallelCol > -1) && ($symbolCol > -1) && ($canonCol > -1)) || 
-	    die "E $0: cannot find required column headers in $inFile:\n$header\n";
+            die "E $0: cannot find required column headers in $inFile:\n$header\n";
 
         # find lines affecting a CANONICAL transcript of $causal in $inFile,
         # if no lines $foundCausal stays false
         my $foundCausal = 0;
         while (my $line = <INFILE>) {
-	    chomp($line);
-	    my @line = split(/\t/,$line);
-	    ($line[$symbolCol] eq "' $causal") || next;
-	    ($line[$canonCol] eq 'YES') || next;
+            chomp($line);
+            my @line = split(/\t/,$line);
+            ($line[$symbolCol] eq "' $causal") || next;
+            ($line[$canonCol] eq 'YES') || next;
 
-	    if ($line[$biallelCol] eq 'HIGH') {
-		push(@causalHigh, "$sample\t$patho\t$causal\tHIGH");
-	    }
-	    elsif ($line[$biallelCol] eq 'MODHIGH') {
-		push(@causalModHigh, "$sample\t$patho\t$causal\tMODHIGH");
-	    }
-	    elsif ($line[$biallelCol] eq 'NO') {
-		push(@mono, "$sample\t$patho\t$causal\tMONO-ALLELIC");
-	    }
-	    else {
-		push(@causalLow, "$sample\t$patho\t$causal\tLOW-MODER");
-	    }
-	    $foundCausal = 1;
-	    last;
+            if ($line[$biallelCol] eq 'HIGH') {
+                push(@causalHigh, "$sample\t$patho\t$causal\tHIGH");
+            }
+            elsif ($line[$biallelCol] eq 'MODHIGH') {
+                push(@causalModHigh, "$sample\t$patho\t$causal\tMODHIGH");
+            }
+            elsif ($line[$biallelCol] eq 'NO') {
+                push(@mono, "$sample\t$patho\t$causal\tMONO-ALLELIC");
+            }
+            else {
+                push(@causalLow, "$sample\t$patho\t$causal\tLOW-MODER");
+            }
+            $foundCausal = 1;
+            last;
         }
         ($foundCausal) ||
-	    push(@noVar, "$sample\t$patho\t$causal\tNOVARIANT");
+            push(@noVar, "$sample\t$patho\t$causal\tNOVARIANT");
     }
 
     # else $sample doesn't have a causal gene: see if any known candidate gene is severely hit
@@ -208,108 +208,108 @@ foreach my $inFile (sort(readdir(INDIR))) {
         chomp($header);
         my @header = split(/\t/,$header);
         foreach my $i (0..$#header) {
-	    ($header[$i] eq 'SYMBOL') && ($symbolCol = $i);
-	    ($header[$i] eq 'KNOWN_CANDIDATE_GENE') && ($candCol = $i);
-	    ($header[$i] eq 'GENOTYPE') && ($genoCol = $i);
-	    ($header[$i] eq 'IMPACT') && ($impactCol = $i);
-	    ($header[$i] eq 'BIALLELIC') && ($biallelCol = $i);
-	    ($header[$i] eq 'CANONICAL') && ($canonCol = $i);
-	    ($impactCol > -1) && ($candCol > -1) && ($biallelCol > -1) && ($genoCol > -1) &&
-		($symbolCol > -1) && ($canonCol > -1) && last;
+            ($header[$i] eq 'SYMBOL') && ($symbolCol = $i);
+            ($header[$i] eq 'KNOWN_CANDIDATE_GENE') && ($candCol = $i);
+            ($header[$i] eq 'GENOTYPE') && ($genoCol = $i);
+            ($header[$i] eq 'IMPACT') && ($impactCol = $i);
+            ($header[$i] eq 'BIALLELIC') && ($biallelCol = $i);
+            ($header[$i] eq 'CANONICAL') && ($canonCol = $i);
+            ($impactCol > -1) && ($candCol > -1) && ($biallelCol > -1) && ($genoCol > -1) &&
+                ($symbolCol > -1) && ($canonCol > -1) && last;
         }
         (($impactCol > -1) && ($candCol > -1) && ($biallelCol > -1) && ($genoCol > -1) &&
-	 ($symbolCol > -1) && ($canonCol > -1)) || 
-	    die "E $0: cannot find required column headers for undiagnosed sample in $inFile:\n$header\n";
+         ($symbolCol > -1) && ($canonCol > -1)) || 
+            die "E $0: cannot find required column headers for undiagnosed sample in $inFile:\n$header\n";
 
-	# candidate genes (for $sample's patho) that are hit in $sample:
-	# key == "$sample\t$patho\t$gene\t$pathosLevels", where $patho is $sample's pathology, and
-	# $pathosLevels is a string of comma-separated "$pat:$level" pairs, $gene being a known
-	# candidate gene of confidence level $level for pathology $pat,
-	# value == ref to an array of 3 ints == numbers of HV_HIGH, HV_MODHIGH
-	# and HET_MODHIGH+ variants affecting $gene's canonical transcript
-	my %hitCands = ();
+        # candidate genes (for $sample's patho) that are hit in $sample:
+        # key == "$sample\t$patho\t$gene\t$pathosLevels", where $patho is $sample's pathology, and
+        # $pathosLevels is a string of comma-separated "$pat:$level" pairs, $gene being a known
+        # candidate gene of confidence level $level for pathology $pat,
+        # value == ref to an array of 3 ints == numbers of HV_HIGH, HV_MODHIGH
+        # and HET_MODHIGH+ variants affecting $gene's canonical transcript
+        my %hitCands = ();
 
-	# candidate genes for other pathologies that are hit in $sample:
-	# same key as as %hitCands,
-	# value is a ref to an array of 2 ints == numbers of HV_HIGH, HV_MODHIGH variants
-	# affecting $gene's canonical transcript
-	my %hitCandsOtherPathos = ();
+        # candidate genes for other pathologies that are hit in $sample:
+        # same key as as %hitCands,
+        # value is a ref to an array of 2 ints == numbers of HV_HIGH, HV_MODHIGH variants
+        # affecting $gene's canonical transcript
+        my %hitCandsOtherPathos = ();
         
         while (my $line = <INFILE>) {
-	    chomp($line);
-	    my @line = split(/\t/,$line);
+            chomp($line);
+            my @line = split(/\t/,$line);
 
-	    ($line[$canonCol] eq 'YES') || next;
-	    ($line[$biallelCol] eq 'HIGH') || ($line[$biallelCol] eq 'MODHIGH') || next;
+            ($line[$canonCol] eq 'YES') || next;
+            ($line[$biallelCol] eq 'HIGH') || ($line[$biallelCol] eq 'MODHIGH') || next;
 
-	    if ($line[$candCol] ne "") {
-		# OK we have a severely hit candidate gene, build the key for %hitCands / %hitCandsOtherPathos
-		my $key = "$sample\t$patho\t";
-		($line[$symbolCol] =~ /^' (\S+)$/) ||
-		    die "E $0: cannot extract gene name in:\n$line\n";
-		$key .= "$1\t";
-		$key .= $line[$candCol];
-		# $samePatho: true iff $gene is a candidate for $patho
-		my $samePatho = 0;
-		if ($line[$candCol] =~ /($patho:[^,]+)/) {
-		    # candidate is for this sample's patho
-		    $samePatho = 1;
-		}
+            if ($line[$candCol] ne "") {
+                # OK we have a severely hit candidate gene, build the key for %hitCands / %hitCandsOtherPathos
+                my $key = "$sample\t$patho\t";
+                ($line[$symbolCol] =~ /^' (\S+)$/) ||
+                    die "E $0: cannot extract gene name in:\n$line\n";
+                $key .= "$1\t";
+                $key .= $line[$candCol];
+                # $samePatho: true iff $gene is a candidate for $patho
+                my $samePatho = 0;
+                if ($line[$candCol] =~ /($patho:[^,]+)/) {
+                    # candidate is for this sample's patho
+                    $samePatho = 1;
+                }
 
-		if ($samePatho) {
-		    (defined $hitCands{$key}) || ($hitCands{$key} = [0,0,0]);
-		    if (($line[$impactCol] eq 'HIGH') && ($line[$genoCol] eq 'HV')) {
-			$hitCands{$key}->[0]++;
-		    }
-		    elsif (($line[$impactCol] eq 'MODHIGH') && ($line[$genoCol] eq 'HV')) {
-			$hitCands{$key}->[1]++;
-		    }
-		    elsif ((($line[$impactCol] eq 'HIGH') || ($line[$impactCol] eq 'MODHIGH')) &&
-			   ($line[$genoCol] eq 'HET')) {
-			$hitCands{$key}->[2]++;
-		    }
-		}
-		elsif (($line[$genoCol] eq 'HV') && (($line[$impactCol] eq 'HIGH') ||
-						     ($line[$impactCol] eq 'MODHIGH'))) {
-		    # only count HVs if gene is a candidate for another patho
-		    (defined $hitCandsOtherPathos{$key}) || ($hitCandsOtherPathos{$key} = [0,0]);
-		    if ($line[$impactCol] eq 'HIGH') {
-			$hitCandsOtherPathos{$key}->[0]++;
-		    }
-		    elsif ($line[$impactCol] eq 'MODHIGH') {
-			$hitCandsOtherPathos{$key}->[1]++;
-		    }
-		}
-	    }
-	}
+                if ($samePatho) {
+                    (defined $hitCands{$key}) || ($hitCands{$key} = [0,0,0]);
+                    if (($line[$impactCol] eq 'HIGH') && ($line[$genoCol] eq 'HV')) {
+                        $hitCands{$key}->[0]++;
+                    }
+                    elsif (($line[$impactCol] eq 'MODHIGH') && ($line[$genoCol] eq 'HV')) {
+                        $hitCands{$key}->[1]++;
+                    }
+                    elsif ((($line[$impactCol] eq 'HIGH') || ($line[$impactCol] eq 'MODHIGH')) &&
+                           ($line[$genoCol] eq 'HET')) {
+                        $hitCands{$key}->[2]++;
+                    }
+                }
+                elsif (($line[$genoCol] eq 'HV') && (($line[$impactCol] eq 'HIGH') ||
+                                                     ($line[$impactCol] eq 'MODHIGH'))) {
+                    # only count HVs if gene is a candidate for another patho
+                    (defined $hitCandsOtherPathos{$key}) || ($hitCandsOtherPathos{$key} = [0,0]);
+                    if ($line[$impactCol] eq 'HIGH') {
+                        $hitCandsOtherPathos{$key}->[0]++;
+                    }
+                    elsif ($line[$impactCol] eq 'MODHIGH') {
+                        $hitCandsOtherPathos{$key}->[1]++;
+                    }
+                }
+            }
+        }
 
-	# done parsing INFILE, now prepare output: for each gene, only print info
-	# for the most severe category of variants
-	foreach my $key (sort keys(%hitCands)) {
-	    if ($hitCands{$key}->[0] > 0) {
-		push(@candidateHVHigh, "$key\tHV-HIGH\t".$hitCands{$key}->[0]);
-	    }
-	    elsif ($hitCands{$key}->[1] > 0) {
-		push(@candidateHVModHigh, "$key\tHV-MODHIGH\t".$hitCands{$key}->[1]);
-	    }
-	    elsif ($hitCands{$key}->[2] > 1) {
-		push(@candidateHets, "$key\tHET-MODHIGH+\t".$hitCands{$key}->[2]);
-	    }
-	    else {
-		die "E $0: impossible count vector for key $key: ".@{$hitCands{$key}};
-	    }
-	}
-	foreach my $key (sort keys(%hitCandsOtherPathos)) {
-	    if ($hitCandsOtherPathos{$key}->[0] > 0) {
-		push(@candOtherPathosHVHigh, "$key\tHV-HIGH\t".$hitCandsOtherPathos{$key}->[0]);
-	    }
-	    elsif ($hitCandsOtherPathos{$key}->[1] > 0) {
-		push(@candOtherPathosHVModHigh, "$key\tHV-MODHIGH\t".$hitCandsOtherPathos{$key}->[1]);
-	    }
-	    else {
-		die "E $0: impossible count vector (otherPathos) for key $key: ".@{$hitCandsOtherPathos{$key}};
-	    }
-	}
+        # done parsing INFILE, now prepare output: for each gene, only print info
+        # for the most severe category of variants
+        foreach my $key (sort keys(%hitCands)) {
+            if ($hitCands{$key}->[0] > 0) {
+                push(@candidateHVHigh, "$key\tHV-HIGH\t".$hitCands{$key}->[0]);
+            }
+            elsif ($hitCands{$key}->[1] > 0) {
+                push(@candidateHVModHigh, "$key\tHV-MODHIGH\t".$hitCands{$key}->[1]);
+            }
+            elsif ($hitCands{$key}->[2] > 1) {
+                push(@candidateHets, "$key\tHET-MODHIGH+\t".$hitCands{$key}->[2]);
+            }
+            else {
+                die "E $0: impossible count vector for key $key: ".@{$hitCands{$key}};
+            }
+        }
+        foreach my $key (sort keys(%hitCandsOtherPathos)) {
+            if ($hitCandsOtherPathos{$key}->[0] > 0) {
+                push(@candOtherPathosHVHigh, "$key\tHV-HIGH\t".$hitCandsOtherPathos{$key}->[0]);
+            }
+            elsif ($hitCandsOtherPathos{$key}->[1] > 0) {
+                push(@candOtherPathosHVModHigh, "$key\tHV-MODHIGH\t".$hitCandsOtherPathos{$key}->[1]);
+            }
+            else {
+                die "E $0: impossible count vector (otherPathos) for key $key: ".@{$hitCandsOtherPathos{$key}};
+            }
+        }
     }
     close(INFILE);
 }

@@ -85,15 +85,15 @@ my $min_hr; # COUNT_HR >= $x
 my $canon = ''; # if enabled, only keep lines with CANONICAL==YES
 
 GetOptions ("indir=s" => \$inDir,
-	    "outdir=s" => \$outDir,
-	    "jobs=i" => \$jobs,
-	    "reorder" => \$reorder,
-	    "favoriteTissues=s" => \$favoriteTissues,
-	    "max_ctrl_hv=i" => \$max_ctrl_hv,
-	    "max_ctrl_het=i" => \$max_ctrl_het,
-	    "min_cohort_hv=i" => \$min_cohort_hv,
-	    "min_hr=i" => \$min_hr,
-	    "canonical" => \$canon)
+            "outdir=s" => \$outDir,
+            "jobs=i" => \$jobs,
+            "reorder" => \$reorder,
+            "favoriteTissues=s" => \$favoriteTissues,
+            "max_ctrl_hv=i" => \$max_ctrl_hv,
+            "max_ctrl_het=i" => \$max_ctrl_het,
+            "min_cohort_hv=i" => \$min_cohort_hv,
+            "min_hr=i" => \$min_hr,
+            "canonical" => \$canon)
     or die("E $0: Error in command line arguments\n");
 
 ($inDir) ||
@@ -129,24 +129,24 @@ my $verbose = 1;
 while (my $inFile = readdir(INDIR)) {
     ($inFile =~ /^\./) && next;
     if ($childFailed) {
-	$now = strftime("%F %T", localtime);
-	die "E $now: $0 FAILED - some child died, no point going on\n";
+        $now = strftime("%F %T", localtime);
+        die "E $now: $0 FAILED - some child died, no point going on\n";
     }
     if ($pm->start) {
-	$verbose = 0;
-	next;
+        $verbose = 0;
+        next;
     }
     my ($fileStart,$gz);
     if ($inFile =~ (/^(.+)\.csv$/)) {
-	$fileStart = $1;
+        $fileStart = $1;
     }
     elsif ($inFile =~ (/^(.+)\.csv\.gz$/)) {
-	$fileStart = $1;
-	$gz = 1;
+        $fileStart = $1;
+        $gz = 1;
     }
     else {
-	warn "W $0: cannot parse filename of inFile $inFile, skipping it\n";
-	$pm->finish;
+        warn "W $0: cannot parse filename of inFile $inFile, skipping it\n";
+        $pm->finish;
     }
 
     my $outFile = $fileStart ;
@@ -162,10 +162,10 @@ while (my $inFile = readdir(INDIR)) {
     ($canon) && ($com .= " --canonical");
     
     if ($gz) {
-	$com = "gunzip -c $inDir/$inFile | $com ";
+        $com = "gunzip -c $inDir/$inFile | $com ";
     }
     else {
-	$com = "cat $inDir/$inFile | $com ";
+        $com = "cat $inDir/$inFile | $com ";
     }
 
     # reorder columns if requested

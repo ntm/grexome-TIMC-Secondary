@@ -1,5 +1,4 @@
 
-
 ############################################################################################
 # Copyright (C) Nicolas Thierry-Mieg, 2019-2025
 #
@@ -57,8 +56,8 @@ our @EXPORT_OK = qw(refGenome vepCacheFile vepPluginDataPath fastTmpPath
 sub refGenome {
     # return the first file that exists, so this works on all our servers
     foreach my $genome ("/home/nthierry/HumanGenome/hs38DH.fa",
-			"/home/nthierry/DATA/HumanGenome/hs38DH.fa") {
-	(-f $genome) && return($genome);
+                        "/home/nthierry/DATA/HumanGenome/hs38DH.fa") {
+        (-f $genome) && return($genome);
     }
     # if we get here no file was found...
     die "E: no refGenome found, you need to edit *config.pm";
@@ -77,16 +76,16 @@ sub vepCacheFile {
     # you'll need to customize the array of possible values for $cachedir,
     # we use the first dir that exists (works on all our servers)
     foreach my $cachedir ("/home/nthierry/PierreRay_DATA/RunSecondaryAnalyses/",
-			  "/home/nthierry/sshMounts/mordor/PierreRay_DATA/RunSecondaryAnalyses/") {
-	if (-d $cachedir) {
-	    # the name of the file itself, can probably stay as-is
-	    my $cacheFile = "VEP_cache";
-	    $cacheFile = "$cachedir/$cacheFile";
-	    # if it exists it must be writable
-	    (! -e $cacheFile) || (-w $cacheFile) ||
-		die "E: vepCacheFile $cacheFile exists but you can't write to it, fix the permissions or use another cachedir";
-	    return($cacheFile);
-	}
+                          "/home/nthierry/sshMounts/mordor/PierreRay_DATA/RunSecondaryAnalyses/") {
+        if (-d $cachedir) {
+            # the name of the file itself, can probably stay as-is
+            my $cacheFile = "VEP_cache";
+            $cacheFile = "$cachedir/$cacheFile";
+            # if it exists it must be writable
+            (! -e $cacheFile) || (-w $cacheFile) ||
+                die "E: vepCacheFile $cacheFile exists but you can't write to it, fix the permissions or use another cachedir";
+            return($cacheFile);
+        }
     }
     # no dir was found
     die "E: no vepCachePath found, you need to edit *config.pm";
@@ -97,7 +96,7 @@ sub vepCacheFile {
 sub vepPluginDataPath {
     # return first existing subdir
     foreach my $dir ("/home/nthierry/DATA/") {
-	(-d $dir) && return($dir);
+        (-d $dir) && return($dir);
     }
     # no dir found
     die "E: no vepPluginDataPath found, you need to edit *config.pm";
@@ -127,10 +126,10 @@ sub coveragePath {
     # specify $covDir="" to disable this feature
     my $covDir = "/home/nthierry/PierreRay_DATA/CoverageResults/Coverage_Rolling/";
     if (($covDir eq "") || (-d $covDir)) {
-	return($covDir);
+        return($covDir);
     }
     else {
-	die "E: covDir was provided but doesn't exist, you need to edit *config.pm";
+        die "E: covDir was provided but doesn't exist, you need to edit *config.pm";
     }
 }
 
@@ -159,7 +158,7 @@ sub gtexFavoriteTissues {
     # default: working on infertility here...
     my $favoriteTissues = "testis,ovary";
     ($favoriteTissues =~ /\s/) &&
-	die "E: gtexFavoriteTissues cannot contain whitespace, replace with underscores";
+        die "E: gtexFavoriteTissues cannot contain whitespace, replace with underscores";
     return($favoriteTissues);
 }
 
@@ -170,9 +169,9 @@ sub subCohorts {
     # if you  don't have subCohorts, just return the empty hash, ie:
     my %subCohorts = ();
     # my %subCohorts = ("/home/nthierry/GrexomeZoufris/WES/SubCohorts//subCohort_FV.txt" => "NOA",
-    # 		      "/home/nthierry/GrexomeZoufris/WES/SubCohorts/subCohort_London.txt" => "NOA",
-    # 		      "/home/nthierry/GrexomeZoufris/WES/SubCohorts/subCohort_AzooZouari.txt" => "NOA",
-    # 		      "/home/nthierry/GrexomeZoufris/WES/SubCohorts/subCohort_SB.txt" => "NOA");
+    #                   "/home/nthierry/GrexomeZoufris/WES/SubCohorts/subCohort_London.txt" => "NOA",
+    #                   "/home/nthierry/GrexomeZoufris/WES/SubCohorts/subCohort_AzooZouari.txt" => "NOA",
+    #                   "/home/nthierry/GrexomeZoufris/WES/SubCohorts/subCohort_SB.txt" => "NOA");
     return(\%subCohorts);
 }
 

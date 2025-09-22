@@ -82,8 +82,8 @@ Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --help : print this USAGE";
 
 GetOptions ("gtex=s" => \$gtexFile,
-			"favoriteTissues=s" => \$favoriteTissues,
-			"help" => \$help)
+            "favoriteTissues=s" => \$favoriteTissues,
+            "help" => \$help)
     or die("E: $0 - Error in command line arguments\n$USAGE\n");
 
 # make sure required options were provided and sanity check them
@@ -127,11 +127,11 @@ my @favTissIndex = (-1) x @favoriteTissues;
 foreach my $i (0..$#tissues) {
     $tissues[$i] =~ s/ /_/g ;
     foreach my $fti (0..$#favoriteTissues) {
-		if ($tissues[$i] eq $favoriteTissues[$fti]) {
-			($favTissIndex[$fti] != -1) && die "E $0: found favorite tissue $tissues[$i] twice, WTF!\n";
-			$favTissIndex[$fti] = $i;
-			last;
-		}
+        if ($tissues[$i] eq $favoriteTissues[$fti]) {
+            ($favTissIndex[$fti] != -1) && die "E $0: found favorite tissue $tissues[$i] twice, WTF!\n";
+            $favTissIndex[$fti] = $i;
+            last;
+        }
     }
     $tissues[$i] = "GTEX_".$tissues[$i];
 }
@@ -150,7 +150,7 @@ while ($line=<GTEX>) {
     my $ensg = shift(@data);
     shift(@data);
     ($gtex{$ensg}) &&
-		die "E $0: ENSG $ensg present twice in GTEX file\n";
+        die "E $0: ENSG $ensg present twice in GTEX file\n";
     
     # @thisGtex: array of strings holding expression values, one per tissue
     my @thisGtex =("") x @tissues ;
@@ -161,30 +161,30 @@ while ($line=<GTEX>) {
     # sum of all gtex values
     my $sumOfGtex = 0;
     foreach my $i (0..$#data) {
-		($data[$i]) || next;
-		$thisGtex[$i] = $data[$i];
-		$sumOfGtex += $data[$i] ;
+        ($data[$i]) || next;
+        $thisGtex[$i] = $data[$i];
+        $sumOfGtex += $data[$i] ;
     }
 
     # favExp / averageExp == favExp / (sumExp / nbTissues) == favExp * nbTissues / sumExp
     # so make sure we can divide by $sumOfGtex
     ($sumOfGtex) || die "E $0: Sum of GTEX values is zero for gene $ensg, impossible?\n$line\n";
     foreach my $ii (0..$#favTissIndex) {
-		($thisGtex[$favTissIndex[$ii]]) && 
-			($favTissRatios[$ii] = $thisGtex[$favTissIndex[$ii]] * @tissues / $sumOfGtex) ;
+        ($thisGtex[$favTissIndex[$ii]]) && 
+            ($favTissRatios[$ii] = $thisGtex[$favTissIndex[$ii]] * @tissues / $sumOfGtex) ;
     }
     
     # OK build array of strings with GTEX_RATIOs first, then favorites, then others
     my @toPrint = ();
     foreach my $favTissRatio (@favTissRatios) {
-		# print max 2 digits after decimal
-		my $favTR_toPrint = $favTissRatio;
-		($favTissRatio) && ($favTR_toPrint = sprintf("%.2f",$favTissRatio));
-		push(@toPrint, $favTR_toPrint);
+        # print max 2 digits after decimal
+        my $favTR_toPrint = $favTissRatio;
+        ($favTissRatio) && ($favTR_toPrint = sprintf("%.2f",$favTissRatio));
+        push(@toPrint, $favTR_toPrint);
     }
     push(@toPrint, @thisGtex[@favTissIndex]);
     foreach my $i (0..$#tissues) {
-		(grep(/^$i$/, @favTissIndex) == 0) && push(@toPrint, $thisGtex[$i]);
+        (grep(/^$i$/, @favTissIndex) == 0) && push(@toPrint, $thisGtex[$i]);
     }
     $gtex{$ensg} = \@toPrint;
 }
@@ -239,11 +239,11 @@ while (my $line = <STDIN>) {
     # build line with expression values inserted where they should
     my @toPrint = @fields[0..$insertBeforeIndex-1];
     if (defined $gtex{$gene}) {
-		push(@toPrint, @{$gtex{$gene}});
+        push(@toPrint, @{$gtex{$gene}});
     }
     else {
-		# no expression data for $gene, use empty strings
-		push(@toPrint, ("") x (@favoriteTissues + @tissues)) ;
+        # no expression data for $gene, use empty strings
+        push(@toPrint, ("") x (@favoriteTissues + @tissues)) ;
     }
     push(@toPrint, @fields[$insertBeforeIndex..$#fields]);
     print join("\t",@toPrint)."\n";

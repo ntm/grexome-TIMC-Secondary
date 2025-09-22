@@ -65,19 +65,19 @@ while (my $inFile = readdir(INDIR)) {
     ($inFile =~ /^\./) && next;
     my $cohort;
     if ($inFile =~ /^(\w+)\..*csv$/) {
-	$cohort = $1;
+        $cohort = $1;
     }
     else {
-	warn "W: $0 - cannot parse filename of inFile $inFile, skipping it\n";
-	next;
+        warn "W: $0 - cannot parse filename of inFile $inFile, skipping it\n";
+        next;
     }
 
     open(INFILE, "$inDir/$inFile") ||
-	die "E: $0 - cannot open infile $inDir/$inFile\n";
+        die "E: $0 - cannot open infile $inDir/$inFile\n";
 
     my $outFile = "$cohort.final.csv" ;
     open(OUTFILE, "> $outDir/$outFile") ||
-	die "E: $0 - cannot open outfile $outDir/$outFile: $!\n";
+        die "E: $0 - cannot open outfile $outDir/$outFile: $!\n";
 
 
     ###################################
@@ -90,29 +90,29 @@ while (my $inFile = readdir(INDIR)) {
     my ($hvCol,$hetCol) = (-1,-1);
 
     foreach my $hi (0..$#headers) {
-	if ($headers[$hi] eq "COUNT_$cohort"."_HV") {
-	    $hvCol = $hi;
-	}
-	elsif ($headers[$hi] eq "COUNT_$cohort"."_HET") {
-	    $hetCol = $hi;
-	}
+        if ($headers[$hi] eq "COUNT_$cohort"."_HV") {
+            $hvCol = $hi;
+        }
+        elsif ($headers[$hi] eq "COUNT_$cohort"."_HET") {
+            $hetCol = $hi;
+        }
     }
     # sanity check
     (($hvCol >= 0) && ($hetCol >= 0)) || 
-	die "E: $0 couldn't find one of HV/HET for $cohort\n";
+        die "E: $0 couldn't find one of HV/HET for $cohort\n";
 
     print OUTFILE "$header\n";
 
     # data lines
     while (my $line = <INFILE>) {
-	chomp($line);
-	my @fields = split(/\t/, $line, -1) ;
-	if (($fields[$hvCol] == 0) && ($fields[$hetCol] == 0)) {
-	    next;
-	}
-	else {
-	    print OUTFILE "$line\n";
-	}
+        chomp($line);
+        my @fields = split(/\t/, $line, -1) ;
+        if (($fields[$hvCol] == 0) && ($fields[$hetCol] == 0)) {
+            next;
+        }
+        else {
+            print OUTFILE "$line\n";
+        }
     }
     close(INFILE);
     close(OUTFILE);

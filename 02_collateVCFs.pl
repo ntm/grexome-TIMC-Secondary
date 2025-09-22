@@ -62,7 +62,7 @@ Arguments (all can be abbreviated to shortest unambiguous prefix):
 ';
 
 GetOptions ("vcf=s" => \$vcf,
-	    "help" => \$help)
+            "help" => \$help)
     or die("E: $0 - Error in command line arguments\n$USAGE\n");
 
 # make sure required options were provided and sanity check them
@@ -94,42 +94,42 @@ my @main2sec;
     # samples in secondary VCF: key==sampleID, value==column index in $vcf
     my %secSamples;
     while(my $line = <STDIN>) {
-	if ($line =~ /^##/) {
-	    print($line);
-	}
-	elsif ($line =~ /^#CHROM/) {
-	    print($line);
-	    chomp($line);
-	    @samples = split(/\t/, $line);
-	    last;
-	}
-	else {
-	    die "E $0: parsing headers from STDIN, #CHROM line not seen yet but found a non-header line:\n$line";
-	}
+        if ($line =~ /^##/) {
+            print($line);
+        }
+        elsif ($line =~ /^#CHROM/) {
+            print($line);
+            chomp($line);
+            @samples = split(/\t/, $line);
+            last;
+        }
+        else {
+            die "E $0: parsing headers from STDIN, #CHROM line not seen yet but found a non-header line:\n$line";
+        }
     }
     while(my $line = <VCF>) {
-	if ($line =~ /^##/) {
-	    # NOOP
-	}
-	elsif  ($line =~ /^#CHROM/) {
-	    chomp($line);
-	    my @secSamps = split(/\t/, $line);
-	    foreach my $i (0..$#secSamps) {
-		$secSamples{$secSamps[$i]} = $i;
-	    }
-	    last;
-	}
-	else {
-	    die "E $0: parsing headers from $vcf, #CHROM line not seen yet but found a non-header line:\n$line";
-	}
+        if ($line =~ /^##/) {
+            # NOOP
+        }
+        elsif  ($line =~ /^#CHROM/) {
+            chomp($line);
+            my @secSamps = split(/\t/, $line);
+            foreach my $i (0..$#secSamps) {
+                $secSamples{$secSamps[$i]} = $i;
+            }
+            last;
+        }
+        else {
+            die "E $0: parsing headers from $vcf, #CHROM line not seen yet but found a non-header line:\n$line";
+        }
     }
     foreach my $i (0..$#samples) {
-	if (defined $secSamples{$samples[$i]}) {
-	    $main2sec[$i] = $secSamples{$samples[$i]};
-	}
-	else {
-	    $main2sec[$i] = -1;
-	}
+        if (defined $secSamples{$samples[$i]}) {
+            $main2sec[$i] = $secSamples{$samples[$i]};
+        }
+        else {
+            $main2sec[$i] = -1;
+        }
     }
 }
 
@@ -166,45 +166,45 @@ elsif ($nextSec) {
 # as long as there is data...
 while ($nextMain || $nextSec) {
     if (($nextMain) && ((! $nextSec) ||
-			($nextMainChr < $nextSecChr) ||
-			(($nextMainChr == $nextSecChr) && ($nextMainPos <= $nextSecPos)))) {
-	# still have main data and it must be printed now
-	print $nextMain;
-	# read next line fom main==STDIN
-	$nextMain = <STDIN>;
-	if ($nextMain && ($nextMain =~ /^([^\t]+)\t(\d+)\t/)) {
-	    ($nextMainChr,$nextMainPos)=($1,$2);
-	    $nextMainChr = &chr2num($nextMainChr);
-	}
-	elsif ($nextMain) {
-	    die"E $0: STDIN has a data line but I can't parse it:\n$nextMain\n";
-	}
-	next;
+                        ($nextMainChr < $nextSecChr) ||
+                        (($nextMainChr == $nextSecChr) && ($nextMainPos <= $nextSecPos)))) {
+        # still have main data and it must be printed now
+        print $nextMain;
+        # read next line fom main==STDIN
+        $nextMain = <STDIN>;
+        if ($nextMain && ($nextMain =~ /^([^\t]+)\t(\d+)\t/)) {
+            ($nextMainChr,$nextMainPos)=($1,$2);
+            $nextMainChr = &chr2num($nextMainChr);
+        }
+        elsif ($nextMain) {
+            die"E $0: STDIN has a data line but I can't parse it:\n$nextMain\n";
+        }
+        next;
     }
     else {
-	# $nextSec line must be processed and printed
-	chomp($nextSec);
-	my @nextData = split(/\t/, $nextSec);
-	my $toPrint = $nextData[0];
-	foreach my $i (1..$#main2sec) {
-	    if ($main2sec[$i] == -1) {
-		$toPrint .= "\t./.";
-	    }
-	    else {
-		$toPrint .= "\t".$nextData[$main2sec[$i]];
-	    }
-	}
-	print $toPrint."\n";
-	# read next line fom Sec
-	$nextSec = <VCF>;
-	if ($nextSec && ($nextSec =~ /^([^\t]+)\t(\d+)\t/)) {
-	    ($nextSecChr,$nextSecPos)=($1,$2);
-	    $nextSecChr = &chr2num($nextSecChr);
-	}
-	elsif ($nextSec) {
-	    die"E $0: Secondary VCF has a data line but I can't parse it:\n$nextSec\n";
-	}
-	next;
+        # $nextSec line must be processed and printed
+        chomp($nextSec);
+        my @nextData = split(/\t/, $nextSec);
+        my $toPrint = $nextData[0];
+        foreach my $i (1..$#main2sec) {
+            if ($main2sec[$i] == -1) {
+                $toPrint .= "\t./.";
+            }
+            else {
+                $toPrint .= "\t".$nextData[$main2sec[$i]];
+            }
+        }
+        print $toPrint."\n";
+        # read next line fom Sec
+        $nextSec = <VCF>;
+        if ($nextSec && ($nextSec =~ /^([^\t]+)\t(\d+)\t/)) {
+            ($nextSecChr,$nextSecPos)=($1,$2);
+            $nextSecChr = &chr2num($nextSecChr);
+        }
+        elsif ($nextSec) {
+            die"E $0: Secondary VCF has a data line but I can't parse it:\n$nextSec\n";
+        }
+        next;
     }
 }
 
@@ -229,16 +229,16 @@ sub chr2num {
     my ($chr) = @_;
     $chr =~ s/^chr//;
     if ($chr eq 'X') {
-	$chr = 1023;
+        $chr = 1023;
     }
     elsif ($chr eq 'Y') {
-	$chr = 1024;
+        $chr = 1024;
     }
     elsif (($chr eq 'M') || ($chr eq 'MT')) {
-	$chr = 1025;
+        $chr = 1025;
     }
     elsif ($chr !~ /^\d+$/) {
-	die "E $0 in chr2num: CHROM is not numeric or X/Y/M/MT, need to fix the code to deal with this";
+        die "E $0 in chr2num: CHROM is not numeric or X/Y/M/MT, need to fix the code to deal with this";
     }
     return($chr);
 }

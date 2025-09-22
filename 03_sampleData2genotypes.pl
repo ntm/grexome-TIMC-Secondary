@@ -69,40 +69,40 @@ warn "I $now: $0 - starting to run\n";
 my @samples;
 while(my $line = <STDIN>) {
     if ($line =~ /^##/) {
-	# ignore previous FORMAT descriptions, print other header lines
-	($line =~ /^##FORMAT=/) || print $line;
+        # ignore previous FORMAT descriptions, print other header lines
+        ($line =~ /^##FORMAT=/) || print $line;
     }
     elsif ($line =~ /^#CHROM/) {
-	chomp($line);
-	@samples = split(/\t/, $line);
-	(@samples >= 10) || die "E $0: no sample ids in CHROM line?\n$line\n";
-	# first 9 fields are just copied
-	my $lineToPrint = shift(@samples);
-	foreach my $i (2..9) {
-	    $lineToPrint .= "\t".shift(@samples);
-	}
-	# now @samples has the sample ids, as we wanted.
-	# add the new column names
-	$lineToPrint .= "\tHV\tHET\tOTHER\tHR\n";
+        chomp($line);
+        @samples = split(/\t/, $line);
+        (@samples >= 10) || die "E $0: no sample ids in CHROM line?\n$line\n";
+        # first 9 fields are just copied
+        my $lineToPrint = shift(@samples);
+        foreach my $i (2..9) {
+            $lineToPrint .= "\t".shift(@samples);
+        }
+        # now @samples has the sample ids, as we wanted.
+        # add the new column names
+        $lineToPrint .= "\tHV\tHET\tOTHER\tHR\n";
 
-	# Now print the command line, the new FORMAT descriptions, and 
-	# then the new CHROM line
-	# add info with full command line run
-	my $com = "$0 ".join(" ",@ARGV);
-	chomp($com);
-	$com .= " < ".`readlink -f /proc/$$/fd/0` ;
-	chomp($com);
-	$com .= " > ".`readlink -f /proc/$$/fd/1` ;
-	chomp($com);
-	$com .= " 2> ".`readlink -f /proc/$$/fd/2` ;
-	chomp($com);
-	print "##sampleData2genotypes=<commandLine=\"$com\">\n";
-	print "##FORMAT=<ID=GENOS,Number=.,Type=String,Description=\"pipe-separated list of genotypes called at this position, with all corresponding sample identifiers for each genotype (with [DP:AF] for HET and HV SNVs/short-indels, and [GQ:FR:BP] for CNVs (no BP if unavailable)\">\n";
-	print $lineToPrint;
-	last;
+        # Now print the command line, the new FORMAT descriptions, and 
+        # then the new CHROM line
+        # add info with full command line run
+        my $com = "$0 ".join(" ",@ARGV);
+        chomp($com);
+        $com .= " < ".`readlink -f /proc/$$/fd/0` ;
+        chomp($com);
+        $com .= " > ".`readlink -f /proc/$$/fd/1` ;
+        chomp($com);
+        $com .= " 2> ".`readlink -f /proc/$$/fd/2` ;
+        chomp($com);
+        print "##sampleData2genotypes=<commandLine=\"$com\">\n";
+        print "##FORMAT=<ID=GENOS,Number=.,Type=String,Description=\"pipe-separated list of genotypes called at this position, with all corresponding sample identifiers for each genotype (with [DP:AF] for HET and HV SNVs/short-indels, and [GQ:FR:BP] for CNVs (no BP if unavailable)\">\n";
+        print $lineToPrint;
+        last;
     }
     else {
-	die "E $0: parsing header, found bad line:\n$line";
+        die "E $0: parsing header, found bad line:\n$line";
     }
 }
 
@@ -116,7 +116,7 @@ while(my $line = <STDIN>) {
     $data[4] =~ s/,<NON_REF>//;
     my $lineToPrint = shift(@data);
     foreach my $i (1..7) {
-	$lineToPrint .= "\t".shift(@data);
+        $lineToPrint .= "\t".shift(@data);
     }
 
     # from FORMAT we need GT:AF+DP (assumption: filterBadCalls.pl already ran
@@ -130,81 +130,81 @@ while(my $line = <STDIN>) {
     my $dpCol = 0;
 
     if ($format eq "GT:GQ:FR:BPR:BP") {
-	$isCnv = 2;
+        $isCnv = 2;
     }
     elsif ($format eq "GT:GQ:FR:BPR") {
-	$isCnv = 1;
+        $isCnv = 1;
     }
     elsif ($format =~ /^GT:AF:/) {
-	my @format = split(/:/, $format);
-	foreach my $i (2..$#format) {
-	    ($format[$i] eq "DP") && ($dpCol = $i) && last;
-	}
-	($dpCol==0) && die "E $0: SNV line but DP not found in format:\n$line\n";
+        my @format = split(/:/, $format);
+        foreach my $i (2..$#format) {
+            ($format[$i] eq "DP") && ($dpCol = $i) && last;
+        }
+        ($dpCol==0) && die "E $0: SNV line but DP not found in format:\n$line\n";
     }
     else {
-	die "E $0: FORMAT doesn't begin with 'GT:AF:' or 'GT:GQ:FR:BPR' in:\n$line\n";
+        die "E $0: FORMAT doesn't begin with 'GT:AF:' or 'GT:GQ:FR:BPR' in:\n$line\n";
     }
     # print new FORMAT
     $lineToPrint .= "\tGENOS";
 
     # sanity check
     (@data == @samples) || 
-	die "E $0: we don't have same number of samples and data columns in:\n$line\n";
+        die "E $0: we don't have same number of samples and data columns in:\n$line\n";
     # construct comma-separated list of samples for each called genotype
     my %geno2samples = ();
 
     foreach my $i (0..$#data) {
-	# ignore NOCALLs
-	($data[$i] eq './.') && next;
+        # ignore NOCALLs
+        ($data[$i] eq './.') && next;
 
-	my $geno;
-	# $callInfo: stays "" for HRs, else [$dp:$af] for SNVs, [$gq:$fr:$bp] or [$gq:$fr] for CNVs
-	my $callInfo = "";
+        my $geno;
+        # $callInfo: stays "" for HRs, else [$dp:$af] for SNVs, [$gq:$fr:$bp] or [$gq:$fr] for CNVs
+        my $callInfo = "";
 
-	if ($isCnv) {
-	    # CNV
-	    if ($data[$i] eq '0/0') {
-		$geno = '0/0';
-	    }
-	    else {
-		($data[$i] =~ m~^(\d+/\d+):([^:]+:[^:]+):~) || 
-		    die "E $0: cannot grab GT:GQ:FR for sample $i in $data[$i] in line:\n$line\n";
-		($geno,$callInfo) = ($1,$2);
-		if ($isCnv == 2) {
-		    # grab :BP == last field
-		    ($data[$i] =~ m~(:[^:]+)$~) ||
-			die "cannot grab BP in $data[$i]\n";
-		    my $bp = $1;
-		    # we can have several comma-separated BPs, but commas are used to separate
-		    # samples -> substitute with _
-		    $bp =~ s/,/_/g;
-		    $callInfo .= $bp;
-		}
-		$callInfo = "[$callInfo]";
-	    }
-	}
-	else {
-	    # SNV/short-indel
-	    if ($data[$i] =~ m~^0/0:~) {
-		$geno = '0/0';
-	    }
-	    else {
-		($data[$i] =~ m~^(\d+/\d+):([^:]+):~) || 
-		    die "E $0: cannot grab genotype and AF for sample $i in $data[$i] in line:\n$line\n";
-		($geno,$callInfo) = ($1,$2);
-		my @thisData = split(/:/, $data[$i]);
-		my $dp = 0;
-		($dpCol) && ($thisData[$dpCol]) && ($thisData[$dpCol] ne '.') && ($dp = $thisData[$dpCol]);
-		($dp) || die "E $0: AF is $callInfo but couldn't find DP in $data[$i]\n$line\n";
-		# we want [$DP:$AF]
-		$callInfo = "[$dp:$callInfo]";
-	    }
-	}
-	
-	if (defined $geno2samples{$geno}) { $geno2samples{$geno} .= ","; }
-	else { $geno2samples{$geno} = ""; }
-	$geno2samples{$geno} .= $samples[$i].$callInfo;
+        if ($isCnv) {
+            # CNV
+            if ($data[$i] eq '0/0') {
+                $geno = '0/0';
+            }
+            else {
+                ($data[$i] =~ m~^(\d+/\d+):([^:]+:[^:]+):~) || 
+                    die "E $0: cannot grab GT:GQ:FR for sample $i in $data[$i] in line:\n$line\n";
+                ($geno,$callInfo) = ($1,$2);
+                if ($isCnv == 2) {
+                    # grab :BP == last field
+                    ($data[$i] =~ m~(:[^:]+)$~) ||
+                        die "cannot grab BP in $data[$i]\n";
+                    my $bp = $1;
+                    # we can have several comma-separated BPs, but commas are used to separate
+                    # samples -> substitute with _
+                    $bp =~ s/,/_/g;
+                    $callInfo .= $bp;
+                }
+                $callInfo = "[$callInfo]";
+            }
+        }
+        else {
+            # SNV/short-indel
+            if ($data[$i] =~ m~^0/0:~) {
+                $geno = '0/0';
+            }
+            else {
+                ($data[$i] =~ m~^(\d+/\d+):([^:]+):~) || 
+                    die "E $0: cannot grab genotype and AF for sample $i in $data[$i] in line:\n$line\n";
+                ($geno,$callInfo) = ($1,$2);
+                my @thisData = split(/:/, $data[$i]);
+                my $dp = 0;
+                ($dpCol) && ($thisData[$dpCol]) && ($thisData[$dpCol] ne '.') && ($dp = $thisData[$dpCol]);
+                ($dp) || die "E $0: AF is $callInfo but couldn't find DP in $data[$i]\n$line\n";
+                # we want [$DP:$AF]
+                $callInfo = "[$dp:$callInfo]";
+            }
+        }
+        
+        if (defined $geno2samples{$geno}) { $geno2samples{$geno} .= ","; }
+        else { $geno2samples{$geno} = ""; }
+        $geno2samples{$geno} .= $samples[$i].$callInfo;
     }
     
     # now print data for each genotype, removing data from %geno2samples as we go
@@ -212,10 +212,10 @@ while(my $line = <STDIN>) {
     # HV
     $lineToPrint .= "\t";
     foreach my $geno (sort GENOSORT keys %geno2samples) {
-	($geno eq '0/0') && next; # skip HR
-	($geno =~ m~^(\d+)/\1$~) || next;
-	$lineToPrint .= "$geno~".$geno2samples{$geno}."|";
-	delete($geno2samples{$geno});
+        ($geno eq '0/0') && next; # skip HR
+        ($geno =~ m~^(\d+)/\1$~) || next;
+        $lineToPrint .= "$geno~".$geno2samples{$geno}."|";
+        delete($geno2samples{$geno});
     }
     # remove last | if needed (not needed if there are no HVs)
     $lineToPrint =~ s/\|$// ;
@@ -223,10 +223,10 @@ while(my $line = <STDIN>) {
     # HET == 0/*
     $lineToPrint .= "\t";
     foreach my $geno (sort GENOSORT keys %geno2samples) {
-	($geno eq '0/0') && next; # skip HR
-	($geno =~ m~^0/\d+$~) || next;
-	$lineToPrint .= "$geno~".$geno2samples{$geno}."|";
-	delete($geno2samples{$geno});
+        ($geno eq '0/0') && next; # skip HR
+        ($geno =~ m~^0/\d+$~) || next;
+        $lineToPrint .= "$geno~".$geno2samples{$geno}."|";
+        delete($geno2samples{$geno});
     }
     # remove last | if there was at least one HET geno
     $lineToPrint =~ s/\|$// ;
@@ -234,10 +234,10 @@ while(my $line = <STDIN>) {
     # OTHER
     $lineToPrint .= "\t";
     foreach my $geno (sort GENOSORT keys %geno2samples) {
-	($geno eq '0/0') && next; # skip HR
-	($geno =~ m~^\d+/\d+$~) || die "E $0: cannot parse geno $geno in line:\n$line\n";
-	$lineToPrint .= "$geno~".$geno2samples{$geno}."|";
-	delete($geno2samples{$geno});
+        ($geno eq '0/0') && next; # skip HR
+        ($geno =~ m~^\d+/\d+$~) || die "E $0: cannot parse geno $geno in line:\n$line\n";
+        $lineToPrint .= "$geno~".$geno2samples{$geno}."|";
+        delete($geno2samples{$geno});
     }
     # remove last | if needed
     $lineToPrint =~ s/\|$// ;
@@ -245,13 +245,13 @@ while(my $line = <STDIN>) {
     # HR: if no sample is HR, column is empty
     $lineToPrint .= "\t";
     if (defined $geno2samples{'0/0'}) {
-	$lineToPrint .= "0/0~".$geno2samples{'0/0'};
-	delete($geno2samples{'0/0'});
+        $lineToPrint .= "0/0~".$geno2samples{'0/0'};
+        delete($geno2samples{'0/0'});
     }
 
     # sanity:
     (%geno2samples) &&
-	die "E $0: after eating every geno, geno2samples not empty: %geno2samples, line:\n$line\n";
+        die "E $0: after eating every geno, geno2samples not empty: %geno2samples, line:\n$line\n";
 
     print $lineToPrint."\n";
 }

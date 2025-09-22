@@ -100,45 +100,45 @@ $pm->run_on_finish( sub { ($_[1]) && ($childFailed=1) });
 while (my $inFile = readdir(INDIR)) {
     ($inFile =~ /^\./) && next;
     if ($childFailed) {
-	$now = strftime("%F %T", localtime);
-	die "E $now: $0 FAILED - some child died, no point going on\n";
+        $now = strftime("%F %T", localtime);
+        die "E $now: $0 FAILED - some child died, no point going on\n";
     }
     $pm->start && next;
     my ($fileStart,$gz);
     if ($inFile =~ /^(.+)\.csv$/) {
-	$fileStart = $1;
+        $fileStart = $1;
     }
     elsif ($inFile =~ /^(.+)\.csv\.gz$/) {
-	$fileStart = $1;
-	$gz = 1;
+        $fileStart = $1;
+        $gz = 1;
     }
     else {
-	warn "W $0: cannot parse filename of inFile $inDir/$inFile, skipping it\n";
-	$pm->finish;
+        warn "W $0: cannot parse filename of inFile $inDir/$inFile, skipping it\n";
+        $pm->finish;
     }
 
     my $inFull = "$inDir/$inFile";
     ($gz) && ($inFull = "gunzip -c $inFull | ");
     open(IN, $inFull) ||
-	die "E $0: cannot (gunzip-?)open cohort datafile $inDir/$inFile (as $inFull)\n";
+        die "E $0: cannot (gunzip-?)open cohort datafile $inDir/$inFile (as $inFull)\n";
 
     my $outFile = "$outDir/$fileStart.patientIDs.csv";
     my $outFull = " > $outFile";
     ($gz) && ($outFull = " | gzip -c $outFull.gz");
     open (OUT, $outFull) || 
-	die "E $0: cannot (gzip-?)open $outFile for writing (as $outFull)\n";
+        die "E $0: cannot (gzip-?)open $outFile for writing (as $outFull)\n";
 
     while (my $line = <IN>) {
-	chomp($line);
+        chomp($line);
         # add trailing ',' so we know sampleID is always followed by some char
         $line .= ',';
-	# chuck norris style: brutal but it works...
-	foreach my $sample (keys %$sample2patientR) {
-	    $line =~ s/$sample2re{$sample}/$sample($sample2patientR->{$sample})$1/g ;
-	}
-	# remove the trailing ,
-	($line =~ s/,$//) || die "E $0: cannot remove trailing , in:\n$line\n";
-	print OUT "$line\n";
+        # chuck norris style: brutal but it works...
+        foreach my $sample (keys %$sample2patientR) {
+            $line =~ s/$sample2re{$sample}/$sample($sample2patientR->{$sample})$1/g ;
+        }
+        # remove the trailing ,
+        ($line =~ s/,$//) || die "E $0: cannot remove trailing , in:\n$line\n";
+        print OUT "$line\n";
     }
     close(IN);
     close(OUT);

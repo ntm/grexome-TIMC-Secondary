@@ -100,15 +100,15 @@ Arguments (all can be abbreviated to shortest unambiguous prefixes):
 --help : print this USAGE";
 
     GetOptions ("cacheFile=s" => \$cacheFile,
-		"genome=s" => \$genome,
-		"species=s" => \$species,
-		"dataDir=s" => \$dataDir,
-		"tmpDir=s" => \$tmpDir,
-		"debug" => \$debug,
-		"vep=s" => \$vepBin,
-		"jobs=i" => \$vepJobs,
-		"help" => \$help)
-	or die("E $0: Error in command line arguments\n$USAGE\n");
+                "genome=s" => \$genome,
+                "species=s" => \$species,
+                "dataDir=s" => \$dataDir,
+                "tmpDir=s" => \$tmpDir,
+                "debug" => \$debug,
+                "vep=s" => \$vepBin,
+                "jobs=i" => \$vepJobs,
+                "help" => \$help)
+        or die("E $0: Error in command line arguments\n$USAGE\n");
 
     # make sure required options were provided and sanity check them
     ($help) && die "$USAGE\n\n";
@@ -116,15 +116,15 @@ Arguments (all can be abbreviated to shortest unambiguous prefixes):
     ($cacheFile) || die "E $0: you must provide a cacheFile\n$USAGE\n";
     # if cacheFile exists we need write-access to it
     if (-e $cacheFile) {
-	(-w $cacheFile) ||
-	    die "E $0: provided cacheFile $cacheFile exists but isn't writable\n";
+        (-w $cacheFile) ||
+            die "E $0: provided cacheFile $cacheFile exists but isn't writable\n";
     }
     # otherwise it's OK we'll create it, but we need write-access to the subdir
     else {
-	open(TEST, ">>$cacheFile") ||
-	    die "E $0: provided cacheFile $cacheFile doesn't exist and we can't create it\n";
-	close(TEST);
-	unlink($cacheFile);
+        open(TEST, ">>$cacheFile") ||
+            die "E $0: provided cacheFile $cacheFile doesn't exist and we can't create it\n";
+        close(TEST);
+        unlink($cacheFile);
     }
 
     ($genome) || die "E $0: you must provide a ref genome fasta file\n";
@@ -133,17 +133,17 @@ Arguments (all can be abbreviated to shortest unambiguous prefixes):
     ($species =~ /^\w+$/) || die "E $0: VEP species must be alphanumeric+underscores\n";
 
     ($dataDir) || 
-	die "E $0: you must provide a dataDir containing the data required by the VEP plugins we use\n";
+        die "E $0: you must provide a dataDir containing the data required by the VEP plugins we use\n";
     (-d $dataDir) ||
-	die "E $0: the provided dataDir $dataDir doesn't exist or isn't a dir\n";
+        die "E $0: the provided dataDir $dataDir doesn't exist or isn't a dir\n";
 
     ($tmpDir) || die "E $0: you must provide a non-existing tmpDir\n";
     (-e $tmpDir) &&
-	die "E $0: tmpDir $tmpDir exists, please rm -r $tmpDir or use another tmpDir as arg\n";
+        die "E $0: tmpDir $tmpDir exists, please rm -r $tmpDir or use another tmpDir as arg\n";
     mkdir($tmpDir) || die "E $0: cannot create tmpDir $tmpDir\n";
 
     system("which $vepBin &> /dev/null") &&
-	die "E $0: the VEP executable $vepBin can't be found\n";
+        die "E $0: the VEP executable $vepBin can't be found\n";
 
     ($vepJobs =~ /^\d+$/) || die "E $0: --jobs must be an int, you provided $vepJobs\n";
 
@@ -168,8 +168,8 @@ Arguments (all can be abbreviated to shortest unambiguous prefixes):
     my $cache = {};
     # grab previously cached data except in debug mode
     if ((!$debug) && (-f $cacheFile) && (! -z $cacheFile)) {
-	$cache = &lock_retrieve($cacheFile) ||
-	    die "E $0: cachefile $cacheFile exists and is not empty but I can't retrieve hash from it.\n";
+        $cache = &lock_retrieve($cacheFile) ||
+            die "E $0: cachefile $cacheFile exists and is not empty but I can't retrieve hash from it.\n";
     }
 
     # $cacheUpdate is a hashref, same key->value pairs as $cache but it
@@ -183,13 +183,13 @@ Arguments (all can be abbreviated to shortest unambiguous prefixes):
     # - store the #CHROM header line in $headerLine, we'll need it later for VEP.
     my $headerLine = &checkHeaders($cache, $cacheUpdate, $tmpDir, $vepCommand);
     if (!$headerLine) {
-	# VEP version or CSQ mismatch detected
-	unlink($vepStats) || die "E $0: cannot unlink vepStats file $vepStats\n";
-	rmdir($tmpDir) ||
-	    warn "W $0: VEP version or INFO-CSQ mismatch but can't rmdir tmpDir $tmpDir\n";
-	die "E $0:  VEP version or INFO-CSQ mismatch. If you updated your VEP cache or VEP ".
-	    "options/plugins this script's cachefile is now stale, you need to rm $cacheFile ".
-	    "and rebuild a fresh cache.\n";
+        # VEP version or CSQ mismatch detected
+        unlink($vepStats) || die "E $0: cannot unlink vepStats file $vepStats\n";
+        rmdir($tmpDir) ||
+            warn "W $0: VEP version or INFO-CSQ mismatch but can't rmdir tmpDir $tmpDir\n";
+        die "E $0:  VEP version or INFO-CSQ mismatch. If you updated your VEP cache or VEP ".
+            "options/plugins this script's cachefile is now stale, you need to rm $cacheFile ".
+            "and rebuild a fresh cache.\n";
     }
 
     #################################
@@ -212,85 +212,85 @@ Arguments (all can be abbreviated to shortest unambiguous prefixes):
 
     # parse data lines from stdin
     while (my $line = <STDIN>) {
-	chomp($line);
-	my @f = split(/\t/,$line,-1);
-	(@f >= 8) || die "E $0: VCF line doesn't have >= 8 columns:\n$line\n";
+        chomp($line);
+        my @f = split(/\t/,$line,-1);
+        (@f >= 8) || die "E $0: VCF line doesn't have >= 8 columns:\n$line\n";
 
-	my $chr = $f[0];
-	if (!defined $prevChr) {
-	    # this is the first data line
-	    $vcfFromVep = "$tmpDir/vcfFromVep_$chr.vcf.gz";
-	    (-e $vcfFromVep) &&
-		die "E $0: vcfFromVep $vcfFromVep already exists\n";
-	    open($VCFVEP, "| $vepCommand | gzip -c --fast > $vcfFromVep") ||
-		die "E $0: cannot run VEP on new data for chrom $chr\n";
-	    $vcfFromCache = "$tmpDir/vcfFromCache_$chr.vcf.gz";
-	    (-e $vcfFromCache) &&
-		die "E $0: vcfFromCache $vcfFromCache already exists\n";
-	    open($VCFCACHE, "| gzip -c --fast > $vcfFromCache") ||
-		die "E $0: cannot open gzip pipe to vcfFromCache $vcfFromCache\n";
-	    # send minimal header to VEP
-	    print $VCFVEP $headerLine;
-	    $prevChr = $chr;
-	}
-	elsif ($prevChr ne $chr) {
-	    # we changed chrom, start merging and printing results from prevChr
-	    close($VCFVEP);
-	    close($VCFCACHE);
-	    $now = strftime("%F %T", localtime);
-	    warn "I $now: $0 - finished parsing/processing chrom $prevChr\n";
-	    # merge prevChr files
-	    &mergeAndPrint($vcfFromVep, $vcfFromCache, $cacheUpdate);
-	    unlink($vcfFromVep, $vcfFromCache);
-	    # set up new outputs
-	    $vcfFromVep = "$tmpDir/vcfFromVep_$chr.vcf.gz";
-	    (-e $vcfFromVep) &&
-		die "E $0: vcfFromVep $vcfFromVep already exists\n";
-	    open($VCFVEP, "| $vepCommand | gzip -c --fast > $vcfFromVep") ||
-		die "E $0: cannot run VEP on new data for chrom $chr\n";
-	    $vcfFromCache = "$tmpDir/vcfFromCache_$chr.vcf.gz";
-	    (-e $vcfFromCache) &&
-		die "E $0: vcfFromCache $vcfFromCache already exists\n";
-	    open($VCFCACHE, "| gzip -c --fast > $vcfFromCache") ||
-		die "E $0: cannot open gzip pipe to vcfFromCache $vcfFromCache\n";
-	    # send minimal header to VEP
-	    print $VCFVEP $headerLine;
-	    $prevChr = $chr;
-	}
+        my $chr = $f[0];
+        if (!defined $prevChr) {
+            # this is the first data line
+            $vcfFromVep = "$tmpDir/vcfFromVep_$chr.vcf.gz";
+            (-e $vcfFromVep) &&
+                die "E $0: vcfFromVep $vcfFromVep already exists\n";
+            open($VCFVEP, "| $vepCommand | gzip -c --fast > $vcfFromVep") ||
+                die "E $0: cannot run VEP on new data for chrom $chr\n";
+            $vcfFromCache = "$tmpDir/vcfFromCache_$chr.vcf.gz";
+            (-e $vcfFromCache) &&
+                die "E $0: vcfFromCache $vcfFromCache already exists\n";
+            open($VCFCACHE, "| gzip -c --fast > $vcfFromCache") ||
+                die "E $0: cannot open gzip pipe to vcfFromCache $vcfFromCache\n";
+            # send minimal header to VEP
+            print $VCFVEP $headerLine;
+            $prevChr = $chr;
+        }
+        elsif ($prevChr ne $chr) {
+            # we changed chrom, start merging and printing results from prevChr
+            close($VCFVEP);
+            close($VCFCACHE);
+            $now = strftime("%F %T", localtime);
+            warn "I $now: $0 - finished parsing/processing chrom $prevChr\n";
+            # merge prevChr files
+            &mergeAndPrint($vcfFromVep, $vcfFromCache, $cacheUpdate);
+            unlink($vcfFromVep, $vcfFromCache);
+            # set up new outputs
+            $vcfFromVep = "$tmpDir/vcfFromVep_$chr.vcf.gz";
+            (-e $vcfFromVep) &&
+                die "E $0: vcfFromVep $vcfFromVep already exists\n";
+            open($VCFVEP, "| $vepCommand | gzip -c --fast > $vcfFromVep") ||
+                die "E $0: cannot run VEP on new data for chrom $chr\n";
+            $vcfFromCache = "$tmpDir/vcfFromCache_$chr.vcf.gz";
+            (-e $vcfFromCache) &&
+                die "E $0: vcfFromCache $vcfFromCache already exists\n";
+            open($VCFCACHE, "| gzip -c --fast > $vcfFromCache") ||
+                die "E $0: cannot open gzip pipe to vcfFromCache $vcfFromCache\n";
+            # send minimal header to VEP
+            print $VCFVEP $headerLine;
+            $prevChr = $chr;
+        }
 
-	# no else: process $line whether we changed chrom or not
-	# key: chrom:pos:ref:alt for SNVs/indels, chrom:pos:ref:alt:end for CNVs
-	my $key = "$f[0]:$f[1]:$f[3]:$f[4]";
-	if (($f[4] eq '<DUP>') || ($f[4] eq '<DEL>')) {
-	    # CNV: grab END
-	    ($f[7] =~ /END=(\d+)/) || 
-		die "E $0: cannot grab END from CNV line:\n$line\n";
-	    $key .= ":$1";
-	}
-	if (defined $cache->{$key}) {
-	    # just copy CSQ from cache
-	    ($f[7]) && ($f[7] ne '.') && ($f[7] .= ';');
-	    ($f[7]) && ($f[7] eq '.') && ($f[7] = '');
-	    $f[7] .= 'CSQ='.$cache->{$key};
-	    print $VCFCACHE join("\t",@f)."\n";
-	}
-	else {
-	    print $VCFVEP "$line\n";
-	}
+        # no else: process $line whether we changed chrom or not
+        # key: chrom:pos:ref:alt for SNVs/indels, chrom:pos:ref:alt:end for CNVs
+        my $key = "$f[0]:$f[1]:$f[3]:$f[4]";
+        if (($f[4] eq '<DUP>') || ($f[4] eq '<DEL>')) {
+            # CNV: grab END
+            ($f[7] =~ /END=(\d+)/) || 
+                die "E $0: cannot grab END from CNV line:\n$line\n";
+            $key .= ":$1";
+        }
+        if (defined $cache->{$key}) {
+            # just copy CSQ from cache
+            ($f[7]) && ($f[7] ne '.') && ($f[7] .= ';');
+            ($f[7]) && ($f[7] eq '.') && ($f[7] = '');
+            $f[7] .= 'CSQ='.$cache->{$key};
+            print $VCFCACHE join("\t",@f)."\n";
+        }
+        else {
+            print $VCFVEP "$line\n";
+        }
     }
 
     # merge VCFs for last chrom, unless stdin was completely empty
     if ($prevChr) {
-	$now = strftime("%F %T", localtime);
-	warn "I $now: $0 - finished parsing/processing chrom $prevChr\n";
-	close($VCFVEP);
-	close($VCFCACHE);
-	# merge last chr files
-	&mergeAndPrint($vcfFromVep, $vcfFromCache, $cacheUpdate);
-	unlink($vcfFromVep, $vcfFromCache);
+        $now = strftime("%F %T", localtime);
+        warn "I $now: $0 - finished parsing/processing chrom $prevChr\n";
+        close($VCFVEP);
+        close($VCFCACHE);
+        # merge last chr files
+        &mergeAndPrint($vcfFromVep, $vcfFromCache, $cacheUpdate);
+        unlink($vcfFromVep, $vcfFromCache);
 
-	# update cache with new CSQs
-	&updateCache($cacheFile, $cacheUpdate, $debug);
+        # update cache with new CSQs
+        &updateCache($cacheFile, $cacheUpdate, $debug);
     }
 
     # clean up
@@ -343,131 +343,131 @@ sub vepCommand {
     ## other possibilities to consider: --tsl --appris 
 
     if (($species eq 'homo_sapiens') || ($species eq 'human')) {
-	# human-only options
-	# limit to "GENCODE basic" transcripts ("removes fragmented or problematic transcripts")
-	# in v113 this is 158k transcripts, including all 19k MANE, almost all 41k "GENCODE Primary",
-	# and 72.7k/78.7k "Ensembl canonical"
-	$vepCommand .= " --gencode_basic";
-	$vepCommand .= " --mane --sift b --polyphen b";
-	# --af_gnomade and --af_gnomadg are gnomad v4.1 frequencies since v113
-	# (see https://github.com/Ensembl/ensembl-vep/issues/1574#issuecomment-2298281150 )
-	$vepCommand .= " --af_gnomade --af_gnomadg";
-	$vepCommand .= " --check_existing";
-	# Don't URI escape HGVS strings
-	$vepCommand .= " --no_escape";
-	$vepCommand .= " --fasta $genome --hgvs";
+        # human-only options
+        # limit to "GENCODE basic" transcripts ("removes fragmented or problematic transcripts")
+        # in v113 this is 158k transcripts, including all 19k MANE, almost all 41k "GENCODE Primary",
+        # and 72.7k/78.7k "Ensembl canonical"
+        $vepCommand .= " --gencode_basic";
+        $vepCommand .= " --mane --sift b --polyphen b";
+        # --af_gnomade and --af_gnomadg are gnomad v4.1 frequencies since v113
+        # (see https://github.com/Ensembl/ensembl-vep/issues/1574#issuecomment-2298281150 )
+        $vepCommand .= " --af_gnomade --af_gnomadg";
+        $vepCommand .= " --check_existing";
+        # Don't URI escape HGVS strings
+        $vepCommand .= " --no_escape";
+        $vepCommand .= " --fasta $genome --hgvs";
 
-	# plugins: all are human-only
-	# full --plugin string with all VEP plugins we want to use and
-	# associated datafiles (with paths)
-	my $vepPlugins = "";
-	
-	# CADD - dbNSFP provides it (among many other things) for coding and consensus
-	# splice site variants, but not for deeper intronic variants
-	my $caddPath = "$dataDir/CADD/";
-	if (-d $caddPath) {
-	    my $caddSnvs = "$caddPath/whole_genome_SNVs.tsv.gz";
-	    my $caddIndels = "$caddPath/gnomad.genomes.r4.0.indel.tsv.gz";
-	    if (-f $caddSnvs) {
-		if (-f $caddIndels) {
-		    $vepPlugins .= " --plugin CADD,snv=$caddSnvs,indels=$caddIndels";
-		}
-		else {
-		    warn "W: $0 - not using CADD plugin: cannot find CADD indels file, looking for $caddIndels\n";
-		}
-	    }
-	    else {
-		warn "W: $0 - not using CADD plugin: cannot find CADD SNVs file, looking for $caddSnvs\n";
-	    }
-	}
-	else {
-	    warn "W $0 - not using CADD plugin: CADD datadir doesn't exist, looking for $caddPath\n";
-	}
-	
-	# dbNSFP and dbscSNV
-	my $dbNsfpPath = "$dataDir/dbNSFP/";
-	if (-d $dbNsfpPath) {
-	    my $dbNsfpFile = "$dbNsfpPath/dbNSFP5.2a_grch38.gz";
-	    if (-f $dbNsfpFile) {
-		# comma-separated list of fields to retrieve from dbNSFP, there are MANY
-		# possibilities, check the README in $dbNsfpPath
-		my $dbNsfpFields = "MutationTaster_pred,REVEL_rankscore,CADD_raw_rankscore";
-		# MetaRNN: both MetaRNN_rankscore and MetaRNN_pred: T(olerated) or D(amaging)
-		$dbNsfpFields .= ",MetaRNN_rankscore,MetaRNN_pred";
-		# ALFA minor allele freq: grab from dbNSFP, it's not in VEP cache despite
-		# https://github.com/Ensembl/ensembl-vep/issues/1043
-		$dbNsfpFields .= ",ALFA_Total_AF";
-		# "All of Us" (250k genomes) alt allele freq for all data, and max over all populations
-		$dbNsfpFields .= ",AllofUs_ALL_AF,AllofUs_POPMAX_AF";
-		# alt allele freq of the whole Regeneron Genetics Center Million Exome (RGC-ME)
-		$dbNsfpFields .= ",RegeneronME_ALL_AF";
-		# max alt allele freq across all populations in dbNSFP, and corresponding pop(s)
-		$dbNsfpFields .= ",dbNSFP_POPMAX_AF,dbNSFP_POPMAX_POP";
+        # plugins: all are human-only
+        # full --plugin string with all VEP plugins we want to use and
+        # associated datafiles (with paths)
+        my $vepPlugins = "";
+        
+        # CADD - dbNSFP provides it (among many other things) for coding and consensus
+        # splice site variants, but not for deeper intronic variants
+        my $caddPath = "$dataDir/CADD/";
+        if (-d $caddPath) {
+            my $caddSnvs = "$caddPath/whole_genome_SNVs.tsv.gz";
+            my $caddIndels = "$caddPath/gnomad.genomes.r4.0.indel.tsv.gz";
+            if (-f $caddSnvs) {
+                if (-f $caddIndels) {
+                    $vepPlugins .= " --plugin CADD,snv=$caddSnvs,indels=$caddIndels";
+                }
+                else {
+                    warn "W: $0 - not using CADD plugin: cannot find CADD indels file, looking for $caddIndels\n";
+                }
+            }
+            else {
+                warn "W: $0 - not using CADD plugin: cannot find CADD SNVs file, looking for $caddSnvs\n";
+            }
+        }
+        else {
+            warn "W $0 - not using CADD plugin: CADD datadir doesn't exist, looking for $caddPath\n";
+        }
+        
+        # dbNSFP and dbscSNV
+        my $dbNsfpPath = "$dataDir/dbNSFP/";
+        if (-d $dbNsfpPath) {
+            my $dbNsfpFile = "$dbNsfpPath/dbNSFP5.2a_grch38.gz";
+            if (-f $dbNsfpFile) {
+                # comma-separated list of fields to retrieve from dbNSFP, there are MANY
+                # possibilities, check the README in $dbNsfpPath
+                my $dbNsfpFields = "MutationTaster_pred,REVEL_rankscore,CADD_raw_rankscore";
+                # MetaRNN: both MetaRNN_rankscore and MetaRNN_pred: T(olerated) or D(amaging)
+                $dbNsfpFields .= ",MetaRNN_rankscore,MetaRNN_pred";
+                # ALFA minor allele freq: grab from dbNSFP, it's not in VEP cache despite
+                # https://github.com/Ensembl/ensembl-vep/issues/1043
+                $dbNsfpFields .= ",ALFA_Total_AF";
+                # "All of Us" (250k genomes) alt allele freq for all data, and max over all populations
+                $dbNsfpFields .= ",AllofUs_ALL_AF,AllofUs_POPMAX_AF";
+                # alt allele freq of the whole Regeneron Genetics Center Million Exome (RGC-ME)
+                $dbNsfpFields .= ",RegeneronME_ALL_AF";
+                # max alt allele freq across all populations in dbNSFP, and corresponding pop(s)
+                $dbNsfpFields .= ",dbNSFP_POPMAX_AF,dbNSFP_POPMAX_POP";
 
-		$vepPlugins .= " --plugin dbNSFP,$dbNsfpFile,transcript_match=1,$dbNsfpFields";
-	    }
-	    else {
-		warn "W: $0 - not using dbNSFP plugin: cannot find dbNSFP file, looking for $dbNsfpFile\n";
-	    }
+                $vepPlugins .= " --plugin dbNSFP,$dbNsfpFile,transcript_match=1,$dbNsfpFields";
+            }
+            else {
+                warn "W: $0 - not using dbNSFP plugin: cannot find dbNSFP file, looking for $dbNsfpFile\n";
+            }
 
-	    # dbscSNV (splicing), data is with dbNSFP (same authors)
-	    my $dbscSNVfile = "$dbNsfpPath/dbscSNV1.1_GRCh38.txt.gz";
-	    if (-f $dbscSNVfile) {
-		# specify assembly GRCh38 as second param because the plugin can't figure it out
-		$vepPlugins .= " --plugin dbscSNV,$dbscSNVfile,GRCh38";
-	    }
-	    else {
-		warn "W: $0 - not using dbscSNV plugin: cannot find dbscSNV file, looking for $dbscSNVfile\n";
-	    }
-	}
-	else {
-	    warn "W $0 - not using dbNSFP and dbscSNV plugins: datadir doesn't exist, looking for $dbNsfpPath\n";
-	}
+            # dbscSNV (splicing), data is with dbNSFP (same authors)
+            my $dbscSNVfile = "$dbNsfpPath/dbscSNV1.1_GRCh38.txt.gz";
+            if (-f $dbscSNVfile) {
+                # specify assembly GRCh38 as second param because the plugin can't figure it out
+                $vepPlugins .= " --plugin dbscSNV,$dbscSNVfile,GRCh38";
+            }
+            else {
+                warn "W: $0 - not using dbscSNV plugin: cannot find dbscSNV file, looking for $dbscSNVfile\n";
+            }
+        }
+        else {
+            warn "W $0 - not using dbNSFP and dbscSNV plugins: datadir doesn't exist, looking for $dbNsfpPath\n";
+        }
 
-	# spliceAI - data must be DL'd, for that you have to create an account, provide your email
-	# and personal details... see eg:
-	# https://github.com/Ensembl/VEP_plugins/blob/release/113/SpliceAI.pm
-	my $spliceAIPath = "$dataDir/SpliceAI/";
-	if (-d $spliceAIPath) {
-	    my $spliceAISnvs = "$spliceAIPath/spliceai_scores.raw.snv.hg38.vcf.gz";
-	    my $spliceAIIndels = "$spliceAIPath/spliceai_scores.raw.indel.hg38.vcf.gz";
-	    if (-f $spliceAISnvs) {
-		if (-f $spliceAIIndels) {
-		    $vepPlugins .= " --plugin SpliceAI,snv=$spliceAISnvs,indel=$spliceAIIndels";
-		}
-		else {
-		    warn "W: $0 - not using spliceAI plugin: cannot find spliceAI indels file, looking for $spliceAIIndels\n";
-		}
-	    }
-	    else {
-		warn "W: $0 - not using spliceAI plugin: cannot find spliceAI SNVs file, looking for $spliceAISnvs\n";
-	    }
-	}
-	else {
-	    warn "W $0 - not using spliceAI plugin: spliceAI datadir doesn't exist, looking for $spliceAIPath\n";
-	}
-	
-	# AlphaMissense, data file must be DL'd as $alphaMSfile and tabix-indexed, see:
-	# https://github.com/Ensembl/VEP_plugins/blob/release/113/AlphaMissense.pm
-	my $alphaMSfile = "$dataDir/AlphaMissense/AlphaMissense_hg38.tsv.gz";
-	if (-f $alphaMSfile) {
-	    $vepPlugins .= " --plugin AlphaMissense,file=$alphaMSfile";
-	}
-	else {
-	    warn "W: $0 - not using AlphaMissense plugin:cannot find alphaMissense file, looking for $alphaMSfile\n";
-	}
+        # spliceAI - data must be DL'd, for that you have to create an account, provide your email
+        # and personal details... see eg:
+        # https://github.com/Ensembl/VEP_plugins/blob/release/113/SpliceAI.pm
+        my $spliceAIPath = "$dataDir/SpliceAI/";
+        if (-d $spliceAIPath) {
+            my $spliceAISnvs = "$spliceAIPath/spliceai_scores.raw.snv.hg38.vcf.gz";
+            my $spliceAIIndels = "$spliceAIPath/spliceai_scores.raw.indel.hg38.vcf.gz";
+            if (-f $spliceAISnvs) {
+                if (-f $spliceAIIndels) {
+                    $vepPlugins .= " --plugin SpliceAI,snv=$spliceAISnvs,indel=$spliceAIIndels";
+                }
+                else {
+                    warn "W: $0 - not using spliceAI plugin: cannot find spliceAI indels file, looking for $spliceAIIndels\n";
+                }
+            }
+            else {
+                warn "W: $0 - not using spliceAI plugin: cannot find spliceAI SNVs file, looking for $spliceAISnvs\n";
+            }
+        }
+        else {
+            warn "W $0 - not using spliceAI plugin: spliceAI datadir doesn't exist, looking for $spliceAIPath\n";
+        }
+        
+        # AlphaMissense, data file must be DL'd as $alphaMSfile and tabix-indexed, see:
+        # https://github.com/Ensembl/VEP_plugins/blob/release/113/AlphaMissense.pm
+        my $alphaMSfile = "$dataDir/AlphaMissense/AlphaMissense_hg38.tsv.gz";
+        if (-f $alphaMSfile) {
+            $vepPlugins .= " --plugin AlphaMissense,file=$alphaMSfile";
+        }
+        else {
+            warn "W: $0 - not using AlphaMissense plugin:cannot find alphaMissense file, looking for $alphaMSfile\n";
+        }
 
-	# pLI, data file must be DL'd as $pLIfile, see:
-	# https://github.com/Ensembl/VEP_plugins/blob/release/113/pLI.pm
-	my $pLIfile = "$dataDir/pLI/pLI_values.txt";
-	if (-f $pLIfile) {
-	    $vepPlugins .= " --plugin pLI,$pLIfile";
-	}
-	else {
-	    warn "W: $0 - not using pLI plugin:cannot find pLI file, looking for $pLIfile\n";
-	}
+        # pLI, data file must be DL'd as $pLIfile, see:
+        # https://github.com/Ensembl/VEP_plugins/blob/release/113/pLI.pm
+        my $pLIfile = "$dataDir/pLI/pLI_values.txt";
+        if (-f $pLIfile) {
+            $vepPlugins .= " --plugin pLI,$pLIfile";
+        }
+        else {
+            warn "W: $0 - not using pLI plugin:cannot find pLI file, looking for $pLIfile\n";
+        }
 
-	$vepCommand .= $vepPlugins;
+        $vepCommand .= $vepPlugins;
     }
 
     # --fork borks when $vepJobs==1
@@ -495,70 +495,70 @@ sub checkHeaders {
     # make a small VCF containing all the headers from STDIN
     my $vcfHeader = "$tmpDir/vcfHeader.vcf";
     open(my $VCFHEAD, "> $vcfHeader") ||
-	die "E $0: cannot open vcfHeader $vcfHeader for writing\n";
+        die "E $0: cannot open vcfHeader $vcfHeader for writing\n";
 
     while (my $line = <STDIN>) {
-	($line =~ /^#/) ||
-	    die "E $0 in checkHeaders: STDIN isn't a correct VCF, found line:\n$line";
-	# header lines go to VCFHEAD
-	print $VCFHEAD $line;
-	# line #CHROM is always last header line
-	($line =~ /^#CHROM/) && ($headerLine = $line) && last;
+        ($line =~ /^#/) ||
+            die "E $0 in checkHeaders: STDIN isn't a correct VCF, found line:\n$line";
+        # header lines go to VCFHEAD
+        print $VCFHEAD $line;
+        # line #CHROM is always last header line
+        ($line =~ /^#CHROM/) && ($headerLine = $line) && last;
     }
     close($VCFHEAD);
 
     ($headerLine) ||
-	die "E $0 in checkHeaders: STDIN is not a VCF, comment lines don't end with #CHROM line\n";
+        die "E $0 in checkHeaders: STDIN is not a VCF, comment lines don't end with #CHROM line\n";
 
     # run VEP on header file
     open(my $VCFHEAD_OUT, "$vepCommand < $vcfHeader |") ||
-	die "E $0: cannot run VEP on header file with:\n$vepCommand < $vcfHeader\n";
+        die "E $0: cannot run VEP on header file with:\n$vepCommand < $vcfHeader\n";
     # check that the cache matches the VEP version and has the correct VEP columns,
     # if AOK print processed headers to stdout
     my $headerToPrint = "";
     while (my $line = <$VCFHEAD_OUT>) {
-	$headerToPrint .= $line;
-	chomp($line);
-	if ($line =~ /^##VEP=/) {
-	    # make sure VEP version + DBs match the cache
-	    # need to remove timestamp
-	    my $lineClean = $line;
-	    ($lineClean =~ s/time="[^"]+" //) ||
-		die "E $0: cannot remove timestamp from ##VEP line:\n$line\n";
-	    # also remove any path before /.vep/ in cache= so different users can use the
-	    # same cacheFile if they have their own VEP install with same cache versions
-	    $lineClean =~ s~(cache=")[^"]+(/.vep/)~$1$2~; # no "||die", eg if the user changed his VEPDIR
-	    # also remove ensembl* fields, they appear in a random order that changes from run to run:
-	    # https://github.com/Ensembl/ensembl-vep/issues/1540
-	    $lineClean =~ s/\sensembl\S+//g ||
-		die "E $0: cannot remove ensembl* version info from ##VEP line:\n$line\n";
-	    if (defined $cache->{"VEPversion"}) {
-		my $cacheLine = $cache->{"VEPversion"};
-		if ($cacheLine ne $lineClean) {
-		    # version mismatch
-		    $headerLine = "";
-		    warn "E: $0 - cached VEP version and ##VEP line from VCF are different:\n$cacheLine\n$lineClean\n";
-		    last;
-		}
-	    }
-	    else {
-		$cacheUpdate->{"VEPversion"} = $lineClean;
-	    }
-	}
-	elsif ($line =~ /^##INFO=<ID=CSQ/) {
-	    # make sure the INFO->CSQ fields from file and cache match
-	    if (defined $cache->{"INFOCSQ"}) {
-		my $cacheLine = $cache->{"INFOCSQ"};
-		if ($cacheLine ne $line) {
-		    $headerLine = "";
-		    warn "E: $0 - cacheLine and INFO-CSQ line from VCF are different:\n$cacheLine\n$line\n";
-		    last;
-		}
-	    }
-	    else {
-		$cacheUpdate->{"INFOCSQ"} = $line;
-	    }
-	}
+        $headerToPrint .= $line;
+        chomp($line);
+        if ($line =~ /^##VEP=/) {
+            # make sure VEP version + DBs match the cache
+            # need to remove timestamp
+            my $lineClean = $line;
+            ($lineClean =~ s/time="[^"]+" //) ||
+                die "E $0: cannot remove timestamp from ##VEP line:\n$line\n";
+            # also remove any path before /.vep/ in cache= so different users can use the
+            # same cacheFile if they have their own VEP install with same cache versions
+            $lineClean =~ s~(cache=")[^"]+(/.vep/)~$1$2~; # no "||die", eg if the user changed his VEPDIR
+            # also remove ensembl* fields, they appear in a random order that changes from run to run:
+            # https://github.com/Ensembl/ensembl-vep/issues/1540
+            $lineClean =~ s/\sensembl\S+//g ||
+                die "E $0: cannot remove ensembl* version info from ##VEP line:\n$line\n";
+            if (defined $cache->{"VEPversion"}) {
+                my $cacheLine = $cache->{"VEPversion"};
+                if ($cacheLine ne $lineClean) {
+                    # version mismatch
+                    $headerLine = "";
+                    warn "E: $0 - cached VEP version and ##VEP line from VCF are different:\n$cacheLine\n$lineClean\n";
+                    last;
+                }
+            }
+            else {
+                $cacheUpdate->{"VEPversion"} = $lineClean;
+            }
+        }
+        elsif ($line =~ /^##INFO=<ID=CSQ/) {
+            # make sure the INFO->CSQ fields from file and cache match
+            if (defined $cache->{"INFOCSQ"}) {
+                my $cacheLine = $cache->{"INFOCSQ"};
+                if ($cacheLine ne $line) {
+                    $headerLine = "";
+                    warn "E: $0 - cacheLine and INFO-CSQ line from VCF are different:\n$cacheLine\n$line\n";
+                    last;
+                }
+            }
+            else {
+                $cacheUpdate->{"INFOCSQ"} = $line;
+            }
+        }
     }
     close($VCFHEAD_OUT);
     unlink($vcfHeader);
@@ -582,9 +582,9 @@ sub mergeAndPrint {
     my ($vcfFromVep, $vcfFromCache, $cacheUpdate) = @_;
 
     open(my $FROMVEP, "gunzip -c $vcfFromVep |") || 
-	die "E $0: cannot gunzip-open FROMVEP $vcfFromVep\n";
+        die "E $0: cannot gunzip-open FROMVEP $vcfFromVep\n";
     open (my $FROMCACHE, "gunzip -c $vcfFromCache |") || 
-	die "E $0: cannot gunzip-open FROMCACHE $vcfFromCache\n";
+        die "E $0: cannot gunzip-open FROMCACHE $vcfFromCache\n";
 
     # next data lines from each file
     my ($nextVep, $nextCache);
@@ -598,114 +598,114 @@ sub mergeAndPrint {
     #######################
     # prime with first lines, skipping headers
     do {
-	$nextVep = <$FROMVEP>;
+        $nextVep = <$FROMVEP>;
     } while(($nextVep) && ($nextVep =~ /^#/));
     if ($nextVep) {
-	# grab next* values for deterministic merging of fromVep and fromCache, and
-	# also populate $cacheUpdate for updating cache at the end
-	my @f = split(/\t/,$nextVep);
-	(@f >= 8) || die "E $0: nextVep line doesn't have >=8 columns:\n$nextVep";
-	($chr,$nextVepPos,$nextVepAlt)=($f[0],$f[1],$f[4]);
-	# key for $cacheUpdate: chrom:pos:ref:alt for SNVs/indels, chrom:pos:ref:alt:end for CNVs
-	my $key = "$f[0]:$f[1]:$f[3]:$f[4]";
-	$nextVepEnd = -1;
-	if (($nextVepAlt eq '<DUP>') || ($nextVepAlt eq '<DEL>')) {
-	    # CNV: grab END
-	    ($f[7] =~ /END=(\d+)/) || 
-		die "E $0: cannot grab END in nextVep line:\n$nextVep";
-	    $nextVepEnd = $1;
-	    $key .= ":$1";
-	}
-	my $csq = "";
-	if ($f[7] =~ /CSQ=([^;]+)/) {
-	    $csq = $1;
-	}
-	else {
-	    warn "I $0: cannot grab CSQ in nextVep line, this is expected for huge SVs only:\n$nextVep";
-	}
-	$cacheUpdate->{$key} = $csq;
+        # grab next* values for deterministic merging of fromVep and fromCache, and
+        # also populate $cacheUpdate for updating cache at the end
+        my @f = split(/\t/,$nextVep);
+        (@f >= 8) || die "E $0: nextVep line doesn't have >=8 columns:\n$nextVep";
+        ($chr,$nextVepPos,$nextVepAlt)=($f[0],$f[1],$f[4]);
+        # key for $cacheUpdate: chrom:pos:ref:alt for SNVs/indels, chrom:pos:ref:alt:end for CNVs
+        my $key = "$f[0]:$f[1]:$f[3]:$f[4]";
+        $nextVepEnd = -1;
+        if (($nextVepAlt eq '<DUP>') || ($nextVepAlt eq '<DEL>')) {
+            # CNV: grab END
+            ($f[7] =~ /END=(\d+)/) || 
+                die "E $0: cannot grab END in nextVep line:\n$nextVep";
+            $nextVepEnd = $1;
+            $key .= ":$1";
+        }
+        my $csq = "";
+        if ($f[7] =~ /CSQ=([^;]+)/) {
+            $csq = $1;
+        }
+        else {
+            warn "I $0: cannot grab CSQ in nextVep line, this is expected for huge SVs only:\n$nextVep";
+        }
+        $cacheUpdate->{$key} = $csq;
     }
 
     $nextCache = <$FROMCACHE>;
     if ($nextCache) {
-	my @f = split(/\t/,$nextCache);
-	my $thisChr = $f[0];
-	if (!defined $chr) {
-	    $chr = $thisChr;
-	}
-	else {
-	    ($chr eq $thisChr) ||
-		die"E $0: vcfFromCache has line with bad chrom, expected $chr:\n$nextCache\n";
-	}
-	($nextCachePos,$nextCacheAlt) = ($f[1],$f[4]);
-	$nextCacheEnd = -1;
-	if (($nextCacheAlt eq '<DUP>') || ($nextCacheAlt eq '<DEL>')) {
-	    # CNV: grab END
-	    ($f[7] =~ /END=(\d+)/) || 
-		die "E $0: cannot grab END in nextCache line:\n$nextCache";
-	    $nextCacheEnd = $1;
-	}
+        my @f = split(/\t/,$nextCache);
+        my $thisChr = $f[0];
+        if (!defined $chr) {
+            $chr = $thisChr;
+        }
+        else {
+            ($chr eq $thisChr) ||
+                die"E $0: vcfFromCache has line with bad chrom, expected $chr:\n$nextCache\n";
+        }
+        ($nextCachePos,$nextCacheAlt) = ($f[1],$f[4]);
+        $nextCacheEnd = -1;
+        if (($nextCacheAlt eq '<DUP>') || ($nextCacheAlt eq '<DEL>')) {
+            # CNV: grab END
+            ($f[7] =~ /END=(\d+)/) || 
+                die "E $0: cannot grab END in nextCache line:\n$nextCache";
+            $nextCacheEnd = $1;
+        }
     }
     
     #######################
     # as long as there is data
     while ($nextVep || $nextCache) {
-	if (($nextVep) && ((! $nextCache) ||
-			   ($nextVepPos < $nextCachePos) ||
-			   (($nextVepPos == $nextCachePos) && ($nextVepAlt lt $nextCacheAlt)) ||
-			   (($nextVepPos == $nextCachePos) && ($nextVepAlt eq $nextCacheAlt) && ($nextVepEnd < $nextCacheEnd)) )) {
-	    # still have VEP data and it must be printed now
-	    print $nextVep;
-	    # read next VEP line
-	    $nextVep = <$FROMVEP>;
-	    if ($nextVep) {
-		# grab next* values for deterministic merging of fromVep and fromCache, and
-		# also populate $cacheUpdate for updating cache at the end
-		my @f = split(/\t/,$nextVep);
-		(@f >= 8) || die "E $0: nextVep line doesn't have >=8 columns:\n$nextVep";
-		my $thisChr = $f[0];
-		($chr eq $thisChr) ||
-		    die "E $0: vcfFromVep has line with bad chrom, expected $chr:\n$nextVep\n";
-		($nextVepPos,$nextVepAlt)=($f[1],$f[4]);
-		# key for $cacheUpdate: chrom:pos:ref:alt for SNVs/indels, chrom:pos:ref:alt:end for CNVs
-		my $key = "$f[0]:$f[1]:$f[3]:$f[4]";
-		$nextVepEnd = -1;
-		if (($nextVepAlt eq '<DUP>') || ($nextVepAlt eq '<DEL>')) {
-		    # CNV: grab END
-		    ($f[7] =~ /END=(\d+)/) || 
-			die "E $0: cannot grab END in nextVep line:\n$nextVep";
-		    $nextVepEnd = $1;
-		    $key .= ":$1";
-		}
-		my $csq = "";
-		if ($f[7] =~ /CSQ=([^;]+)/) {
-		    $csq = $1;
-		}
-		else {
-		    warn "I $0: cannot grab CSQ in nextVep line, this is expected for huge SVs only:\n$nextVep";
-		}
-		$cacheUpdate->{$key} = $csq;
-	    }
-	}
-	else {
-	    # cache data must be printed
-	    print $nextCache;
-	    $nextCache = <$FROMCACHE>;
-	    if ($nextCache) {
-		my @f = split(/\t/,$nextCache);
-		my $thisChr = $f[0];
-		($chr eq $thisChr) ||
-		    die"E $0: vcfFromCache has line with bad chrom, expected $chr:\n$nextCache\n";
-		($nextCachePos,$nextCacheAlt) = ($f[1],$f[4]);
-		$nextCacheEnd = -1;
-		if (($nextCacheAlt eq '<DUP>') || ($nextCacheAlt eq '<DEL>')) {
-		    # CNV: grab END
-		    ($f[7] =~ /END=(\d+)/) || 
-			die "E $0: cannot grab END in nextCache line:\n$nextCache";
-		    $nextCacheEnd = $1;
-		}
-	    }
-	}
+        if (($nextVep) && ((! $nextCache) ||
+                           ($nextVepPos < $nextCachePos) ||
+                           (($nextVepPos == $nextCachePos) && ($nextVepAlt lt $nextCacheAlt)) ||
+                           (($nextVepPos == $nextCachePos) && ($nextVepAlt eq $nextCacheAlt) && ($nextVepEnd < $nextCacheEnd)) )) {
+            # still have VEP data and it must be printed now
+            print $nextVep;
+            # read next VEP line
+            $nextVep = <$FROMVEP>;
+            if ($nextVep) {
+                # grab next* values for deterministic merging of fromVep and fromCache, and
+                # also populate $cacheUpdate for updating cache at the end
+                my @f = split(/\t/,$nextVep);
+                (@f >= 8) || die "E $0: nextVep line doesn't have >=8 columns:\n$nextVep";
+                my $thisChr = $f[0];
+                ($chr eq $thisChr) ||
+                    die "E $0: vcfFromVep has line with bad chrom, expected $chr:\n$nextVep\n";
+                ($nextVepPos,$nextVepAlt)=($f[1],$f[4]);
+                # key for $cacheUpdate: chrom:pos:ref:alt for SNVs/indels, chrom:pos:ref:alt:end for CNVs
+                my $key = "$f[0]:$f[1]:$f[3]:$f[4]";
+                $nextVepEnd = -1;
+                if (($nextVepAlt eq '<DUP>') || ($nextVepAlt eq '<DEL>')) {
+                    # CNV: grab END
+                    ($f[7] =~ /END=(\d+)/) || 
+                        die "E $0: cannot grab END in nextVep line:\n$nextVep";
+                    $nextVepEnd = $1;
+                    $key .= ":$1";
+                }
+                my $csq = "";
+                if ($f[7] =~ /CSQ=([^;]+)/) {
+                    $csq = $1;
+                }
+                else {
+                    warn "I $0: cannot grab CSQ in nextVep line, this is expected for huge SVs only:\n$nextVep";
+                }
+                $cacheUpdate->{$key} = $csq;
+            }
+        }
+        else {
+            # cache data must be printed
+            print $nextCache;
+            $nextCache = <$FROMCACHE>;
+            if ($nextCache) {
+                my @f = split(/\t/,$nextCache);
+                my $thisChr = $f[0];
+                ($chr eq $thisChr) ||
+                    die"E $0: vcfFromCache has line with bad chrom, expected $chr:\n$nextCache\n";
+                ($nextCachePos,$nextCacheAlt) = ($f[1],$f[4]);
+                $nextCacheEnd = -1;
+                if (($nextCacheAlt eq '<DUP>') || ($nextCacheAlt eq '<DEL>')) {
+                    # CNV: grab END
+                    ($f[7] =~ /END=(\d+)/) || 
+                        die "E $0: cannot grab END in nextCache line:\n$nextCache";
+                    $nextCacheEnd = $1;
+                }
+            }
+        }
     }
     
     #######################
@@ -731,30 +731,30 @@ sub updateCache {
     # add any new entries from %$cacheUpdate and store
     # -> works correctly even if several jobs are running in parallel
     open(CACHELOCK, ">>$cacheFile") ||
-	die "E $0: I want to update cacheFile but I can't open it for locking\n";
+        die "E $0: I want to update cacheFile but I can't open it for locking\n";
     flock(CACHELOCK, LOCK_EX) || die "E $0: cannot get lock on cachefile\n";
 
     my $cache = {};
     if (! -z $cacheFile) {
-	$cache = &retrieve($cacheFile) ||
-	    die "E $0: I can't retrieve fresh copy of cache from cachefile $cacheFile\n";
+        $cache = &retrieve($cacheFile) ||
+            die "E $0: I can't retrieve fresh copy of cache from cachefile $cacheFile\n";
     }
     foreach my $k (keys(%$cacheUpdate)) {
-	if (defined($cache->{$k})) {
-	    # annotation for key $k has been added to $cacheFile while we were running
-	    # (or was already there if $debug), make sure it's consistent
-	    ($cache->{$k} eq $cacheUpdate->{$k}) ||
-		warn "W $0: cacheFile entry for $k was added while we were running (or we are in debugVep mode)".
-		" and disagrees with our entry, we keep the cached version:\n".
-		$cache->{$k}."\n".$cacheUpdate->{$k}."\n";
-	}
-	else {
-	    $cache->{$k} = $cacheUpdate->{$k};
-	}
+        if (defined($cache->{$k})) {
+            # annotation for key $k has been added to $cacheFile while we were running
+            # (or was already there if $debug), make sure it's consistent
+            ($cache->{$k} eq $cacheUpdate->{$k}) ||
+                warn "W $0: cacheFile entry for $k was added while we were running (or we are in debugVep mode)".
+                " and disagrees with our entry, we keep the cached version:\n".
+                $cache->{$k}."\n".$cacheUpdate->{$k}."\n";
+        }
+        else {
+            $cache->{$k} = $cacheUpdate->{$k};
+        }
     }
     if (! $debug) {
-	&store($cache, $cacheFile) || 
-	    die "E $0: produced/updated cache but cannot store to cachefile $cacheFile\n";
+        &store($cache, $cacheFile) || 
+            die "E $0: produced/updated cache but cannot store to cachefile $cacheFile\n";
     }
 
     # remove file if it exists but is empty (can happen in debug mode with 

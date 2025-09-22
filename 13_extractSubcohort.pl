@@ -75,9 +75,9 @@ while (my $line = <SUBC>) {
     # remove leading or trailing blank chars and make sure we have a reasonable ID (no blanks,
     # no ( or [)
     ($line =~ /^\s*(\S+)\s*$/) ||
-	die "E $0: cannot find reasonable sampleID in line $line from subcohort file\n";
+        die "E $0: cannot find reasonable sampleID in line $line from subcohort file\n";
     ($1 =~ /[(\[]/) && 
-	die "E $0: sampleID $1 from subcohort file contains ( or [, illegal\n";
+        die "E $0: sampleID $1 from subcohort file contains ( or [, illegal\n";
     $subcohort{$1} = 1;
 }
 
@@ -108,22 +108,22 @@ my @header = split(/\t/,$header);
 my @genoCols = ();
 foreach my $i (0..$#header) {
     if ($type == 1) {
-	# start by ignoring COUNT*, NEGCTRL, COMPAT, and OTHERCAUSE
-	if (($header[$i] =~ /^COUNT_/) || ($header[$i] =~ /^NEGCTRL_/) ||
-	    ($header[$i] =~ /^COMPAT_/) || ($header[$i] =~ /_OTHERCAUSE_/)) {
-	    next;
-	}
-	# remaining _HV or _HET column should be good
-	elsif (($header[$i] =~ /_HV$/) || ($header[$i] =~ /_HET$/)) {
-	    push(@genoCols, $i);
-	}
+        # start by ignoring COUNT*, NEGCTRL, COMPAT, and OTHERCAUSE
+        if (($header[$i] =~ /^COUNT_/) || ($header[$i] =~ /^NEGCTRL_/) ||
+            ($header[$i] =~ /^COMPAT_/) || ($header[$i] =~ /_OTHERCAUSE_/)) {
+            next;
+        }
+        # remaining _HV or _HET column should be good
+        elsif (($header[$i] =~ /_HV$/) || ($header[$i] =~ /_HET$/)) {
+            push(@genoCols, $i);
+        }
     }
     elsif ($type==2) {
-	# transcripts
-	if (($header[$i] =~ /^HV_/) || ($header[$i] =~ /^BIALLELIC_/) ||
-	    ($header[$i] =~ /^OTHERCAUSE_/)) {
-	    push(@genoCols, $i);
-	}
+        # transcripts
+        if (($header[$i] =~ /^HV_/) || ($header[$i] =~ /^BIALLELIC_/) ||
+            ($header[$i] =~ /^OTHERCAUSE_/)) {
+            push(@genoCols, $i);
+        }
     }
 }
 # we should have found exactly 2 columns (HV, HET) for cohorts
@@ -139,23 +139,23 @@ print "$header\n";
      chomp($line);
      my @fields = split(/\t/, $line, -1) ;
      foreach my $i (@genoCols) {
-	 if ($fields[$i]) {
-	     # clean up: remove genotype eg '1/1~' in cohortfiles
-	     if ($type==1) {
-		 ($fields[$i] =~ s/^[^~]+~([^~\|]+)$/$1/) || 
-		     die "E $0: cohortfile but cannot parse genoData $fields[$i]\n";
-	     }
-	     foreach my $sample (split(/,/,$fields[$i])) {
-		 # valid sampleIDs cannot have '(' or '[' ,  so with the below regexp we're fine 
-		 # with [DP:AF] / [GQ:FR:BP] and/or if infile went through addPatientIDs.pl
-		 ($sample =~ /^([^(\[]+)/) ||
-		     die "E $0: inFile has a genoData for a sample I can't recognize: $sample\n";
-		 if ($subcohort{$1}) {
-		     print "$line\n";
-		     next LINE;
-		 }
-	     }
-	 }
+         if ($fields[$i]) {
+             # clean up: remove genotype eg '1/1~' in cohortfiles
+             if ($type==1) {
+                 ($fields[$i] =~ s/^[^~]+~([^~\|]+)$/$1/) || 
+                     die "E $0: cohortfile but cannot parse genoData $fields[$i]\n";
+             }
+             foreach my $sample (split(/,/,$fields[$i])) {
+                 # valid sampleIDs cannot have '(' or '[' ,  so with the below regexp we're fine 
+                 # with [DP:AF] / [GQ:FR:BP] and/or if infile went through addPatientIDs.pl
+                 ($sample =~ /^([^(\[]+)/) ||
+                     die "E $0: inFile has a genoData for a sample I can't recognize: $sample\n";
+                 if ($subcohort{$1}) {
+                     print "$line\n";
+                     next LINE;
+                 }
+             }
+         }
      }
 }
 
