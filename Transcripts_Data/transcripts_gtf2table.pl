@@ -90,10 +90,10 @@ while (my $line = <>) {
         # CHROM
         my $chr = $fields[0];
         $chr =~ s/^chr//;
-        # for sorting we want just the chrom number, replace X Y M|MT by 23-25
-        if ($chr eq "X") { $trans2chr{$transcript} = "23" }
-        elsif ($chr eq "Y") { $trans2chr{$transcript} = "24" }
-        elsif (($chr eq "M") || ($chr eq "MT")) { $trans2chr{$transcript} = "25" }
+        # for sorting we want just the chrom number, replace X Y M|MT by 1023-1025
+        if ($chr eq "X") { $trans2chr{$transcript} = "1023" }
+        elsif ($chr eq "Y") { $trans2chr{$transcript} = "1024" }
+        elsif (($chr eq "M") || ($chr eq "MT")) { $trans2chr{$transcript} = "1025" }
         else { $trans2chr{$transcript} = $chr }
         # for printing we use chr* convention
         ($chr eq "MT") && ($chr = "M");
