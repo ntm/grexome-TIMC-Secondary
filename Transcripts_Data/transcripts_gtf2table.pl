@@ -71,7 +71,7 @@ while (my $line = <>) {
     ($fields[8] =~ /$toiDef/) || next;
 
     # TRANSCRIPT
-    ($fields[8] =~ /transcript_id "(ENST\d+)";/) ||
+    ($fields[8] =~ /transcript_id "(ENS\w+)";/) ||
         die "E: cannot grab transcript_id from line:\n$line\n";
     my $transcript = $1;
 
