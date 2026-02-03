@@ -34,7 +34,7 @@ The top-of-file comments in grexomeTIMCsec_config.pm list the few other hard-cod
 
 METADATA FILES:
 ***************
-The pipeline can use several xlsx files containing metadata, some are REQUIRED and some are OPTIONAL. Examples are provided in the Documentation/ subdirectory, these can serve as starting points. All columns present in the Documentation/ example files (and listed below) are required by the pipeline (except "Sex" in samples.xlsx, which is optional), don't change their names! You can add new columns and/or change the order of columns to your taste, just don't touch the pre-existing column names. The filenames can also be modified, you provide them as arguments to grexome-TIMC-secondary.pl.
+The pipeline can use several xlsx or txt files containing metadata, some are REQUIRED and some are OPTIONAL. Examples are provided in the Documentation/ subdirectory, these can serve as starting points. All columns present in the Documentation/ example files (and listed below) are required by the pipeline (except "Sex" in samples.xlsx, which is optional), don't change their names! You can add new columns and/or change the order of columns to your taste, just don't touch the pre-existing column names. The filenames can also be modified, you provide them as arguments to grexome-TIMC-secondary.pl.
 
 1. samples.xlsx: REQUIRED, describes the samples. This metadata file (and the code that parses it, in grexome_metaParse.pm) is shared with the grexome-TIMC-Primary pipeline [2].
 Required columns:
@@ -55,15 +55,14 @@ Optional column:
 - pathologyID: pathology/phenotype, as in the previous metadata files.
 - Confidence score: indicates how confident you are that LOF variants in this gene are causal for this pathology. We recommend using integers between 1 and 5, 5 meaning the gene is definitely causal while 1 is a lower-confidence candidate.
 
-4. "sub-cohort" files (e.g. Documentation/subCohort_Darwin.txt): OPTIONAL. A subCohort file is a simple text file that lists some samples by their sampleID (same as in patient_summary.xlsx), one sample per line, all must belong to the same cohort (i.e. pathologyID). This allows to produce Cohorts and Transcripts files corresponding to subsets of samples. Typically the subsets are samples that were provided by collaborators, and this allows to send them the results concerning their patients.
-To add or remove sub-cohorts you have to edit &subCohorts() in grexomeTIMCsec_config.pm , in addition to creating your subCohort_*.txt files.
+4. "sub-cohort" files (e.g. Documentation/subCohort_Darwin.txt): OPTIONAL. A subCohort file is a simple text file that lists some samples by their sampleID (same as in patient_summary.xlsx), one sample per line. This allows to produce Cohorts and Transcripts files corresponding to subsets of samples. Typically the subsets are samples that were provided by collaborators, and this allows to send them the results concerning their patients.
 
 
 EXAMPLE USAGE:
 **************
-perl grexome-TIMC-Secondary/grexome-TIMC-secondary.pl --samples=Grexome_Metadata/samples.xlsx --pathologies=Grexome_Metadata/pathologies.xlsx --candidateGenes=Grexome_Metadata/candidateGenes.xlsx --infile=GVCFs_Merged/grexomes_merged.g.vcf.gz --outdir=SecondaryAnalyses_TEST --config=mySecConfig.pm  2> grexomeTIMCsec_TEST.log &
+perl grexome-TIMC-Secondary/grexome-TIMC-secondary.pl --samples=Grexome_Metadata/samples.xlsx --pathologies=Grexome_Metadata/pathologies.xlsx --candidateGenes=Grexome_Metadata/candidateGenes.xlsx --subcohort=Grexome_Metadata/darwin.txt  --infile=GVCFs_Merged/grexomes_merged.g.vcf.gz --outdir=SecondaryAnalyses_TEST --config=mySecConfig.pm  2> grexomeTIMCsec_TEST.log &
 
-This will create the provided workdir (SecondaryAnalyses_TEST/) , copy the samples.xlsx, pathologies.xlsx and candidateGenes.xlsx files into it, and populate it with subdirs Cohorts/ Cohorts_Canonical/ Samples/ Transcripts/ and optionnally SubCohorts/ (if sub-cohorts are defined), as well as qc_causal.txt (see below).
+This will create the provided workdir (SecondaryAnalyses_TEST/) , copy the samples.xlsx, pathologies.xlsx and candidateGenes.xlsx files into it, and populate it with subdirs Cohorts/ Cohorts_Canonical/ Samples/ Transcripts/ and optionally SubCohorts/ (if --subcohort is provided), as well as qc_causal.txt (see below).
 The subdirectories provide three different viewpoints on the analysis results, corresponding to three use-cases:
 - Cohorts/ for identifying candidate causal variants;
 - Cohorts_Canonical/ is the same as Cohorts/ but restricted to canonical transcripts (useful because Cohorts files with ALL transcripts can get too large for working comofortably with calc/excel), it is not created if you use the --canonical switch because in that case Cohorts/ is already resctricted to canonical transcripts;

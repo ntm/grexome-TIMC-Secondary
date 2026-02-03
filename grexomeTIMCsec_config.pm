@@ -45,7 +45,7 @@ our @ISA = ('Exporter');
 # provide the customized *config.pm as an argument, see --config in
 # grexome-TIMC-secondary.pl for an example.
 our @EXPORT_OK = qw(refGenome vepCacheFile vepPluginDataPath fastTmpPath 
-                    coveragePath gtexDatafile gtexFavoriteTissues subCohorts);
+                    coveragePath gtexDatafile gtexFavoriteTissues);
 
 
 #################################################################
@@ -160,19 +160,6 @@ sub gtexFavoriteTissues {
     ($favoriteTissues =~ /\s/) &&
         die "E: gtexFavoriteTissues cannot contain whitespace, replace with underscores";
     return($favoriteTissues);
-}
-
-# Return a ref to a hash:
-# key==path+file defining a subCohort (filename must start with subCohort_ and end with .txt),
-# value==pathology (must match the pathologyID column of the pathologies metadata xlsx).
-sub subCohorts {
-    # if you  don't have subCohorts, just return the empty hash, ie:
-    my %subCohorts = ();
-    # my %subCohorts = ("/home/nthierry/GrexomeZoufris/WES/SubCohorts//subCohort_FV.txt" => "NOA",
-    #                   "/home/nthierry/GrexomeZoufris/WES/SubCohorts/subCohort_London.txt" => "NOA",
-    #                   "/home/nthierry/GrexomeZoufris/WES/SubCohorts/subCohort_AzooZouari.txt" => "NOA",
-    #                   "/home/nthierry/GrexomeZoufris/WES/SubCohorts/subCohort_SB.txt" => "NOA");
-    return(\%subCohorts);
 }
 
 

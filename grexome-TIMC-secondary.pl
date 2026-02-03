@@ -91,6 +91,11 @@ my $inFile;
 # input multi-sample VCF containing CNV calls, possibly (b)gzipped
 my $cnvs;
 
+# path+file with sampleIDs that belong to a sub-cohort (specific Cohort
+# and Transcripts files will be produced for them), filename == [subcohortName].txt
+# with one sampleID per line
+my $subcohortFile;
+
 # outDir must not exist, it will be created and populated with
 # subdirs (containing the pipeline results), logfiles (in debug mode),
 # and copies of all provided metadata files.
@@ -135,6 +140,8 @@ Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --species string [default $species]: species, as expected by VEP (eg mus_musculus)
 --cnvs : [optional] multi-sample VCF file containing CNV calls, possibly (b)gzipped, conventions are:
                 ALT is <DEL> or <DUP>, INFO contains END=, FORMAT must start with GT:GQ:FR:BPR and possibly :BP
+--subcohort : [optional] txt file holding sampleIDs (one per line), specific Cohort and Transcripts
+            files will be produced for them, filename is used as subcohort name
 --outdir : subdir where results will be created, must not pre-exist
 --config [defaults to grexomeTIMCsec_config.pm alongside this script] : your customized copy (with path) of the distributed *config.pm
 --canonical : restrict results to canonical transcripts
@@ -148,6 +155,7 @@ GetOptions ("samples=s" => \$samples,
             "infile=s" => \$inFile,
             "species=s" => \$species,
             "cnvs=s" => \$cnvs,
+            "subcohort=s" => \$subcohortFile,
             "outdir=s" => \$outDir,
             "config=s" => \$config,
             "canonical" => \$canon,
@@ -179,7 +187,7 @@ if ($cnvs) {
 (-f $config) ||  die "E $0: the supplied config.pm doesn't exist: $config\n";
 require($config);
 grexomeTIMCsec_config->import(qw(refGenome vepCacheFile vepPluginDataPath fastTmpPath), 
-                              qw(coveragePath gtexDatafile gtexFavoriteTissues subCohorts));
+                              qw(coveragePath gtexDatafile gtexFavoriteTissues));
 
 ($outDir) || die "E $0: you must provide an outDir\n";
 (-e $outDir) && 
@@ -213,6 +221,16 @@ if ($candidateGenes) {
     $candidateGenes = join(',', @candNew);
 }
 
+if ($subcohortFile) {
+    (-f $subcohortFile) || die "E $0: the supplied subcohort file doesn't exist\n";
+    copy($subcohortFile, $outDir) ||
+        die "E $0: cannot copy subcohort file to outDir: $!\n";
+    # use copy from now on
+    $subcohortFile = "$outDir/".basename($subcohortFile);
+}
+
+
+#############################################
 my $now = strftime("%F %T", localtime);
 warn "I $now: $0 - starting to run\n";
 
@@ -231,6 +249,54 @@ else {
         &parseCandidateGenes($candidateGenes, $samples, 1);
     }
 }
+
+# pre-process subcohortFile (if provided):
+# - make sure every subCohort sampleID exists
+# - produce one subcohortFile per pathologyID, store results in hash with
+#   key == subcFile, value == pathoID
+my %subcFile2patho = ();
+if ($subcohortFile) {
+    my ($sample2pathoR) = &parseSamples($samples);
+
+    # parse subcohortFile and separate sampleIDs by patho, save in hash:
+    # key == patho, value == \n-separated list of samples
+    my %patho2subcSamps = ();
+
+    open(SUBC, "$subcohortFile") ||
+        die "E $0: cannot open subcohortFile $subcohortFile for reading\n";
+    while (my $line = <SUBC>) {
+        chomp($line);
+        # skip blank lines
+        ($line =~ /^\s*$/) && next;
+        # remove leading or trailing blank chars and make sure we have a reasonable ID
+        # (no whitespace, no ( or [)
+        ($line =~ /^\s*(\S+)\s*$/) ||
+            die "E $0: cannot find reasonable sampleID in line $line from subcohort file\n";
+        my $samp = $1;
+        ($samp =~ /[(\[]/) && 
+            die "E $0: sampleID $samp from subcohort file contains ( or [, illegal\n";
+        (defined $sample2pathoR->{$samp}) ||
+            die "E $0: sampleID $samp from subcohort file doesn't exist in samples metadata\n";
+        my $patho = $sample2pathoR->{$samp};
+        (defined $patho2subcSamps{$patho}) || ($patho2subcSamps{$patho} = "");
+        $patho2subcSamps{$patho} .= "$samp\n";
+    }
+    close(SUBC);
+    
+    foreach my $patho (keys(%patho2subcSamps)) {
+        # create per-patho subcohort files alongside the copied $subcohortFile
+        my $subcThisPatho = $subcohortFile;
+        ($subcThisPatho =~ s/\.txt$/$patho.txt/) ||
+            die "E $0: subcohort filename must end with .txt";
+        (-e $subcThisPatho) && die "E $0: subcThispatho $subcThisPatho exists, impossible!\n";
+        open(SUBC_OUT, "> $subcThisPatho") ||
+            die "E $0: cannot open subcThisPatho for $patho: $!";
+        print SUBC_OUT $patho2subcSamps{$patho};
+        close(SUBC_OUT);
+        $subcFile2patho{$subcThisPatho} = $patho;
+    }
+}
+
 
 # sanity-check: any sample listed in $samplesFile MUST be present in $inFile,
 # otherwise we can get errors in later steps (eg step 7).
@@ -443,53 +509,35 @@ if (! $canon) {
 ######################
 # STEP 13 - SUBCOHORTS (can run after requireUndiagnosed and addPatientIDs)
 #
-# Only runs if sub-cohorts are defined in &subCohorts() (and the files exist):
+# Only runs if called with --subcohort :
 # the idea is to produce Cohorts and Transcripts files corresponding to subsets of
-# samples, all affected with the same pathology. Typically the subsets are samples
-# that were provided by collaborators, and this allows us to send them the results
-# concerning their patients.
-
-# key==path+file defining a subCohort, value==pathologyID
-my $subCohortsR = &subCohorts();
-
-# don't do anything if no subcohort file exists
-my $doSubCs = 0;
-foreach my $subC (keys(%$subCohortsR)) {
-    if (-e $subC) {
-        $doSubCs=1;
-    }
-    else {
-        warn "W $0: sub-cohort file $subC defined in \&subCohorts() but this file doesn't exist. Skipping this sub-cohort.\n";
-    }
-}
-if ($doSubCs) {
+# samples. Typically the subsets are samples that were provided by collaborators,
+# and this allows us to send them the results concerning their patients.
+if ($subcohortFile) {
     mkdir("$outDir/SubCohorts") || die "E $0: cannot mkdir $outDir/SubCohorts\n";
-    $com = "";
-    foreach my $subC (keys(%$subCohortsR)) {
-        my $patho = $subCohortsR->{$subC};
-        # grab filename from $subC and remove leading "subCohort_" and trailing .txt
-        my $outFileRoot = basename($subC);
-        ($outFileRoot =~ s/^subCohort_//) || die "E $0: cannot remove leading subCohort_ from subCohortFile $outFileRoot\n";
-        ($outFileRoot =~ s/\.txt$//) || die "E $0: cannot remove .txt from subCohortFile $outFileRoot\n";
-        $outFileRoot = "$outDir/SubCohorts/$outFileRoot";
-        ($com) && ($com .= '&& ');
-        $com .= "( perl $RealBin/13_extractSubcohort.pl $subC < $outDir/Cohorts/$patho.final.patientIDs.csv > $outFileRoot.cohort.csv ";
-        ($debug) && ($com .= "2>> $outDir/step13-subCohorts.err ");
-        $com .= ") && ";
+    # output filename: input filename prepended with $subcName
+    my $subcName = basename($subcohortFile);
+    ($subcName =~ s/.txt$//); # sanity already checked
+    my $outFileRoot = "$outDir/SubCohorts/$subcName";
+
+    foreach my $subcFile (keys(%subcFile2patho)) {
+        my $patho = $subcFile2patho{$subcFile};
+        my $com = "( perl $RealBin/13_extractSubcohort.pl $subcFile ";
+        $com .= "< $outDir/Cohorts/$patho.final.patientIDs.csv > $outFileRoot.$patho.cohort.csv ) && ";
         if (! $canon) {
-            $com .= "( perl $RealBin/13_extractSubcohort.pl $subC < $outDir/Cohorts_Canonical/$patho.final.patientIDs.canon.csv > $outFileRoot.cohort.canon.csv ";
-            ($debug) && ($com .= "2>> $outDir/step13-subCohorts.err ");
-            $com .= ") && ";
+            $com .= "( perl $RealBin/13_extractSubcohort.pl $subcFile ";
+            $com .= "< $outDir/Cohorts_Canonical/$patho.final.patientIDs.canon.csv > $outFileRoot.$patho.cohort.canon.csv ) && ";
         }
-        $com .= "( perl $RealBin/13_extractSubcohort.pl $subC < $outDir/Transcripts/$patho.Transcripts.patientIDs.csv > $outFileRoot.transcripts.csv ";
+        $com .= "( perl $RealBin/13_extractSubcohort.pl $subcFile ";
+        $com .= "< $outDir/Transcripts/$patho.Transcripts.patientIDs.csv > $outFileRoot.$patho.transcripts.csv ) ";
         ($debug) && ($com .= "2>> $outDir/step13-subCohorts.err ");
-        $com .= ") ";
+        system($com) && die "E $0: step13-subCohorts failed\n";
     }
-    system($com) && die "E $0: step13-subCohorts failed\n";
 }
 else {
-    warn "I $0: no existing sub-cohort, step13-subCohorts skipped\n";
+    warn "I $0: no provided subcohort, step13-subCohorts skipped\n";
 }
+
 
 ######################
 # STEP14 - clean up and QC

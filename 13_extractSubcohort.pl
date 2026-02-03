@@ -70,15 +70,9 @@ open(SUBC, "$subcohortFile") ||
     die "E $0: cannot open subcohortFile $subcohortFile for reading\n";
 while (my $line = <SUBC>) {
     chomp($line);
-    # skip blank lines
-    ($line =~ /^\s*$/) && next;
-    # remove leading or trailing blank chars and make sure we have a reasonable ID (no blanks,
-    # no ( or [)
-    ($line =~ /^\s*(\S+)\s*$/) ||
-        die "E $0: cannot find reasonable sampleID in line $line from subcohort file\n";
-    ($1 =~ /[(\[]/) && 
-        die "E $0: sampleID $1 from subcohort file contains ( or [, illegal\n";
-    $subcohort{$1} = 1;
+    ($line =~ /[(\[]/) && 
+        die "E $0: sampleID $line from subcohort file contains ( or [, illegal\n";
+    $subcohort{$line} = 1;
 }
 
 
