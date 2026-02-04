@@ -546,7 +546,7 @@ if ($subcohortFile) {
             my @infile = glob("$outDir/Samples/$patho.$samp.*");
             (@infile == 1) || die "E $0: extractSubcohort.pl finds several Samples files for $samp\n";
             my $sampFile = basename($infile[0]);
-            symlink("../../Samples/$sampFile", "SubCohort/Samples/") ||
+            symlink("../../Samples/$sampFile", "$outDir/SubCohort/Samples/$sampFile") ||
                 die "E $0: cannot symlink $sampFile for subcohort\n";
         }
         close(SUBC);
