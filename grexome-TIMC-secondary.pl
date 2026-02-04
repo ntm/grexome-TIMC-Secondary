@@ -520,7 +520,8 @@ if ($subcohortFile) {
     warn "I $now: 13_extractSubcohort.pl - starting to run\n";
 
     mkdir("$outDir/SubCohort") || die "E $0: cannot mkdir $outDir/SubCohort\n";
-    # output filename: input filename prepended with $subcName
+    mkdir("$outDir/SubCohort/Samples") || die "E $0: cannot mkdir $outDir/SubCohort/Samples\n";
+    # output filenames: input filename prepended with $subcName
     my $subcName = basename($subcohortFile);
     ($subcName =~ s/.txt$//); # sanity already checked
     my $outFileRoot = "$outDir/SubCohort/$subcName";
@@ -537,8 +538,20 @@ if ($subcohortFile) {
         $com .= "< $outDir/Transcripts/$patho.Transcripts.patientIDs.csv > $outFileRoot.$patho.transcripts.csv ) ";
         ($debug) && ($com .= "2>> $outDir/step13-subCohort.err ");
         system($com) && die "E $0: step13-subCohort failed\n";
-    }
 
+        # also symlink Samples files
+        open(SUBC, "$subcFile") || die "E $0: cannot open subcFile $subcFile for reading\n";
+        while (my $samp = <SUBC>) {
+            chomp($samp);
+            my @infile = glob("$outDir/Samples/$patho.$samp.*");
+            (@infile == 1) || die "E $0: extractSubcohort.pl finds several Samples files for $samp\n";
+            my $sampFile = basename($infile[0]);
+            symlink("../../Samples/$sampFile", "SubCohort/Samples/") ||
+                die "E $0: cannot symlink $sampFile for subcohort\n";
+        }
+        close(SUBC);
+    }
+    
     $now = strftime("%F %T", localtime);
     warn "I $now: 13_extractSubcohort.pl - ALL DONE, completed successfully!\n";
 }
