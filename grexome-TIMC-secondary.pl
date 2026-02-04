@@ -515,6 +515,11 @@ if (! $canon) {
 # and this allows us to send them the results concerning their patients.
 if ($subcohortFile) {
     mkdir("$outDir/SubCohorts") || die "E $0: cannot mkdir $outDir/SubCohorts\n";
+    # 13_extractSubcohort.pl gets called many times but we prefer a single pair of log
+    # messages -> warn here, pretending to be 13_extractSubcohort.pl
+    $now = strftime("%F %T", localtime);
+    warn "I $now: 13_extractSubcohort.pl - starting to run\n";
+
     # output filename: input filename prepended with $subcName
     my $subcName = basename($subcohortFile);
     ($subcName =~ s/.txt$//); # sanity already checked
@@ -533,6 +538,9 @@ if ($subcohortFile) {
         ($debug) && ($com .= "2>> $outDir/step13-subCohorts.err ");
         system($com) && die "E $0: step13-subCohorts failed\n";
     }
+
+    $now = strftime("%F %T", localtime);
+    warn "I $now: 13_extractSubcohort.pl - ALL DONE, completed successfully!\n";
 }
 else {
     warn "I $0: no provided subcohort, step13-subCohorts skipped\n";

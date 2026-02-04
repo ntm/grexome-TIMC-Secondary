@@ -53,10 +53,6 @@ $0 = basename($0);
 (@ARGV == 1) || die "E $0, needs 1 arg: a text file with one sampleID per line\n";
 my ($subcohortFile) = @ARGV;
 
-my $now = strftime("%F %T", localtime);
-my $subCpretty = basename($subcohortFile);
-warn "I $now: $0 - starting to run with $subCpretty, don't yet know if STDIN is cohort or transcripts file\n";
-
 
 #########################################################
 # parse subcohort file
@@ -152,8 +148,3 @@ print "$header\n";
          }
      }
 }
-
-$now = strftime("%F %T", localtime);
-my $typeString = "Cohort";
-($type == 2) && ($typeString = "Transcripts");
-warn "I $now: $0 - ALL DONE, completed successfully with $subCpretty on a $typeString file!\n";
