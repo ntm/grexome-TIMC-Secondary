@@ -507,23 +507,23 @@ if (! $canon) {
 
 
 ######################
-# STEP 13 - SUBCOHORTS (can run after requireUndiagnosed and addPatientIDs)
+# STEP 13 - SUBCOHORT (can run after requireUndiagnosed and addPatientIDs)
 #
 # Only runs if called with --subcohort :
 # the idea is to produce Cohorts and Transcripts files corresponding to subsets of
 # samples. Typically the subsets are samples that were provided by collaborators,
 # and this allows us to send them the results concerning their patients.
 if ($subcohortFile) {
-    mkdir("$outDir/SubCohorts") || die "E $0: cannot mkdir $outDir/SubCohorts\n";
     # 13_extractSubcohort.pl gets called many times but we prefer a single pair of log
     # messages -> warn here, pretending to be 13_extractSubcohort.pl
     $now = strftime("%F %T", localtime);
     warn "I $now: 13_extractSubcohort.pl - starting to run\n";
 
+    mkdir("$outDir/SubCohort") || die "E $0: cannot mkdir $outDir/SubCohort\n";
     # output filename: input filename prepended with $subcName
     my $subcName = basename($subcohortFile);
     ($subcName =~ s/.txt$//); # sanity already checked
-    my $outFileRoot = "$outDir/SubCohorts/$subcName";
+    my $outFileRoot = "$outDir/SubCohort/$subcName";
 
     foreach my $subcFile (keys(%subcFile2patho)) {
         my $patho = $subcFile2patho{$subcFile};
@@ -535,15 +535,15 @@ if ($subcohortFile) {
         }
         $com .= "( perl $RealBin/13_extractSubcohort.pl $subcFile ";
         $com .= "< $outDir/Transcripts/$patho.Transcripts.patientIDs.csv > $outFileRoot.$patho.transcripts.csv ) ";
-        ($debug) && ($com .= "2>> $outDir/step13-subCohorts.err ");
-        system($com) && die "E $0: step13-subCohorts failed\n";
+        ($debug) && ($com .= "2>> $outDir/step13-subCohort.err ");
+        system($com) && die "E $0: step13-subCohort failed\n";
     }
 
     $now = strftime("%F %T", localtime);
     warn "I $now: 13_extractSubcohort.pl - ALL DONE, completed successfully!\n";
 }
 else {
-    warn "I $0: no provided subcohort, step13-subCohorts skipped\n";
+    warn "I $0: no provided subcohort, step13-subCohort skipped\n";
 }
 
 
@@ -581,7 +581,7 @@ while (my $f = <FILES>) {
 close(FILES);
 
 
-# QC_CHECKCAUSAL: report coverage of known causal genes by (severe) variants
+# QC_CHECKCAUSAL: report hits of known causal genes by (severe) variants
 # QC report will be printed to $qc_causal file
 my $qc_causal = "$outDir/qc_causal.csv";
 
