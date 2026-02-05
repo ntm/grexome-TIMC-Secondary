@@ -562,13 +562,13 @@ if ($subcohortFile) {
     foreach my $subcFile (keys(%subcFile2patho)) {
         my $patho = $subcFile2patho{$subcFile};
         my $com = "( perl $RealBin/13_extractSubcohort.pl $subcFile ";
-        $com .= "< $outDir/Cohorts/$patho.final.patientIDs.csv > $outFileRoot.$patho.cohort.csv ) && ";
+        $com .= "< $outDir/Cohorts/$patho.final.patientIDs.$caller.csv > $outFileRoot.$patho.cohort.$caller.csv ) && ";
         if (! $canon) {
             $com .= "( perl $RealBin/13_extractSubcohort.pl $subcFile ";
-            $com .= "< $outDir/Cohorts_Canonical/$patho.final.patientIDs.canon.csv > $outFileRoot.$patho.cohort.canon.csv ) && ";
+            $com .= "< $outDir/Cohorts_Canonical/$patho.final.patientIDs.canon.$caller.csv > $outFileRoot.$patho.cohort.canon.$caller.csv ) && ";
         }
         $com .= "( perl $RealBin/13_extractSubcohort.pl $subcFile ";
-        $com .= "< $outDir/Transcripts/$patho.Transcripts.patientIDs.csv > $outFileRoot.$patho.transcripts.csv ) ";
+        $com .= "< $outDir/Transcripts/$patho.Transcripts.patientIDs.$caller.csv > $outFileRoot.$patho.transcripts.$caller.csv ) ";
         ($debug) && ($com .= "2>> $outDir/step14-subCohort.err ");
         system($com) && die "E $0: step14-subCohort failed\n";
 
