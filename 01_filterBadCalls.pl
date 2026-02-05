@@ -92,7 +92,9 @@ $0 = basename($0);
 
 # max number of lines to read in a single batch. Each batch is then
 # processed by a worker thread.
-# Reduce if you are filling up $tmpDir (which should be on a RAMDISK),
+# Will be rescaled depending on the number of samples in the GVCF.
+# Reduce if you are running out  of RAM or filling up $tmpDir (which
+# should be on a RAMDISK),
 # increase if jobs are almost instantaneous (because you are then 
 # wasting time in parallelization overhead)
 my $batchSize = 500000;
@@ -261,6 +263,8 @@ while(my $line = <STDIN>) {
         my $goodSamples = 0;
         chomp($line);
         my @fields = split(/\t/,$line);
+        # rescale $batchSize to avoid high RAM usage of workers if input has many columns
+        $batchSize /= 1 + int(@fields / 20);
         foreach my $i (reverse(9..$#fields)) {
             # reverse so we can splice bad columns out
             if (! $samples{$fields[$i]}) {
