@@ -458,7 +458,7 @@ system($com) && die "E $0: step10-transcripts-addPatientIDs failed\n";
 (! $debug) && remove_tree("$tmpdir/Transcripts_noIDs/");
 
 
-# STEP 10: filter variants on COUNTs and reorder columns, clean up unfiltered CohortFiles
+# STEP 10b - filter variants on COUNTs and reorder columns, clean up unfiltered CohortFiles
 $com = "perl $RealBin/10_filterAndReorderAll.pl --indir $tmpdir/Cohorts/ --outdir $tmpdir/Cohorts_Filtered/ ";
 $com .= "--reorder --favoriteTissues=".&gtexFavoriteTissues()." ";
 # set min_hr to 20% of $numSamples
@@ -507,7 +507,40 @@ if (! $canon) {
 
 
 ######################
-# STEP 13 - SUBCOHORT (can run after requireUndiagnosed and addPatientIDs)
+# STEP13 - rename and clean up
+
+# APPENDVC: append $caller (if it was auto-detected) to all final filenames
+if ($caller) {
+    open (FILES, "find $outDir/ -name \'*csv\' |") ||
+        die "E $0: step13-appendVC cannot find final csv files with find\n";
+    while (my $f = <FILES>) {
+        chomp($f);
+        my $new = $f; 
+        ($new =~ s/\.csv$/.$caller.csv/) || 
+            die "E $0: step13-appendVC cannot add $caller as suffix to $new\n";
+        (-e $new) && 
+            die "E $0: step13-appendVC want to rename to new $new but it already exists?!\n";
+        rename($f,$new) ||
+            die "E $0: step13-appendVC cannot rename $f $new\n";
+    }
+    close(FILES);
+}
+
+# REMOVEEMPTY: remove files with no data lines (eg if infile concerned only some samples)
+open (FILES, "find $outDir/ -name \'*csv\' |") ||
+    die "E $0: step13-removeEmpty cannot find final csv files with find\n";
+while (my $f = <FILES>) {
+    chomp($f);
+    my $wc = `head -n 2 $f | wc -l`;
+    # there's always 1 header line
+    ($wc > 1) || unlink($f) ||
+        die "E $0: step13-removeEmpty cannot unlink $f: $!\n";
+}
+close(FILES);
+
+
+######################
+# STEP 14 - SUBCOHORT, must run after APPENDVC and REMOVEEMPTY
 #
 # Only runs if called with --subcohort :
 # the idea is to produce Cohorts and Transcripts files corresponding to subsets of
@@ -536,8 +569,8 @@ if ($subcohortFile) {
         }
         $com .= "( perl $RealBin/13_extractSubcohort.pl $subcFile ";
         $com .= "< $outDir/Transcripts/$patho.Transcripts.patientIDs.csv > $outFileRoot.$patho.transcripts.csv ) ";
-        ($debug) && ($com .= "2>> $outDir/step13-subCohort.err ");
-        system($com) && die "E $0: step13-subCohort failed\n";
+        ($debug) && ($com .= "2>> $outDir/step14-subCohort.err ");
+        system($com) && die "E $0: step14-subCohort failed\n";
 
         # also symlink Samples files
         open(SUBC, "$subcFile") || die "E $0: cannot open subcFile $subcFile for reading\n";
@@ -556,44 +589,13 @@ if ($subcohortFile) {
     warn "I $now: 13_extractSubcohort.pl - ALL DONE, completed successfully!\n";
 }
 else {
-    warn "I $0: no provided subcohort, step13-subCohort skipped\n";
+    warn "I $0: no provided subcohort, step14-subCohort skipped\n";
 }
 
 
 ######################
-# STEP14 - clean up and QC
-
-# APPENDVC: append $caller (if it was auto-detected) to all final filenames
-if ($caller) {
-    open (FILES, "find $outDir/ -name \'*csv\' |") ||
-        die "E $0: step14-appendVC cannot find final csv files with find\n";
-    while (my $f = <FILES>) {
-        chomp($f);
-        my $new = $f; 
-        ($new =~ s/\.csv$/.$caller.csv/) || 
-            die "E $0: step14-appendVC cannot add $caller as suffix to $new\n";
-        (-e $new) && 
-            die "E $0: step14-appendVC want to rename to new $new but it already exists?!\n";
-        rename($f,$new) ||
-            die "E $0: step14-appendVC cannot rename $f $new\n";
-    }
-    close(FILES);
-}
-
-
-# REMOVEEMPTY: remove files with no data lines (eg if infile concerned only some samples)
-open (FILES, "find $outDir/ -name \'*csv\' |") ||
-    die "E $0: step14-removeEmpty cannot find final csv files with find\n";
-while (my $f = <FILES>) {
-    chomp($f);
-    my $wc = `head -n 2 $f | wc -l`;
-    # there's always 1 header line
-    ($wc > 1) || unlink($f) ||
-        die "E $0: step14-removeEmpty cannot unlink $f: $!\n";
-}
-close(FILES);
-
-
+# STEP15 - QC
+#
 # QC_CHECKCAUSAL: report hits of known causal genes by (severe) variants
 # QC report will be printed to $qc_causal file
 my $qc_causal = "$outDir/qc_causal.csv";
@@ -601,7 +603,7 @@ my $qc_causal = "$outDir/qc_causal.csv";
 $com = "perl $RealBin/14_qc_checkCausal.pl --samplesFile=$samples --indir=$outDir/Samples/ ";
 $com .= "> $qc_causal ";
 ($debug) && ($com .= "2> $outDir/step14-qc_causal.err");
-system($com) && die "E $0: step14-qc_causal failed\n";
+system($com) && die "E $0: step15-qc_causal failed\n";
 
 
 ######################
