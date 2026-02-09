@@ -270,7 +270,7 @@ while (my $inFile = readdir(INDIR)) {
         die "E: $0 - cohort $cohort parsed from filename of infile $inFile is not in $samplesFile\n";
     foreach my $sample (@{$cohort2samples{$cohort}}) {
         my $patient = $sample2patientR->{$sample};
-        my $outFile = "$outDir/$cohort.$sample.$patient.$fileEnd";
+        my $outFile = "$outDir/$sample.$patient.$cohort.$fileEnd";
         ($gz) && ($outFile .= ".gz");
         my $outFull = " > $outFile";
         ($gz) && ($outFull = " | gzip -c $outFull");

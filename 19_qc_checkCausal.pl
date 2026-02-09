@@ -135,18 +135,14 @@ my @candOtherPathosHVModHigh = ();
 
 foreach my $inFile (sort(readdir(INDIR))) {
     ($inFile =~ /^\./) && next;
-    my $sample;
-    foreach my $s (keys(%$sample2cohortR)) {
-        if ($inFile =~ /^$sample2cohortR->{$s}\.$s\./) {
-            $sample = $s;
-            last;
-        }
-    }
-    ($sample) || 
-        ((print "W: inFile $inFile doesn't seem to correspond to any sample, skipping it\n") && next);
+    ($inFile =~ /^([^\.]+)\./) ||
+        die "E $0: cannot extract sampleID from inFile $inFile\n";
+    my $sample = $1;
+    (defined $sample2cohortR->{$sample}) ||
+        ((warn "W: inFile $inFile doesn't seem to correspond to any sample, skipping it\n") && next);
 
     my $patho = $sample2cohortR->{$sample};
-    # empty $sample2cohortR as we go, for sanity testing and speed
+    # empty $sample2cohortR as we go, for sanity testing
     delete($sample2cohortR->{$sample});
 
     open(INFILE, "$inDir/$inFile") ||
