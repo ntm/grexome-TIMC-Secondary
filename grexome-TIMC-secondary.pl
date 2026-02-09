@@ -447,14 +447,14 @@ else {
 # subsequent steps work on the individual CohortFiles
 
 # STEP 10 - TRANSCRIPTS, before filtering
-$com = "perl $RealBin/11_extractTranscripts.pl --indir $tmpdir/Cohorts/ --outdir $tmpdir/Transcripts_noIDs/ ";
+$com = "perl $RealBin/10_extractTranscripts.pl --indir $tmpdir/Cohorts/ --outdir $tmpdir/Transcripts_noIDs/ ";
 ($pathologies) && ($com .= "--pathologies=$pathologies ");
 ($debug) && ($com .= "2> $outDir/step10t.err");
 system($com) && die "E $0: step10-transcripts failed\n";
 
 
 # STEP 11 - COHORTS, filter variants on COUNTs and reorder columns
-$com = "perl $RealBin/10_filterAndReorderAll.pl --indir $tmpdir/Cohorts/ --outdir $tmpdir/Cohorts_Filtered/ ";
+$com = "perl $RealBin/11_filterAndReorderAll.pl --indir $tmpdir/Cohorts/ --outdir $tmpdir/Cohorts_Filtered/ ";
 $com .= "--reorder --favoriteTissues=".&gtexFavoriteTissues()." ";
 # set min_hr to 20% of $numSamples
 my $min_hr = int($numSamples * 0.2);
@@ -472,7 +472,7 @@ system($com) && die "E $0: step11-filter failed\n";
 
 
 # STEP 12 - SAMPLES, after filtering
-$com = "perl $RealBin/11_extractSamples.pl --samples $samples ";
+$com = "perl $RealBin/12_extractSamples.pl --samples $samples ";
 $com .= "--indir $tmpdir/Cohorts_Filtered/ --outdir $outDir/Samples/ ";
 (&coveragePath()) && ($com .= "--covdir ".&coveragePath());
 ($debug) && ($com .= " 2> $outDir/step12-samples.err");
@@ -480,7 +480,7 @@ system($com) && die "E $0: step12-samples failed\n";
 
 
 # STEP 13 - COHORTS, require at least one HV or HET sample
-$com = "perl $RealBin/11_requireUndiagnosed.pl $tmpdir/Cohorts_Filtered/ $tmpdir/Cohorts_minOneSamp/ ";
+$com = "perl $RealBin/13_requireUndiagnosed.pl $tmpdir/Cohorts_Filtered/ $tmpdir/Cohorts_minOneSamp/ ";
 ($debug) && ($com .= "2> $outDir/step13-minOne.err");
 system($com) && die "E $0: step13-minOneSamp failed\n";
 (! $debug) && remove_tree("$tmpdir/Cohorts_Filtered/");
@@ -494,10 +494,10 @@ system($com) && die "E $0: step13-minOneSamp failed\n";
 # samples. Typically the subsets are samples that were provided by collaborators,
 # and this allows us to send them the results concerning their patients.
 if ($subcohortFile) {
-    # 13_extractSubcohort.pl gets called several times but we prefer a single pair of log
-    # messages -> warn here, pretending to be 13_extractSubcohort.pl
+    # extractSubcohort.pl gets called several times but we prefer a single pair of log
+    # messages -> warn here, pretending to be extractSubcohort.pl
     $now = strftime("%F %T", localtime);
-    warn "I $now: extractSubcohort.pl - starting to run\n";
+    warn "I $now: 14_extractSubcohort.pl - starting to run\n";
 
     mkdir("$tmpdir/SubCohort") || die "E $0: cannot mkdir $tmpdir/SubCohort\n";
     # output filenames: input filename prepended with $subcName
@@ -507,17 +507,17 @@ if ($subcohortFile) {
 
     foreach my $subcFile (keys(%subcFile2patho)) {
         my $patho = $subcFile2patho{$subcFile};
-        my $com = "( perl $RealBin/13_extractSubcohort.pl $subcFile ";
+        my $com = "( perl $RealBin/14_extractSubcohort.pl $subcFile ";
         $com .= "< $tmpdir/Cohorts_minOneSamp/$patho.final.csv > $outFileRoot.cohort.$patho.csv ) && ";
 
-        $com .= "( perl $RealBin/13_extractSubcohort.pl $subcFile ";
+        $com .= "( perl $RealBin/14_extractSubcohort.pl $subcFile ";
         $com .= "< $tmpdir/Transcripts_noIDs/$patho.Transcripts.csv > $outFileRoot.transcripts.$patho.csv ) ";
         ($debug) && ($com .= "2>> $outDir/step14-subCohort.err ");
         system($com) && die "E $0: step14-subCohort failed\n";
     }
     
     $now = strftime("%F %T", localtime);
-    warn "I $now: extractSubcohort.pl - ALL DONE, completed successfully!\n";
+    warn "I $now: 14_extractSubcohort.pl - ALL DONE, completed successfully!\n";
 }
 else {
     warn "I $0: no provided subcohort, step14-subCohort skipped\n";
@@ -529,14 +529,14 @@ else {
 # also for subcohort, but only for its own samples
 #
 # cohorts:
-$com = "perl $RealBin/12_addPatientIDs.pl --samples=$samples ";
+$com = "perl $RealBin/15_addPatientIDs.pl --samples=$samples ";
 $com .= "--inDir=$tmpdir/Cohorts_minOneSamp/ --outDir=$outDir/Cohorts/ ";
 ($debug) && ($com .= "2>> $outDir/step15-idsC.err");
 system($com) && die "E $0: step15-addPatientIDs-cohorts failed\n";
 (! $debug) && remove_tree("$tmpdir/Cohorts_minOneSamp/");
 
 # transcripts:
-$com = "perl $RealBin/12_addPatientIDs.pl --samples=$samples ";
+$com = "perl $RealBin/15_addPatientIDs.pl --samples=$samples ";
 $com .= "--inDir=$tmpdir/Transcripts_noIDs/ --outDir=$outDir/Transcripts/ ";
 ($debug) && ($com .= "2>> $outDir/step15-idsT.err");
 system($com) && die "E $0: step15-addPatientIDs-transcripts failed\n";
@@ -545,7 +545,7 @@ system($com) && die "E $0: step15-addPatientIDs-transcripts failed\n";
 # Subcohort: cohorts and transcripts files for all pathologyIDs are in
 # a single subdir, process them all in one go
 if ($subcohortFile) {
-    $com = "perl $RealBin/12_addPatientIDs.pl --samples=$samples --SOIs=$subcohortFile ";
+    $com = "perl $RealBin/15_addPatientIDs.pl --samples=$samples --SOIs=$subcohortFile ";
     $com .= "--inDir=$tmpdir/SubCohort/ --outDir=$outDir/SubCohort/ ";
     ($debug) && ($com .= "2>> $outDir/step15-idsSubC.err");
     system($com) && die "E $0: step15-addPatientIDs-subCohort failed\n";
@@ -581,7 +581,7 @@ if ($subcohortFile) {
 #
 # NOTE: not doing this for SUBCOHORT, files should be small enough
 if (! $canon) {
-    $com = "perl $RealBin/10_filterAndReorderAll.pl --indir $outDir/Cohorts/ --outdir $outDir/Cohorts_Canonical/ --canon ";
+    $com = "perl $RealBin/11_filterAndReorderAll.pl --indir $outDir/Cohorts/ --outdir $outDir/Cohorts_Canonical/ --canon ";
     ($debug) && ($com .= "2> $outDir/step17-cohortsCanonical.err");
     system($com) && die "E $0: step17-cohortsCanonical failed\n";
 }
@@ -627,7 +627,7 @@ if ($caller) {
 # QC report will be printed to $qc_causal file
 my $qc_causal = "$outDir/qc_causal.csv";
 
-$com = "perl $RealBin/14_qc_checkCausal.pl --samplesFile=$samples --indir=$outDir/Samples/ ";
+$com = "perl $RealBin/19_qc_checkCausal.pl --samplesFile=$samples --indir=$outDir/Samples/ ";
 $com .= "> $qc_causal ";
 ($debug) && ($com .= "2> $outDir/step19-qc_causal.err");
 system($com) && die "E $0: step19-qc_causal failed\n";
