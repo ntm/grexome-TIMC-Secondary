@@ -23,23 +23,14 @@
 # 12/08/2019
 # NTM
 
-# Take 3 or 4 arguments: $samplesFile $inDir $outDir [$jobs]
-# $samplesFile is the samples metadata xlsx file;
-# $inDir must contain cohort TSVs as produced by extractCohorts.pl,
-# possibly filtered and reordered with 10_filterAndReorderAll.pl,
-# and possibly gzipped;
-# $outDir doesn't exist, it will be created and filled with 
-# similar TSVs (gzipped if infiles were gzipped), but where every
-# $sampleID identifier in the genoData columns becomes "$sampleID($patientID)",
-# with $patientID taken from patientID column if it's not empty, 
-# specimenID otherwise.
-# Filenames get ".patientIDs" added before .csv.
-# $jobs is the number of cohort infiles to process in parallel.
+# Append ($patientID) to each $sampleID (present in --SOIs if provided),
+# for each file in --inDir.
 
 use strict;
 use warnings;
 use File::Basename qw(basename);
 use FindBin qw($RealBin);
+use Getopt::Long;
 use POSIX qw(strftime);
 use Parallel::ForkManager;
 
@@ -50,20 +41,51 @@ use grexome_metaParse qw(parseSamples);
 # the program name, not the path
 $0 = basename($0);
 
-# number of cohorts to process in parallel
+#############################################
+## options / params from the command-line
+
+# samples metadata xlsx file:
+my $samplesFile;
+
+# $inDir can contain Cohorts/Transcripts/Samples TSVs, possibly filtered and
+# reordered with 10_filterAndReorderAll.pl, and possibly gzipped;
+my $inDir = "";
+
+# $outDir must not pre-exist; it will be created and filled with one file for
+# each inFile, similar name with ".patientIDs" prepended before .csv, gzipped
+# if infiles were gzipped
+my $outDir = "";
+
+# optional txt file listing sampleIDs of interest, one per line. If provided,
+# only these sampleIDs will be enriched with their patientIDs.
+my $SOIsFile;
+    
+# number of files to process in parallel
 my $jobs = 8;
 
-(@ARGV == 3) || (@ARGV == 4) ||
-    die "E $0: needs 3 or 4 args: a samples XLSX, an inDir, a non-existant outDir, and optionally the number of jobs (default=$jobs)\n";
-(@ARGV == 4) && ($jobs = $ARGV[3]);
-my ($samplesFile, $inDir, $outDir) = @ARGV;
-(-d $inDir) ||
-    die "E $0: inDir $inDir doesn't exist or isn't a directory\n";
-opendir(INDIR, $inDir) ||
-    die "E $0: cannot opendir inDir $inDir\n";
-(-e $outDir) && 
-    die "E $0: found argument $outDir but it already exists, remove it or choose another name.\n";
+GetOptions ("samples=s" => \$samplesFile,
+            "inDir=s" => \$inDir,
+            "outDir=s" => \$outDir,
+            "SOIs=s" => \$SOIsFile,
+            "jobs=i" => \$jobs)
+    or die("E: $0 - Error in command line arguments");
+
+# make sure required options were provided and sanity check them
+(($samplesFile) && (-f $samplesFile)) ||
+    die "E $0: need a samples file with --samples\n";
+
+(($inDir) && (-d $inDir)) ||
+    die "E $0: --inDir required and $inDir must be a directory\n";
+opendir(INDIR, $inDir) || die "E $0: cannot opendir inDir $inDir\n";
+
+(($outDir) && (!-e $outDir)) ||
+    die "E $0: --outDir must be provided and $outDir must not pre-exist\n";
 mkdir($outDir) || die "E $0: cannot mkdir outDir $outDir\n";
+
+(!$SOIsFile) || (-f $SOIsFile) ||
+    die "E $0: --SOIs is optional but if provided it must exist\n";
+
+($jobs >= 1) || die "E $0: optional --jobs must be an integer >= 1\n";
 
 my $now = strftime("%F %T", localtime);
 warn "I $now: $0 - starting to run\n";
@@ -71,7 +93,8 @@ warn "I $now: $0 - starting to run\n";
 
 #########################################################
 # parse samples file to populate $sample2patientR:
-# hashref, key==sampleID, value is patientID || specimenID
+# hashref, key==sampleID, value is patientID || specimenID as returned
+# by parseSamples()
 my $sample2patientR;
 {
     # we want the third hashref returned by parseSamples
@@ -79,13 +102,26 @@ my $sample2patientR;
     $sample2patientR = $parsed[2];
 }
 
+# samples of interest, if provided
+my %SOIs;
+if ($SOIsFile) {
+    open(my $SOIsFH, $SOIsFile) || die "E $0: cannot open --SOIs file $SOIsFile: $!\n";
+    while (my $soi = <$SOIsFH>) {
+        chomp($soi);
+        $SOIs{$soi} = 1;
+    }
+    close($SOIsFH);
+}
+
 # precompile the regexps we will use to search for each sample,
 # in this way RAM usage drops from +50G to 21M !!
 # key==sampleID, value is a precompiled regexp 
 my %sample2re;
 foreach my $sample (keys %$sample2patientR) {
+    ($SOIsFile) && (! $SOIs{$sample}) && next;
     $sample2re{$sample} = qr/$sample([\[,\s|])/;
 }
+
 
 #########################################################
 # read infiles
