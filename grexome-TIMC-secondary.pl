@@ -554,52 +554,30 @@ if ($subcohortFile) {
 
 
 ######################
-# STEP 16 - SUBCOHORT: symlink the Samples now that addPatientIDs has
-# created $outDir/SubCohort/
-if ($subcohortFile) {
-    mkdir("$outDir/SubCohort/Samples") || die "E $0: cannot mkdir $outDir/SubCohort/Samples\n";
-
-    foreach my $subcFile (keys(%subcFile2patho)) {
-        my $patho = $subcFile2patho{$subcFile};
-        open(SUBC, "$subcFile") || die "E $0: cannot open subcFile $subcFile for reading\n";
-        while (my $samp = <SUBC>) {
-            chomp($samp);
-            my @infile = glob("$outDir/Samples/$patho.$samp.*");
-            (@infile == 1) || die "E $0: while symlinking Subcohort SampleFiles, found several files for $samp\n";
-            my $sampFile = basename($infile[0]);
-            symlink("../../Samples/$sampFile", "$outDir/SubCohort/Samples/$sampFile") ||
-                die "E $0: cannot symlink $sampFile for subcohort\n";
-        }
-        close(SUBC);
-    }
-}
-
-
-######################
-# STEP 17 - COHORTS_CANONICAL , if called without --canon we still
+# STEP 16 - COHORTS_CANONICAL , if called without --canon we still
 # produce CohortFiles restricted to canonical transcripts (in case
 # the AllTranscripts CohortFiles are too heavy for oocalc/excel)
 #
 # NOTE: not doing this for SUBCOHORT, files should be small enough
 if (! $canon) {
     $com = "perl $RealBin/11_filterAndReorderAll.pl --indir $outDir/Cohorts/ --outdir $outDir/Cohorts_Canonical/ --canon ";
-    ($debug) && ($com .= "2> $outDir/step17-cohortsCanonical.err");
-    system($com) && die "E $0: step17-cohortsCanonical failed\n";
+    ($debug) && ($com .= "2> $outDir/step16-cohortsCanonical.err");
+    system($com) && die "E $0: step16-cohortsCanonical failed\n";
 }
 
 
 ######################
-# STEP18 - remove files without any data (eg if infile concerned only some samples)
+# STEP17 - remove files without any data (eg if infile concerned only some samples)
 # and clean up filenames
 open (FILES, "find $outDir/ -name \'*csv\' |") ||
-    die "E $0: step18-removeEmptyCleanNames cannot find final csv files with find\n";
+    die "E $0: step17-removeEmptyCleanNames cannot find final csv files with find\n";
 while (my $f = <FILES>) {
     chomp($f);
     my $wc = `head -n 2 $f | wc -l`;
     # there's always 1 header line
     if ($wc == 1) {
         unlink($f) ||
-            die "E $0: step18-removeEmpty cannot unlink $f: $!\n";
+            die "E $0: step17-removeEmpty cannot unlink $f: $!\n";
     }
     else {
         my $new = $f;
@@ -609,15 +587,36 @@ while (my $f = <FILES>) {
         # append $caller if it was auto-detected
         if ($caller) {
             ($new =~ s/\.csv$/.$caller.csv/) ||
-                die "E $0: step18-appendVC cannot add $caller as suffix to $new\n";
+                die "E $0: step17-appendVC cannot add $caller as suffix to $new\n";
         }
         (-e $new) &&
-            die "E $0: step18-appendVC want to rename to new $new but it already exists?!\n";
+            die "E $0: step17-appendVC want to rename to new $new but it already exists?!\n";
         rename($f, $new) ||
-            die "E $0: step18-appendVC cannot rename $f $new\n";
+            die "E $0: step17-appendVC cannot rename $f $new\n";
     }
 }
 close(FILES);
+
+
+######################
+# STEP 18 - SUBCOHORT: symlink the Samples now that addPatientIDs has
+# created $outDir/SubCohort/ and final Samples are renamed
+if ($subcohortFile) {
+    mkdir("$outDir/SubCohort/Samples") || die "E $0: cannot mkdir $outDir/SubCohort/Samples\n";
+
+    foreach my $subcFile (keys(%subcFile2patho)) {
+        open(SUBC, "$subcFile") || die "E $0: cannot open subcFile $subcFile for reading\n";
+        while (my $samp = <SUBC>) {
+            chomp($samp);
+            my @infile = glob("$outDir/Samples/$samp.*");
+            (@infile == 1) || die "E $0: while symlinking Subcohort SampleFiles, found several files for $samp\n";
+            my $sampFile = basename($infile[0]);
+            symlink("../../Samples/$sampFile", "$outDir/SubCohort/Samples/$sampFile") ||
+                die "E $0: cannot symlink $sampFile for subcohort\n";
+        }
+        close(SUBC);
+    }
+}
 
 
 ######################
