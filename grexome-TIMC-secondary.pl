@@ -589,36 +589,35 @@ if (! $canon) {
 
 
 ######################
-# STEP18 - remove files without any data and append variantCaller to filenames
-
-# REMOVEEMPTY: remove files with no data lines (eg if infile concerned only some samples)
+# STEP18 - remove files without any data (eg if infile concerned only some samples)
+# and clean up filenames
 open (FILES, "find $outDir/ -name \'*csv\' |") ||
-    die "E $0: step18-removeEmpty cannot find final csv files with find\n";
+    die "E $0: step18-removeEmptyCleanNames cannot find final csv files with find\n";
 while (my $f = <FILES>) {
     chomp($f);
     my $wc = `head -n 2 $f | wc -l`;
     # there's always 1 header line
-    ($wc > 1) || unlink($f) ||
-        die "E $0: step18-removeEmpty cannot unlink $f: $!\n";
-}
-close(FILES);
-
-# APPENDVC: append $caller (if it was auto-detected) to all final filenames
-if ($caller) {
-    open (FILES, "find $outDir/ -name \'*csv\' |") ||
-        die "E $0: step18-appendVC cannot find final csv files with find\n";
-    while (my $f = <FILES>) {
-        chomp($f);
+    if ($wc == 1) {
+        unlink($f) ||
+            die "E $0: step18-removeEmpty cannot unlink $f: $!\n";
+    }
+    else {
         my $new = $f;
-        ($new =~ s/\.csv$/.$caller.csv/) ||
-            die "E $0: step18-appendVC cannot add $caller as suffix to $new\n";
+        # remove .final and .patientIDs suffixes if present
+        $new =~ s/\.patientIDs\.csv$/.csv/;
+        $new =~ s/\.final\.csv$/.csv/;
+        # append $caller if it was auto-detected
+        if ($caller) {
+            ($new =~ s/\.csv$/.$caller.csv/) ||
+                die "E $0: step18-appendVC cannot add $caller as suffix to $new\n";
+        }
         (-e $new) &&
             die "E $0: step18-appendVC want to rename to new $new but it already exists?!\n";
         rename($f, $new) ||
             die "E $0: step18-appendVC cannot rename $f $new\n";
     }
-    close(FILES);
 }
+close(FILES);
 
 
 ######################
