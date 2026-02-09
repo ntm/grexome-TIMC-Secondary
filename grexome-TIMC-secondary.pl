@@ -446,19 +446,14 @@ else {
 ######################
 # subsequent steps work on the individual CohortFiles
 
-# STEP 10 - TRANSCRIPTS , BEFORE FILTERING on max_ctrl*, adding patientIDs
+# STEP 10 - TRANSCRIPTS, before filtering
 $com = "perl $RealBin/11_extractTranscripts.pl --indir $tmpdir/Cohorts/ --outdir $tmpdir/Transcripts_noIDs/ ";
 ($pathologies) && ($com .= "--pathologies=$pathologies ");
 ($debug) && ($com .= "2> $outDir/step10t.err");
 system($com) && die "E $0: step10-transcripts failed\n";
 
-$com = "perl $RealBin/12_addPatientIDs.pl $samples $tmpdir/Transcripts_noIDs/ $outDir/Transcripts/ ";
-($debug) && ($com .= "2>> $outDir/step10t.err");
-system($com) && die "E $0: step10-transcripts-addPatientIDs failed\n";
-(! $debug) && remove_tree("$tmpdir/Transcripts_noIDs/");
 
-
-# STEP 10b - filter variants on COUNTs and reorder columns, clean up unfiltered CohortFiles
+# STEP 11 - COHORTS, filter variants on COUNTs and reorder columns
 $com = "perl $RealBin/10_filterAndReorderAll.pl --indir $tmpdir/Cohorts/ --outdir $tmpdir/Cohorts_Filtered/ ";
 $com .= "--reorder --favoriteTissues=".&gtexFavoriteTissues()." ";
 # set min_hr to 20% of $numSamples
@@ -470,123 +465,59 @@ my $max_ctrl_hv = 3;
 my $max_ctrl_het = int($numSamples * 0.02);
 ($max_ctrl_het < 2 * $max_ctrl_hv) && ($max_ctrl_het = 2 * $max_ctrl_hv);
 $com .= "--max_ctrl_hv=$max_ctrl_hv --max_ctrl_het=$max_ctrl_het ";
-($debug) && ($com .= "2> $outDir/step10f.err");
-system($com) && die "E $0: step10-filter failed\n";
+($debug) && ($com .= "2> $outDir/step11-filter.err");
+system($com) && die "E $0: step11-filter failed\n";
 # remove unfiltered results in non-debug mode
 (! $debug) && remove_tree("$tmpdir/Cohorts/");
 
 
-# STEP 11 - SAMPLES
+# STEP 12 - SAMPLES, after filtering
 $com = "perl $RealBin/11_extractSamples.pl --samples $samples ";
 $com .= "--indir $tmpdir/Cohorts_Filtered/ --outdir $outDir/Samples/ ";
 (&coveragePath()) && ($com .= "--covdir ".&coveragePath());
-($debug) && ($com .= " 2> $outDir/step11s.err");
-system($com) && die "E $0: step11-samples failed\n";
+($debug) && ($com .= " 2> $outDir/step12-samples.err");
+system($com) && die "E $0: step12-samples failed\n";
 
 
-# STEP 11 - FINAL COHORTFILES , require at least one HV or HET sample and add patientIDs
-$com = "perl $RealBin/11_requireUndiagnosed.pl $tmpdir/Cohorts_Filtered/ $tmpdir/Cohorts_FINAL/ ";
-($debug) && ($com .= "2> $outDir/step11-finalCohorts.err");
-system($com) && die "E $0: step11-finalCohorts failed\n";
-
-$com = "perl $RealBin/12_addPatientIDs.pl $samples $tmpdir/Cohorts_FINAL/ $outDir/Cohorts/ ";
-($debug) && ($com .= "2>> $outDir/step11-finalCohorts.err");
-system($com) && die "E $0: step11-finalCohorts-addPatientIDs failed\n";
-
-(! $debug) && remove_tree("$tmpdir/Cohorts_Filtered/", "$tmpdir/Cohorts_FINAL/");
-
-
-# STEP 12 - COHORTFILES_CANONICAL , if called without --canon we still
-# produce CohortFiles restricted to canonical transcripts (in case
-# the AllTranscripts CohortFiles are too heavy for oocalc/excel)
-if (! $canon) {
-    $com = "perl $RealBin/10_filterAndReorderAll.pl --indir $outDir/Cohorts/ --outdir $outDir/Cohorts_Canonical/ --canon ";
-    ($debug) && ($com .= "2> $outDir/step12-cohortsCanonical.err");
-    system($com) && die "E $0: step12-cohortsCanonical failed\n";
-}
+# STEP 13 - COHORTS, require at least one HV or HET sample
+$com = "perl $RealBin/11_requireUndiagnosed.pl $tmpdir/Cohorts_Filtered/ $tmpdir/Cohorts_minOneSamp/ ";
+($debug) && ($com .= "2> $outDir/step13-minOne.err");
+system($com) && die "E $0: step13-minOneSamp failed\n";
+(! $debug) && remove_tree("$tmpdir/Cohorts_Filtered/");
 
 
 ######################
-# STEP13 - rename and clean up
-
-# APPENDVC: append $caller (if it was auto-detected) to all final filenames
-if ($caller) {
-    open (FILES, "find $outDir/ -name \'*csv\' |") ||
-        die "E $0: step13-appendVC cannot find final csv files with find\n";
-    while (my $f = <FILES>) {
-        chomp($f);
-        my $new = $f; 
-        ($new =~ s/\.csv$/.$caller.csv/) || 
-            die "E $0: step13-appendVC cannot add $caller as suffix to $new\n";
-        (-e $new) && 
-            die "E $0: step13-appendVC want to rename to new $new but it already exists?!\n";
-        rename($f,$new) ||
-            die "E $0: step13-appendVC cannot rename $f $new\n";
-    }
-    close(FILES);
-}
-
-# REMOVEEMPTY: remove files with no data lines (eg if infile concerned only some samples)
-open (FILES, "find $outDir/ -name \'*csv\' |") ||
-    die "E $0: step13-removeEmpty cannot find final csv files with find\n";
-while (my $f = <FILES>) {
-    chomp($f);
-    my $wc = `head -n 2 $f | wc -l`;
-    # there's always 1 header line
-    ($wc > 1) || unlink($f) ||
-        die "E $0: step13-removeEmpty cannot unlink $f: $!\n";
-}
-close(FILES);
-
-
-######################
-# STEP 14 - SUBCOHORT, must run after APPENDVC and REMOVEEMPTY
+# STEP 14 - SUBCOHORT
 #
 # Only runs if called with --subcohort :
 # the idea is to produce Cohorts and Transcripts files corresponding to subsets of
 # samples. Typically the subsets are samples that were provided by collaborators,
 # and this allows us to send them the results concerning their patients.
 if ($subcohortFile) {
-    # 13_extractSubcohort.pl gets called many times but we prefer a single pair of log
+    # 13_extractSubcohort.pl gets called several times but we prefer a single pair of log
     # messages -> warn here, pretending to be 13_extractSubcohort.pl
     $now = strftime("%F %T", localtime);
-    warn "I $now: 13_extractSubcohort.pl - starting to run\n";
+    warn "I $now: extractSubcohort.pl - starting to run\n";
 
-    mkdir("$outDir/SubCohort") || die "E $0: cannot mkdir $outDir/SubCohort\n";
-    mkdir("$outDir/SubCohort/Samples") || die "E $0: cannot mkdir $outDir/SubCohort/Samples\n";
+    mkdir("$tmpdir/SubCohort") || die "E $0: cannot mkdir $tmpdir/SubCohort\n";
     # output filenames: input filename prepended with $subcName
     my $subcName = basename($subcohortFile);
     ($subcName =~ s/.txt$//); # sanity already checked
-    my $outFileRoot = "$outDir/SubCohort/$subcName";
+    my $outFileRoot = "$tmpdir/SubCohort/$subcName";
 
     foreach my $subcFile (keys(%subcFile2patho)) {
         my $patho = $subcFile2patho{$subcFile};
         my $com = "( perl $RealBin/13_extractSubcohort.pl $subcFile ";
-        $com .= "< $outDir/Cohorts/$patho.final.patientIDs.$caller.csv > $outFileRoot.$patho.cohort.$caller.csv ) && ";
-        if (! $canon) {
-            $com .= "( perl $RealBin/13_extractSubcohort.pl $subcFile ";
-            $com .= "< $outDir/Cohorts_Canonical/$patho.final.patientIDs.canon.$caller.csv > $outFileRoot.$patho.cohort.canon.$caller.csv ) && ";
-        }
+        $com .= "< $tmpdir/Cohorts_minOneSamp/$patho.final.csv > $outFileRoot.cohort.$patho.csv ) && ";
+
         $com .= "( perl $RealBin/13_extractSubcohort.pl $subcFile ";
-        $com .= "< $outDir/Transcripts/$patho.Transcripts.patientIDs.$caller.csv > $outFileRoot.$patho.transcripts.$caller.csv ) ";
+        $com .= "< $tmpdir/Transcripts_noIDs/$patho.Transcripts.csv > $outFileRoot.transcripts.$patho.csv ) ";
         ($debug) && ($com .= "2>> $outDir/step14-subCohort.err ");
         system($com) && die "E $0: step14-subCohort failed\n";
-
-        # also symlink Samples files
-        open(SUBC, "$subcFile") || die "E $0: cannot open subcFile $subcFile for reading\n";
-        while (my $samp = <SUBC>) {
-            chomp($samp);
-            my @infile = glob("$outDir/Samples/$patho.$samp.*");
-            (@infile == 1) || die "E $0: extractSubcohort.pl finds several Samples files for $samp\n";
-            my $sampFile = basename($infile[0]);
-            symlink("../../Samples/$sampFile", "$outDir/SubCohort/Samples/$sampFile") ||
-                die "E $0: cannot symlink $sampFile for subcohort\n";
-        }
-        close(SUBC);
     }
     
     $now = strftime("%F %T", localtime);
-    warn "I $now: 13_extractSubcohort.pl - ALL DONE, completed successfully!\n";
+    warn "I $now: extractSubcohort.pl - ALL DONE, completed successfully!\n";
 }
 else {
     warn "I $0: no provided subcohort, step14-subCohort skipped\n";
@@ -594,7 +525,103 @@ else {
 
 
 ######################
-# STEP15 - QC
+# STEP 15 - add patientIDs in COHORTS and TRANSCRIPTS files;
+# also for subcohort, but only for its own samples
+#
+# cohorts:
+$com = "perl $RealBin/12_addPatientIDs.pl --samples=$samples ";
+$com .= "--inDir=$tmpdir/Cohorts_minOneSamp/ --outDir=$outDir/Cohorts/ ";
+($debug) && ($com .= "2>> $outDir/step15-idsC.err");
+system($com) && die "E $0: step15-addPatientIDs-cohorts failed\n";
+(! $debug) && remove_tree("$tmpdir/Cohorts_minOneSamp/");
+
+# transcripts:
+$com = "perl $RealBin/12_addPatientIDs.pl --samples=$samples ";
+$com .= "--inDir=$tmpdir/Transcripts_noIDs/ --outDir=$outDir/Transcripts/ ";
+($debug) && ($com .= "2>> $outDir/step15-idsT.err");
+system($com) && die "E $0: step15-addPatientIDs-transcripts failed\n";
+(! $debug) && remove_tree("$tmpdir/Transcripts_noIDs/");
+
+# Subcohort: cohorts and transcripts files for all pathologyIDs are in
+# a single subdir, process them all in one go
+if ($subcohortFile) {
+    $com = "perl $RealBin/12_addPatientIDs.pl --samples=$samples --SOIs=$subcohortFile ";
+    $com .= "--inDir=$tmpdir/SubCohort/ --outDir=$outDir/SubCohort/ ";
+    ($debug) && ($com .= "2>> $outDir/step15-idsSubC.err");
+    system($com) && die "E $0: step15-addPatientIDs-subCohort failed\n";
+    (! $debug) && remove_tree("$tmpdir/SubCohort/");
+}
+
+
+######################
+# STEP 16 - SUBCOHORT: symlink the Samples now that addPatientIDs has
+# created $outDir/SubCohort/
+if ($subcohortFile) {
+    mkdir("$outDir/SubCohort/Samples") || die "E $0: cannot mkdir $outDir/SubCohort/Samples\n";
+
+    foreach my $subcFile (keys(%subcFile2patho)) {
+        open(SUBC, "$subcFile") || die "E $0: cannot open subcFile $subcFile for reading\n";
+        while (my $samp = <SUBC>) {
+            chomp($samp);
+            my @infile = glob("$outDir/Samples/$patho.$samp.*");
+            (@infile == 1) || die "E $0: while symlinking Subcohort SampleFiles, found several files for $samp\n";
+            my $sampFile = basename($infile[0]);
+            symlink("../../Samples/$sampFile", "$outDir/SubCohort/Samples/$sampFile") ||
+                die "E $0: cannot symlink $sampFile for subcohort\n";
+        }
+        close(SUBC);
+    }
+}
+
+
+######################
+# STEP 17 - COHORTS_CANONICAL , if called without --canon we still
+# produce CohortFiles restricted to canonical transcripts (in case
+# the AllTranscripts CohortFiles are too heavy for oocalc/excel)
+#
+# NOTE: not doing this for SUBCOHORT, files should be small enough
+if (! $canon) {
+    $com = "perl $RealBin/10_filterAndReorderAll.pl --indir $outDir/Cohorts/ --outdir $outDir/Cohorts_Canonical/ --canon ";
+    ($debug) && ($com .= "2> $outDir/step17-cohortsCanonical.err");
+    system($com) && die "E $0: step17-cohortsCanonical failed\n";
+}
+
+
+######################
+# STEP18 - remove files without any data and append variantCaller to filenames
+
+# REMOVEEMPTY: remove files with no data lines (eg if infile concerned only some samples)
+open (FILES, "find $outDir/ -name \'*csv\' |") ||
+    die "E $0: step18-removeEmpty cannot find final csv files with find\n";
+while (my $f = <FILES>) {
+    chomp($f);
+    my $wc = `head -n 2 $f | wc -l`;
+    # there's always 1 header line
+    ($wc > 1) || unlink($f) ||
+        die "E $0: step18-removeEmpty cannot unlink $f: $!\n";
+}
+close(FILES);
+
+# APPENDVC: append $caller (if it was auto-detected) to all final filenames
+if ($caller) {
+    open (FILES, "find $outDir/ -name \'*csv\' |") ||
+        die "E $0: step18-appendVC cannot find final csv files with find\n";
+    while (my $f = <FILES>) {
+        chomp($f);
+        my $new = $f;
+        ($new =~ s/\.csv$/.$caller.csv/) ||
+            die "E $0: step18-appendVC cannot add $caller as suffix to $new\n";
+        (-e $new) &&
+            die "E $0: step18-appendVC want to rename to new $new but it already exists?!\n";
+        rename($f, $new) ||
+            die "E $0: step18-appendVC cannot rename $f $new\n";
+    }
+    close(FILES);
+}
+
+
+######################
+# STEP19 - QC
 #
 # QC_CHECKCAUSAL: report hits of known causal genes by (severe) variants
 # QC report will be printed to $qc_causal file
@@ -602,8 +629,8 @@ my $qc_causal = "$outDir/qc_causal.csv";
 
 $com = "perl $RealBin/14_qc_checkCausal.pl --samplesFile=$samples --indir=$outDir/Samples/ ";
 $com .= "> $qc_causal ";
-($debug) && ($com .= "2> $outDir/step14-qc_causal.err");
-system($com) && die "E $0: step15-qc_causal failed\n";
+($debug) && ($com .= "2> $outDir/step19-qc_causal.err");
+system($com) && die "E $0: step19-qc_causal failed\n";
 
 
 ######################
