@@ -169,7 +169,7 @@ while (my $inFile = readdir(INDIR)) {
         # add trailing ',' so we know sampleID is always followed by some char
         $line .= ',';
         # chuck norris style: brutal but it works...
-        foreach my $sample (keys %$sample2patientR) {
+        foreach my $sample (keys %sample2re) {
             $line =~ s/$sample2re{$sample}/$sample($sample2patientR->{$sample})$1/g ;
         }
         # remove the trailing ,
