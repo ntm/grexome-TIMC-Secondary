@@ -560,6 +560,7 @@ if ($subcohortFile) {
     mkdir("$outDir/SubCohort/Samples") || die "E $0: cannot mkdir $outDir/SubCohort/Samples\n";
 
     foreach my $subcFile (keys(%subcFile2patho)) {
+        my $patho = $subcFile2patho{$subcFile};
         open(SUBC, "$subcFile") || die "E $0: cannot open subcFile $subcFile for reading\n";
         while (my $samp = <SUBC>) {
             chomp($samp);
