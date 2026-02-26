@@ -44,7 +44,7 @@
 # The HV/HET/OTHER/HR columns are removed and used to produce the following
 # columns in each $cohort outfile, in this order and starting where HV was:
 # - $cohort_HV, $cohort_HET -> samples from $cohort (except those having
-#   a causal variant in another gene)
+#   an identified causal variant in another gene)
 # - $cohort_OTHERCAUSE_HV, $cohort_OTHERCAUSE_HET -> samples from $cohort
 #   that have a causal variant in another gene
 # - COMPAT_HV, COMPAT_HET -> samples from compatible cohorts

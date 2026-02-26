@@ -40,8 +40,8 @@ our @EXPORT_OK = qw(parsePathologies parseSamples parseCandidateGenes);
 
 #################################################################
 
-# Parse pathologies metadata XLSX file: required columns are "pathologyID"
-# and "compatibility groups" (can be in any order but they MUST exist).
+# Parse pathologies metadata XLSX file: required columns are pathologyID,
+# no_files, is_a and "compatibility groups" (can be in any order but they MUST exist).
 #
 # Return a hashref:
 # - key is a pathologyID (used as cohort identifier)
