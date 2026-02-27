@@ -43,10 +43,13 @@ our @EXPORT_OK = qw(parsePathologies parseSamples parseCandidateGenes);
 # Parse pathologies metadata XLSX file: required columns are pathologyID,
 # no_files, is_a and "compatibility groups" (can be in any order but they MUST exist).
 #
-# Return a hashref:
-# - key is a pathologyID (used as cohort identifier)
-# - value is a hashref, with keys==pathoIDs that are compatible with
-#   the current patho and values==1
+# Return 3 hashrefs ($noFilesR, $isaR, $compatR),
+# keys are a pathologyID (used as cohort identifier), values are:
+# - noFilesR: 0 (make files for this patho) or 1 (don't make files)
+# - isaR: a hashref with keys==pathoIDs that are parents (ontology-wise)
+#   of this patho, values==1
+# - compatR: a hashref with keys==pathoIDs that are compatible with
+#   this patho, values==1
 #
 # If the metadata file has errors, log as many as possible and die.
 sub parsePathologies {
@@ -56,11 +59,11 @@ sub parsePathologies {
 
     (-f $pathosFile) || die "E in $subName: provided file $pathosFile doesn't exist\n";
 
-    # ref to %compatible will be returned, as defined above
-    my %compatible = ();
+    # hashrefs to be returned
+    my ($noFilesR, $isaR, $compatR) = ({}, {}, {});
 
     # we will populate temp hash %compatGroups as we go: key==compatGroup id,
-    # value==arrayref of patho acronyms
+    # value==arrayref of pathologyIDs
     my %compatGroups = ();
     
     my $workbook = Spreadsheet::XLSX->new("$pathosFile");
@@ -73,17 +76,23 @@ sub parsePathologies {
     my ($colMin, $colMax) = $worksheet->col_range();
     my ($rowMin, $rowMax) = $worksheet->row_range();
     # check the column titles and grab indexes of our columns of interest
-    my ($pathoCol,$compatCol) = (-1,-1);
+    my ($pathoCol,$noFilesCol,$isaCol,$compatCol) = (-1,-1,-1,-1);
     foreach my $col ($colMin..$colMax) {
         my $cell = $worksheet->get_cell($rowMin, $col);
         # if column has no header just ignore it
         (defined $cell) || next;
         my $val = $cell->unformatted();
         if ($val eq "pathologyID") { $pathoCol = $col; }
+        elsif ($val eq "no_files") { $noFilesCol = $col; }
+        elsif ($val eq "is_a") { $isaCol = $col; }
         elsif ($val eq "compatibility groups") { $compatCol = $col; }
     }
     ($pathoCol >= 0) ||
         die "E in $subName: missing required column title: 'pathologyID'\n";
+    ($noFilesCol >= 0) ||
+        die "E in $subName: missing required column title: 'no_files'\n";
+    ($isaCol >= 0) ||
+        die "E in $subName: missing required column title: 'is_a'\n";
     ($compatCol >= 0) ||
         die "E in $subName: missing required column title: 'compatibility groups'\n";
 
@@ -101,50 +110,83 @@ sub parsePathologies {
             $errorsFound++;
             next;
         }
-        if (defined $compatible{$patho}) {
+        if (defined $noFilesR->{$patho}) {
             warn "E in $subName: there are 2 lines with same pathologyID $patho\n";
             $errorsFound++;
             next;
         }
-        # initialize with anonymous empty hash
-        $compatible{$patho} = {};
+        # initialize with false / anonymous empty hashes
+        $noFilesR->{$patho} = 0;
+        $isaR->{$patho} = {};
+        $compatR->{$patho} = {};
 
+        # no_files can be empty or 0 (false), or 1
+        my $noFiles = $worksheet->get_cell($row, $noFilesCol);
+        if (defined $noFiles) {
+            $noFiles = $noFiles->unformatted();
+            if ($noFiles eq '1') {
+                $noFilesR->{$patho} = 1;
+            }
+            else {
+                warn "E in $subName: no_files must be empty or 0 or 1, found $noFiles for $patho\n";
+                $errorsFound++;
+            }
+        }
+        
+        # is_a must be a comma-separated list of pathologyIDs
+        my $isas = $worksheet->get_cell($row, $isaCol);
+        (defined $isas) || next;
+        $isas = $isas->unformatted();
+        foreach my $isa (split(/,/, $isas)) {
+            # just save the strings for now, when all parsed we will check that
+            # they are valid pathologyIDs
+            if (defined $isaR->{$patho}->{$isa}) {
+                warn "E in $subName: is_a contains the same pathologyID $isa twice for $patho\n";
+                $errorsFound++;
+                next;
+            }
+            $isaR->{$patho}->{$isa} = 1;
+        }
+        
         # 'Compatibility group' must be a comma-separated list of group identifiers (alphanum strings)
         my $compats = $worksheet->get_cell($row, $compatCol);
         (defined $compats) || next;
         $compats = $compats->unformatted();
-        my @CGs = split(/,/, $compats);
-        my $cgErrors = 0;
-        foreach my $cg (@CGs) {
+        foreach my $cg (split(/,/, $compats)) {
             if ($cg !~ /^\w+$/) {
                 warn "E in $subName: compat group identifiers must be alphanumeric strings, found $cg for $patho\n";
-                $cgErrors++;
+                $errorsFound++;
                 next;
             }
             (defined $compatGroups{$cg}) || ($compatGroups{$cg} = []);
             push(@{$compatGroups{$cg}}, $patho);
         }
-        if ($cgErrors) {
-            $errorsFound += $cgErrors;
-            next;
+    }
+    
+    # done parsing file, now check the is_a strings
+    foreach my $patho (keys %$isaR) {
+        foreach my $isa (keys %{$isaR->{$patho}}) {
+            if (! defined $noFilesR->{$isa}) {
+                warn "E in $subName: is_a must be a comma-separated list of pathologyIDs, found $isa for $patho\n";
+                $errorsFound++;
+            }
         }
     }
-
+    
     if ($errorsFound) {
         die "E in $subName: encountered $errorsFound errors while parsing $pathosFile, please fix the file.\n";
     }
-    else {
-        # populate %compatible from %compatGroups
-        foreach my $cgs (values(%compatGroups)) {
-            foreach my $patho (@$cgs) {
-                foreach my $compatPatho (@$cgs) {
-                    ($compatPatho eq $patho) && next;
-                    $compatible{$patho}->{$compatPatho} = 1;
-                }
+
+    # populate %compatible from %compatGroups
+    foreach my $cgs (values(%compatGroups)) {
+        foreach my $patho (@$cgs) {
+            foreach my $compatPatho (@$cgs) {
+                ($compatPatho eq $patho) && next;
+                $compatR->{$patho}->{$compatPatho} = 1;
             }
         }
-        return(\%compatible);
     }
+    return($noFilesR, $isaR, $compatR);
 }
 
 
