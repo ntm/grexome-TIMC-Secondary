@@ -540,12 +540,13 @@ sub parseCandidateGenes {
                 next;
             }
             $gene = $gene->unformatted();
-            # these are HUGO gene names -> must be alphanum+dashes
-            if ($gene !~ /^[\w-]+$/) {
+            # these are HUGO gene names -> must be alphanum+dashes but allow (and ignore) trailing spaces
+            if ($gene !~ /^([\w-]+)\s*$/) {
                 warn "E in $subName, parsing $candidatesFile row ",$row+1,": Gene must be alphanumeric (dashes allowed), found \"$gene\"\n";
                 $errorsFound++;
                 next;
             }
+            $gene = $1;
 
             ################ score
             if (! $score) {
