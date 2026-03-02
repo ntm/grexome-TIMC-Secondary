@@ -39,7 +39,7 @@
 # A new KNOWN_CANDIDATE_GENE column is inserted right after SYMBOL:
 # it holds a comma-separated list of "$pathologyID:$score" strings, listing
 # each pathologyID for which SYMBOL is a known candidate or causal gene with
-# confidence score $score, as produced by &parsePathologies().
+# confidence score $score, as produced by &parseCandidateGenes().
 #
 # The HV/HET/OTHER/HR columns are removed and used to produce the following
 # columns in each $cohort outfile, in this order and starting where HV was:
