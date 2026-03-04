@@ -127,7 +127,7 @@ sub parsePathologies {
             if ($noFiles eq '1') {
                 $noFilesR->{$patho} = 1;
             }
-            else {
+            elsif ($noFiles ne '0') {
                 warn "E in $subName: no_files must be empty or 0 or 1, found $noFiles for $patho\n";
                 $errorsFound++;
             }
@@ -197,9 +197,10 @@ sub parsePathologies {
 # can be in any order but they MUST exist). An optional column "Sex"
 # is parsed if it exists.
 # The optional second argument, if provided and non-empty, is the
-# pathologies metadata XLSX file; it is used to make sure every
+# pathologies metadata XLSX file; it is used to make sure that every
 # pathologyID in samples.xlsx is defined in pathologies.xlsx (ie
-# sanity-check for typoes).
+# sanity-check for typoes), with no_files=0 (if we have a sample for
+# a pathologyID, we MUST make output files for this pathologyID).
 #
 # Return a list of 4 (or 5 if "Sex" column exists) hashrefs, the caller can use
 # whichever it needs:
@@ -233,9 +234,10 @@ sub parseSamples {
 
     ################
     # parse $pathosFile immediately if it was provided
-    my $pathologiesR;
+    my $noFilesR;
     if ($pathosFile) {
-        $pathologiesR = &parsePathologies($pathosFile);
+        # grab just the first returned scalar
+        $noFilesR = &parsePathologies($pathosFile);
     }
 
     ################
@@ -306,8 +308,14 @@ sub parseSamples {
         }
         $patho = $patho->unformatted();
         if ($pathosFile) {
-            if (! defined $pathologiesR->{$patho}) {
+            if (! defined $noFilesR->{$patho}) {
                 warn "E in $subName, row ",$row+1,": pathologyID $patho is not defined in the provided $pathosFile\n";
+                $errorsFound++;
+                next;
+            }
+            elsif ($noFilesR->{$patho}) {
+                warn "E in $subName, row ",$row+1,": pathologyID $patho has no_file==1 in $pathosFile but ".
+                    "no_files==1 is reserved for organisational pathologyIDs\n";
                 $errorsFound++;
                 next;
             }
@@ -455,6 +463,7 @@ sub parseCandidateGenes {
         my @parsed;
         if ($pathosFile) {
             @parsed = &parseSamples($samplesFile, $pathosFile);
+            # grab just the first returned scalar (this is noFilesR, whatever)
             $pathologiesR = &parsePathologies($pathosFile);
         }
         else {
