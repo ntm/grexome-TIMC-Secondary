@@ -446,16 +446,34 @@ else {
 ######################
 # subsequent steps work on the individual CohortFiles
 
-# STEP 10 - TRANSCRIPTS, before filtering
-$com = "perl $RealBin/10_extractTranscripts.pl --indir $tmpdir/Cohorts/ --outdir $tmpdir/Transcripts_noIDs/ ";
-($pathologies) && ($com .= "--pathologies=$pathologies ");
-($debug) && ($com .= "2> $outDir/step10t.err");
-system($com) && die "E $0: step10-transcripts failed\n";
-
-
-# STEP 11 - COHORTS, filter variants on COUNTs and reorder columns
-$com = "perl $RealBin/11_filterAndReorderAll.pl --indir $tmpdir/Cohorts/ --outdir $tmpdir/Cohorts_Filtered/ ";
+# STEP 10 - COHORTS, reorder columns
+$com = "perl $RealBin/10_filterAndReorderAll.pl --indir $tmpdir/Cohorts/ --outdir $tmpdir/Cohorts_Reordered/ ";
 $com .= "--reorder --favoriteTissues=".&gtexFavoriteTissues()." ";
+($debug) && ($com .= "2> $outDir/step10-reorder.err");
+system($com) && die "E $0: step10-reorder failed\n";
+# remove non-reordered results in non-debug mode
+(! $debug) && remove_tree("$tmpdir/Cohorts/");
+
+
+# STEP 11 - TRANSCRIPTS, before filtering
+$com = "perl $RealBin/11_extractTranscripts.pl --indir $tmpdir/Cohorts_Reordered/ ";
+$com .= "--outdir $tmpdir/Transcripts_noIDs/ ";
+($pathologies) && ($com .= "--pathologies=$pathologies ");
+($debug) && ($com .= "2> $outDir/step11-transcripts.err");
+system($com) && die "E $0: step11-transcripts failed\n";
+
+
+# STEP 12 - SAMPLES, before filtering
+$com = "perl $RealBin/12_extractSamples.pl --samples $samples ";
+$com .= "--indir $tmpdir/Cohorts_Reordered/ --outdir $outDir/Samples/ ";
+(&coveragePath()) && ($com .= "--covdir ".&coveragePath());
+($debug) && ($com .= " 2> $outDir/step12-samples.err");
+system($com) && die "E $0: step12-samples failed\n";
+
+
+# STEP 13a - COHORTS, filter variants on COUNTs
+$com = "perl $RealBin/10_filterAndReorderAll.pl --indir $tmpdir/Cohorts_Reordered/ ";
+$com .= "--outdir $tmpdir/Cohorts_Filtered/ ";
 # set min_hr to 20% of $numSamples
 my $min_hr = int($numSamples * 0.2);
 $com .= "--min_hr=$min_hr ";
@@ -465,21 +483,12 @@ my $max_ctrl_hv = 3;
 my $max_ctrl_het = int($numSamples * 0.02);
 ($max_ctrl_het < 2 * $max_ctrl_hv) && ($max_ctrl_het = 2 * $max_ctrl_hv);
 $com .= "--max_ctrl_hv=$max_ctrl_hv --max_ctrl_het=$max_ctrl_het ";
-($debug) && ($com .= "2> $outDir/step11-filter.err");
-system($com) && die "E $0: step11-filter failed\n";
+($debug) && ($com .= "2> $outDir/step13-filter.err");
+system($com) && die "E $0: step13-filter failed\n";
 # remove unfiltered results in non-debug mode
-(! $debug) && remove_tree("$tmpdir/Cohorts/");
+(! $debug) && remove_tree("$tmpdir/Cohorts_Reordered/");
 
-
-# STEP 12 - SAMPLES, after filtering
-$com = "perl $RealBin/12_extractSamples.pl --samples $samples ";
-$com .= "--indir $tmpdir/Cohorts_Filtered/ --outdir $outDir/Samples/ ";
-(&coveragePath()) && ($com .= "--covdir ".&coveragePath());
-($debug) && ($com .= " 2> $outDir/step12-samples.err");
-system($com) && die "E $0: step12-samples failed\n";
-
-
-# STEP 13 - COHORTS, require at least one HV or HET sample
+# STEP 13b - COHORTS, require at least one undiagnosed HV or HET sample
 $com = "perl $RealBin/13_requireUndiagnosed.pl $tmpdir/Cohorts_Filtered/ $tmpdir/Cohorts_minOneSamp/ ";
 ($debug) && ($com .= "2> $outDir/step13-minOne.err");
 system($com) && die "E $0: step13-minOneSamp failed\n";
