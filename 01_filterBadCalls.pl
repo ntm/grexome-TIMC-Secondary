@@ -107,6 +107,8 @@ my $batchSize = 500000;
 # if $dp * AF < $minAD and call was REF/VAR or VAR/VAR, call becomes NOCALL
 # if max(GQ,GQX) < $minGQ , any call becomes NOCALL
 # if AF < $minAF and call was REF/VAR or VAR/VAR, call becomes NOCALL
+# if strand-specific counts are available and on one of the strands, depth >= $minDP
+#     and af < $minAF_STRAND, call becomes NOCALL
 # if $dp >= $minDP_HV and AF >= $minAF_HV , call becomes HV
 # if $dp >= $minDP_HET and AF >= $minAF_HET and AF <= $maxAF_HET, call becomes HET
 my %filterParams = (
@@ -114,8 +116,9 @@ my %filterParams = (
     "minAD" => 4,
     "minGQ" => 20,
     "minAF" => 0.15,
+    "minAF_STRAND" => 0.08,
     "minDP_HV" => 20,
-    "minAF_HV" => 0.85,
+    "minAF_HV" => 0.90,
     "minDP_HET" => 20,
     "minAF_HET" => 0.25,
     "maxAF_HET" => 0.75);
@@ -455,10 +458,12 @@ sub processBatch {
     my ($linesR,$outFH,$filterParamsR,$skippedColsR,$keepHR,$verbose) = @_;
 
     # counters for number of blatant errors fixed to HV or HET, and for fixed DPs
+    # and strand-discordant calls fixed to NOCALL
     my $fixedToHV = 0;
     my $fixedToHET = 0;
     my $fixedDP = 0;
-
+    my $discordant = 0;
+    
     # delay printing lines so we can decrement END= if needed
     # (to work-around strelka bug: indels can be preceded by HR calls
     # at the same POS or by non-variant blocks whose END= goes one too far)
@@ -661,6 +666,56 @@ sub processBatch {
                 next;
             }
 
+            # filter strand-discordant calls: if strand-specific counts are available,
+            # fix HET/HV to NOCALL when one strand is clearly HR
+            # NOTE: STRELKA has strand-specific counts for the REF and each ALT allele in ADF and ADR;
+            # GATK has SB, which holds strand-specific counts for the REF allele, but for the ALT alleles
+            # it sums all counts. This is a GATK limitation (bug), it prevents us from examining
+            # strand-discordance at multi-allelic positions, but at least we can still fix calls
+            # where one strand is clearly HR
+            if ($geno2 != 0) {
+                # allele counts on forward and reverse strands, counts of REF allele must be first
+                my @adfs = ();
+                my @adrs = ();
+                # STRELKA has ADF and ADR
+                if ((defined $format{"ADF"}) && (defined $thisData[$format{"ADF"}]) &&
+                    (defined $format{"ADR"}) && (defined $thisData[$format{"ADR"}])) {
+                    (($thisData[$format{"ADF"}] =~ /^[\d,]+$/) && ($thisData[$format{"ADR"}] =~ /^[\d,]+$/)) ||
+                        die "E $0: we have ADF and ADR but data is BAD in @thisData - line is $line\n";
+                    @adfs = split(/,/, $thisData[$format{"ADF"}]);
+                    @adrs = split(/,/, $thisData[$format{"ADR"}]);
+                }
+                # GATK has SB (strelka also has SB but meaning is different, it doesn't have 4 comma-separated ints)
+                elsif ((defined $format{"SB"}) && (defined $thisData[$format{"SB"}]) &&
+                       ($thisData[$format{"SB"}] =~ /^(\d+),(\d+),(\d+),(\d+)$/)) {
+                    @adfs = ($1, $3);
+                    @adrs = ($2, $4);
+                }
+
+                if (@adfs) {
+                    my ($sumOfADFs, $sumOfADRs) = (0, 0);
+                    foreach my $ad (@adfs) {
+                        $sumOfADFs += $ad;
+                    }
+                    foreach my $ad (@adrs) {
+                        $sumOfADRs += $ad;
+                    }
+                    if ((($sumOfADFs >= $filterParamsR->{"minDP"}) &&
+                         ((($sumOfADFs - $adfs[0]) / $sumOfADFs) < $filterParamsR->{"minAF_STRAND"})) ||
+                        (($sumOfADRs >= $filterParamsR->{"minDP"}) &&
+                         ((($sumOfADRs - $adrs[0]) / $sumOfADRs) < $filterParamsR->{"minAF_STRAND"}))) {
+                        # one of the strands is a clear HR, change to NOCALL
+                        $discordant++;
+                        if ($verbose >= 2) {
+                            # warn with chrom pos ref > alts sample thisData
+                            warn "I $0: strand-discordant->NOCALL, $data[0]:$data[1] $data[3] > $data[4] sample ".($i-9)." $thisData\n";
+                        }
+                        push(@lineToPrint, './.') ;
+                        next;
+                    }
+                }
+            }
+
             # we have $thisDP and $af , fix blatantly wrong calls
             if (($thisDP >= $filterParamsR->{"minDP_HV"}) && ($geno1 == 0) &&
                 ($af ne '.') && ($af >= $filterParamsR->{"minAF_HV"})) {
@@ -683,7 +738,7 @@ sub processBatch {
                 }
             }
 
-            # other filters (eg strandDisc) could go here
+            # other filters could go here
 
             # OK data passed all filters, add/move fields (AF, DP) if needed, careful
             # with order of splices!
@@ -800,6 +855,7 @@ sub processBatch {
         ($fixedToHV) && (warn "I $0: fixed $fixedToHV calls from HET to HV\n");
         ($fixedToHET) && (warn "I $0: fixed $fixedToHET calls from HV to HET\n");
         ($fixedDP) && (warn "I $0: fixed $fixedDP DP values to sumOfADs (was larger)\n");
+        ($discordant) && (warn "I $0: fixed $discordant strand-discordant calls to NOCALL\n");
     }
 }
 
