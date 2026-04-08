@@ -145,7 +145,9 @@ mkdir($outDir) || die "E $0: cannot mkdir outDir $outDir\n";
 my $compatibleR;
 if ($pathologies) {
     (-f $pathologies) || die "E $0: the supplied pathologies file $pathologies doesn't exist\n";
-    $compatibleR = &parsePathologies($pathologies);
+    # ancestorsR will be discarded
+    my $ancestorsR;
+    ($ancestorsR, $compatibleR) = &parsePathologies($pathologies);
 }
 # else $compatibleR stays undef
 
