@@ -31,9 +31,10 @@
 # The cohorts are defined in $pathologies and/or $samplesFile.
 # For each sample, any identified causal (mutation in a) gene 
 # is grabbed from $samplesFile.
-# "Compatible" cohorts (ie belonging to a common compatibility group in the
-# pathologies XLSX file) appear in COMPAT columns and are NOT used
-# as negative controls for each other.
+# Samples from "compatible" cohorts (ie ancestors in the pathology onthology or
+# belonging to a common compatibility group, as specified in the pathologies
+# XLSX file) appear in COMPAT columns and are NOT used as negative controls
+# for each other.
 # For optimal performance $tmpDir should be on a RAMDISK (eg tmpfs).
 #
 # A new KNOWN_CANDIDATE_GENE column is inserted right after SYMBOL:
@@ -43,10 +44,10 @@
 #
 # The HV/HET/OTHER/HR columns are removed and used to produce the following
 # columns in each $cohort outfile, in this order and starting where HV was:
-# - $cohort_HV, $cohort_HET -> samples from $cohort (except those having
-#   an identified causal variant in another gene)
+# - $cohort_HV, $cohort_HET -> samples from $cohort or any of its descendants
+#   (except those having an identified causal variant in another gene)
 # - $cohort_OTHERCAUSE_HV, $cohort_OTHERCAUSE_HET -> samples from $cohort
-#   that have a causal variant in another gene
+#   or any of its descendants that have a causal variant in another gene
 # - COMPAT_HV, COMPAT_HET -> samples from compatible cohorts
 # - NEGCTRL_HV, NEGCTRL_HET -> samples from all other cohorts
 # - OTHERGENO -> samples with OTHER genotypes (from any cohort)
@@ -56,9 +57,9 @@
 # from any cohort without caring about $compatible or $causalGene).
 # The COUNTs are inserted right after the new KNOWN_CANDIDATE_GENE column.
 #
-# Lines where no samples from the cohort are HV|HET (for this alt allele)
-# are skipped. We rely on the fact that vcf2tsv.pl moved HV/HET genotypes
-# concerning other alleles to OTHER (but we check it).
+# Lines where no samples from the cohort+ its descendants are HV|HET (for
+# this alt allele) are skipped. We rely on the fact that vcf2tsv.pl moved
+# HV/HET genotypes concerning other alleles to OTHER (but we check it).
 
 
 use strict;
@@ -112,13 +113,15 @@ my $batchSize;
 my $help = '';
 
 
-my $USAGE = "\nParse on STDIN a fully annotated TSV file as produced by steps 1-8 of this secondaryAnalysis pipeline; create in outDir one gzipped TSV file per cohort.\n
+my $USAGE = "\nParse on STDIN a fully annotated TSV file as produced by steps 1-8 of this secondaryAnalysis pipeline;
+create in outDir one gzipped TSV file per cohort.\n
 Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --samples string : samples metadata xlsx file, with path
 --pathologies string [optional] : pathologies metadata xlsx file, with path
 --candidateGenes string [optional] : comma-separated list of xlsx files holding known candidate genes, with paths
 --outdir string : subdir where resulting cohort files will be created, must not pre-exist
---tmpdir string : subdir where tmp files will be created (on a RAMDISK if possible), must not pre-exist and will be removed after execution
+--tmpdir string : subdir where tmp files will be created (on a RAMDISK if possible), must not pre-exist and
+         will be removed after execution
 --jobs [$jobs] : number of parallel jobs=threads to run
 --batchSize [adaptive] : size of each batch, lower decreases RAM requirements and performance,
              defaults to an optimized adaptive strategy, you shouldn\'t need to specify this except
@@ -138,7 +141,7 @@ GetOptions ("samples=s" => \$samplesFile,
 # make sure required options were provided and sanity check them
 ($help) && die "$USAGE\n\n";
 
-($samplesFile) || die "E $0: you must provide a samples file\n";
+($samplesFile) || die "E $0: you must provide a samples file.\nUSAGE:$USAGE\n";
 (-f $samplesFile) || die "E $0: the supplied samples file doesn't exist\n";
 
 ($outDir) || die "E $0: you must provide an outDir\n";
@@ -202,15 +205,17 @@ my %knownCandidateGenes;
 }
 
 
-# If $pathologies was provided, populate $compatibleR
-# $compatibleR: hashref, key is a cohort name, value is a hashref
-# with keys == cohorts that are compatible with this cohort, value==1
-my $compatibleR;
+# If $pathologies was provided, build 2 hashrefs: ($ancestorsR, $compatR),
+# keys are a pathologyID, values are hashrefs whose keys are the pathoIDs defined by:
+# - ancestorsR: the ancestors (ontology-wise) of this patho;
+# - compatR: the pathos that samples of this patho are "compatible" with;
+# all values are 1.
+my ($ancestorsR, $compatR);
 if ($pathologies) {
     (-f $pathologies) || die "E $0: the supplied pathologies file $pathologies doesn't exist\n";
-    $compatibleR = &parsePathologies($pathologies);
+    ($ancestorsR, $compatR) = &parsePathologies($pathologies);
 }
-# else $compatibleR stays undef
+# else $ancestorsR and $compatR stay undef
 
 # parse useful info from samples metadata file:
 # hashref, key==sample id, value is the $cohort this sample belongs to (ie pathologyID)
@@ -236,6 +241,16 @@ my @cohorts;
     my %seen;
     foreach my $c (values (%$sample2cohortR)) {
         $seen{$c} = 1;
+    }
+    if ($pathologies) {
+        # we also want to make files for pathologyIDs that don't have samples
+        # themselves but are ancestors of pathologyIDs with samples
+        foreach my $patho (keys %$ancestorsR) {
+            (defined $seen{$patho}) || next;
+            foreach my $anc (keys %{$ancestorsR->{$patho}}) {
+                $seen{$anc} = 1;
+            }
+        }
     }
     @cohorts = sort(keys(%seen));
 }
@@ -400,7 +415,7 @@ while (!$lastBatch) {
     }
     # process this batch
     &processBatch(\@lines,\%knownCandidateGenes,$sample2cohortR,\@cohorts,
-                  $sample2causalR,$compatibleR,$symbolCol,\%genoCols,\@tmpOutFHs);
+                  $sample2causalR,$ancestorsR,$compatR,$symbolCol,\%genoCols,\@tmpOutFHs);
 
     # done, close tmp FHs and create flag-file
     foreach my $outFH (@tmpOutFHs) {
@@ -447,7 +462,7 @@ warn "I $now: $0 - ALL DONE, completed successfully!\n";
 # - ref to array of chomped lines
 # - ref to %knownCandidateGenes
 # - refs to %sample2cohort, to @cohorts, and to %sample2causal
-# - ref to %compatible
+# - refs to %ancestors and %compat
 # - $symbolCol, the column index of the SYMBOL column (in data lines)
 # - ref to %genoCols whose keys are "HV","HET,"OTHER","HR" and values are the
 #   corresponding columns (in data lines)
@@ -456,7 +471,7 @@ warn "I $now: $0 - ALL DONE, completed successfully!\n";
 sub processBatch {
     (@_ == 9) || die "E $0: processBatch needs 9 args\n";
     my ($linesR,$knownCandidateGenesR,$sample2cohortR,$cohortsR,$sample2causalR,
-        $compatibleR,$symbolCol,$genoColsR,$tmpOutFilesR) = @_;
+        $ancestorsR,$compatR,$symbolCol,$genoColsR,$tmpOutFilesR) = @_;
 
     foreach my $line (@$linesR) {
         my @fields = split(/\t/, $line, -1) ;
@@ -511,8 +526,9 @@ sub processBatch {
 
                 foreach my $cohorti (0..$#$cohortsR) {
                     my $cohort = $cohortsR->[$cohorti];
-                    if ($sample2cohortR->{$sampleID} eq $cohort) {
-                        # $sample belongs to $cohort
+                    if (($sample2cohortR->{$sampleID} eq $cohort) ||
+                        (defined $ancestorsR->{$sample2cohortR->{$sampleID}}->{$cohort})) {
+                        # $sample belongs to $cohort or to one of its descendants
                         if ((! defined $sample2causalR->{$sampleID}) || ($sample2causalR->{$sampleID} eq $symbol)) {
                             # sample has no causal gene or it's the current gene: add to $cohort_HV or HET
                             if ($cohort2sampleLists[$cohorti]->[$gni]) {
@@ -534,7 +550,7 @@ sub processBatch {
                             $cohort2SLcounts[$cohorti]->[2+$gni]++;
                         }
                     }
-                    elsif (defined $compatibleR->{$sample2cohortR->{$sampleID}}->{$cohort}) {
+                    elsif (defined $compatR->{$sample2cohortR->{$sampleID}}->{$cohort}) {
                         # $sample belongs to a cohort compatible with $cohort, store at index 4+$gni
                         if ($cohort2sampleLists[$cohorti]->[4+$gni]) {
                             $cohort2sampleLists[$cohorti]->[4+$gni] .= ",$sample";
@@ -583,7 +599,7 @@ sub processBatch {
             my $cohort = $cohortsR->[$cohorti];
 
             # skip if no HV or HET sample (possibly with other known causal variant)
-            # in this cohort
+            # in this cohort or its descendants
             ($cohort2SLcounts[$cohorti]->[0] > 0) || ($cohort2SLcounts[$cohorti]->[1] > 0) ||
                 ($cohort2SLcounts[$cohorti]->[2] > 0) || ($cohort2SLcounts[$cohorti]->[3] > 0) || next;
 
