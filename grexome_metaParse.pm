@@ -45,8 +45,8 @@ our @EXPORT_OK = qw(parsePathologies parseSamples parseCandidateGenes);
 #
 # Return 2 hashrefs: ($ancestorsR, $compatR), keys are a pathologyID,
 # values are hashrefs whose keys are the pathoIDs defined by:
-# - ancestorsR: all no_files==0 ancestors (ontology-wise) of this patho,
-# - compatR: all no_files==0 pathos that this patho is "compatible" with;
+# - ancestorsR: all no_files==0 ancestors (ontology-wise) of this patho;
+# - compatR: all no_files==0 pathos that samples of this patho are "compatible" with;
 # all values are 1.
 #
 # The pathologyIDs are structured as a DAG, is_a holds the (possibly empty)
