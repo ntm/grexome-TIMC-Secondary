@@ -43,13 +43,26 @@ our @EXPORT_OK = qw(parsePathologies parseSamples parseCandidateGenes);
 # Parse pathologies metadata XLSX file: required columns are pathologyID,
 # no_files, is_a and "compatibility groups" (can be in any order but they MUST exist).
 #
-# Return 3 hashrefs ($noFilesR, $isaR, $compatR),
-# keys are a pathologyID (used as cohort identifier), values are:
-# - noFilesR: 0 (make files for this patho) or 1 (don't make files)
-# - isaR: a hashref with keys==pathoIDs that are parents (ontology-wise)
-#   of this patho, values==1
-# - compatR: a hashref with keys==pathoIDs that are compatible with
-#   this patho, values==1
+# Return 2 hashrefs: ($ancestorsR, $compatR), keys are a pathologyID,
+# values are hashrefs whose keys are the pathoIDs defined by:
+# - ancestorsR: all no_files==0 ancestors (ontology-wise) of this patho,
+# - compatR: all no_files==0 pathos that this patho is "compatible" with;
+# all values are 1.
+#
+# The pathologyIDs are structured as a DAG, is_a holds the (possibly empty)
+# comma-separated list of parent pathologyIDs.
+# Each pathologyID can belong to zero or more compatibility groups: members of
+# a group may share common causal genes, so they are not used as negative controls
+# for one another.
+# A pathologyID with no_files==1 will never appear in the returned hashrefs,
+# cannot belong to a compatibility group, and must not appear in the samples
+# metadata XLSX; such no_files==1 pathoIDs are only useful for human-friendly
+# structuring of terms.
+# A sample belonging to pathoID implicitly also belongs to all ancestors of pathoID,
+# and is compatible with all descendants of pathoID (in addition to any pathologyID
+# belonging to the same compatibility group as pathoID).
+# Each sample serves as negative control for every pathologyID that is neither an
+# ancestor nor compatible with its own pathoID.
 #
 # If the metadata file has errors, log as many as possible and die.
 sub parsePathologies {
@@ -60,11 +73,15 @@ sub parsePathologies {
     (-f $pathosFile) || die "E in $subName: provided file $pathosFile doesn't exist\n";
 
     # hashrefs to be returned
-    my ($noFilesR, $isaR, $compatR) = ({}, {}, {});
+    my ($ancestorsR, $compatR) = ({}, {});
 
     # we will populate temp hash %compatGroups as we go: key==compatGroup id,
-    # value==arrayref of pathologyIDs
+    # value==arrayref of pathologyIDs that belong to this compatGroup
     my %compatGroups = ();
+    # also as we go: %noFiles, key==pathoID, value==1 (not defined if no_files==0)
+    my %noFiles = ();
+    # also as we go: %parents, key==pathoID, value==arrayref of parent pathoIDs
+    my %parents = ();
     
     my $workbook = Spreadsheet::XLSX->new("$pathosFile");
     (defined $workbook) ||
@@ -104,53 +121,55 @@ sub parsePathologies {
         # skip lines without a pathoID
         ($patho) || next;
         $patho = $patho->unformatted();
-        # require alphanumeric strings
+        # require alphanumeric+underscore strings
         if ($patho !~ /^\w+$/) {
-            warn "E in $subName: pathologyIDs must be alphanumeric strings, found \"$patho\" in row ",$row+1,"\n";
+            warn "E in $subName: pathologyIDs must be alphanumeric+underscore strings, found \"$patho\" in row ",$row+1,"\n";
             $errorsFound++;
             next;
         }
-        if (defined $noFilesR->{$patho}) {
-            warn "E in $subName: there are 2 lines with same pathologyID $patho\n";
+        if (defined $parents{$patho}) {
+            warn "E in $subName: there are 2 lines with the same pathologyID $patho\n";
             $errorsFound++;
             next;
         }
-        # initialize with false / anonymous empty hashes
-        $noFilesR->{$patho} = 0;
-        $isaR->{$patho} = {};
-        $compatR->{$patho} = {};
+        $parents{$patho} = [];
 
-        # no_files can be empty or 0 (false), or 1
-        my $noFiles = $worksheet->get_cell($row, $noFilesCol);
-        if (defined $noFiles) {
-            $noFiles = $noFiles->unformatted();
-            if ($noFiles eq '1') {
-                $noFilesR->{$patho} = 1;
-            }
-            elsif ($noFiles ne '0') {
-                warn "E in $subName: no_files must be empty or 0 or 1, found $noFiles for $patho\n";
-                $errorsFound++;
+        # is_a must be a comma-separated list of pathologyIDs
+        my $isas = $worksheet->get_cell($row, $isaCol);
+        if (defined $isas) {
+            $isas = $isas->unformatted();
+            foreach my $isa (split(/,/, $isas)) {
+                # just save the strings for now, when all parsed we will check that
+                # they are valid pathologyIDs
+                if ( grep( /^$isa$/, @{$parents{$patho}})) {
+                    warn "E in $subName: is_a contains the same pathologyID $isa twice for $patho\n";
+                    $errorsFound++;
+                    next;
+                }
+                push(@{$parents{$patho}}, $isa);
             }
         }
         
-        # is_a must be a comma-separated list of pathologyIDs
-        my $isas = $worksheet->get_cell($row, $isaCol);
-        (defined $isas) || next;
-        $isas = $isas->unformatted();
-        foreach my $isa (split(/,/, $isas)) {
-            # just save the strings for now, when all parsed we will check that
-            # they are valid pathologyIDs
-            if (defined $isaR->{$patho}->{$isa}) {
-                warn "E in $subName: is_a contains the same pathologyID $isa twice for $patho\n";
-                $errorsFound++;
-                next;
+        # no_files can be empty or 0 (false), or 1
+        my $nf = $worksheet->get_cell($row, $noFilesCol);
+        if (defined $nf) {
+            $nf = $nf->unformatted();
+            if ($nf eq '1') {
+                $noFiles{$patho} = 1;
             }
-            $isaR->{$patho}->{$isa} = 1;
+            elsif ($nf ne '0') {
+                warn "E in $subName: no_files must be empty or 0 or 1, found $nf for $patho\n";
+                $errorsFound++;
+            }
         }
         
         # 'Compatibility group' must be a comma-separated list of group identifiers (alphanum strings)
         my $compats = $worksheet->get_cell($row, $compatCol);
         (defined $compats) || next;
+        if (defined $noFiles{$patho}) {
+            warn "E in $subName: pathoID $patho has no_files==1 but also belongs to compat groups, illegal\n";
+            $errorsFound++;
+        }
         $compats = $compats->unformatted();
         foreach my $cg (split(/,/, $compats)) {
             if ($cg !~ /^\w+$/) {
@@ -162,12 +181,15 @@ sub parsePathologies {
             push(@{$compatGroups{$cg}}, $patho);
         }
     }
-    
-    # done parsing file, now check the is_a strings
-    foreach my $patho (keys %$isaR) {
-        foreach my $isa (keys %{$isaR->{$patho}}) {
-            if (! defined $noFilesR->{$isa}) {
-                warn "E in $subName: is_a must be a comma-separated list of pathologyIDs, found $isa for $patho\n";
+
+    ################################
+    # DONE PARSING FILE
+
+    # now check the %parents strings
+    foreach my $patho (keys %parents) {
+        foreach my $parent (@{$parents{$patho}}) {
+            if (! defined $parents{$parent}) {
+                warn "E in $subName: is_a must be a comma-separated list of pathologyIDs, found $parent for $patho\n";
                 $errorsFound++;
             }
         }
@@ -177,16 +199,40 @@ sub parsePathologies {
         die "E in $subName: encountered $errorsFound errors while parsing $pathosFile, please fix the file.\n";
     }
 
-    # populate %compatible from %compatGroups
+    # populate $ancestorsR: naive algorithm but should be fine, we don't expect a huge onthology
+    foreach my $patho (keys %parents) {
+        (defined $noFiles{$patho}) && next;
+        $ancestorsR->{$patho} = {};
+        my @toExamine = @{$parents{$patho}};
+        while (my $anc = shift(@toExamine)) {
+            (defined $noFiles{$anc}) || ($ancestorsR->{$patho}->{$anc} = 1);
+            push(@toExamine, @{$parents{$anc}});
+        }
+    }
+
+    # initialize $compatR
+    foreach my $patho (keys %$ancestorsR) {
+        $compatR->{$patho} = {};
+    }
+    # populate $compatR: start with all descendants of each pathoID
+    foreach my $patho (keys %$ancestorsR) {
+        foreach my $anc (keys %{$ancestorsR->{$patho}}) {
+            $compatR->{$anc}->{$patho} = 1;
+        }
+    }
+    # add compat info from %compatGroups
     foreach my $cgs (values(%compatGroups)) {
         foreach my $patho (@$cgs) {
             foreach my $compatPatho (@$cgs) {
                 ($compatPatho eq $patho) && next;
+                # a patho is never "compatible" with one of its ancestors (it's part of it)
+                (defined $ancestorsR->{$patho}->{$compatPatho}) && next;
                 $compatR->{$patho}->{$compatPatho} = 1;
             }
         }
     }
-    return($noFilesR, $isaR, $compatR);
+    
+    return($ancestorsR, $compatR);
 }
 
 
@@ -199,7 +245,7 @@ sub parsePathologies {
 # The optional second argument, if provided and non-empty, is the
 # pathologies metadata XLSX file; it is used to make sure that every
 # pathologyID in samples.xlsx is defined in pathologies.xlsx (ie
-# sanity-check for typoes), with no_files=0 (if we have a sample for
+# sanity-check for typoes), without no_files=1 (if we have a sample for
 # a pathologyID, we MUST make output files for this pathologyID).
 #
 # Return a list of 4 (or 5 if "Sex" column exists) hashrefs, the caller can use
@@ -234,10 +280,10 @@ sub parseSamples {
 
     ################
     # parse $pathosFile immediately if it was provided
-    my $noFilesR;
+    my $ancestorsR;
     if ($pathosFile) {
         # grab just the first returned scalar
-        $noFilesR = &parsePathologies($pathosFile);
+        $ancestorsR = &parsePathologies($pathosFile);
     }
 
     ################
@@ -308,14 +354,8 @@ sub parseSamples {
         }
         $patho = $patho->unformatted();
         if ($pathosFile) {
-            if (! defined $noFilesR->{$patho}) {
-                warn "E in $subName, row ",$row+1,": pathologyID $patho is not defined in the provided $pathosFile\n";
-                $errorsFound++;
-                next;
-            }
-            elsif ($noFilesR->{$patho}) {
-                warn "E in $subName, row ",$row+1,": pathologyID $patho has no_file==1 in $pathosFile but ".
-                    "no_files==1 is reserved for organisational pathologyIDs\n";
+            if (! defined $ancestorsR->{$patho}) {
+                warn "E in $subName, row ",$row+1,": pathologyID $patho is not defined (or has no_files=1) in $pathosFile\n";
                 $errorsFound++;
                 next;
             }
@@ -463,7 +503,7 @@ sub parseCandidateGenes {
         my @parsed;
         if ($pathosFile) {
             @parsed = &parseSamples($samplesFile, $pathosFile);
-            # grab just the first returned scalar (this is noFilesR, whatever)
+            # grab just the first returned scalar (this is ancestorsR, fine)
             $pathologiesR = &parsePathologies($pathosFile);
         }
         else {
@@ -530,7 +570,7 @@ sub parseCandidateGenes {
             if ($pathosFile) {
                 if (! defined $pathologiesR->{$patho}) {
                     warn "E in $subName, parsing $candidatesFile row ", $row+1,
-                        ": pathologyID $patho is not defined in the provided $pathosFile\n";
+                        ": pathologyID $patho is not defined (or no_files=1) in the provided $pathosFile\n";
                     $errorsFound++;
                     next;
                 }
