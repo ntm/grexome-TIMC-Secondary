@@ -87,7 +87,7 @@ Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --indir : must contain cohort TSVs as produced by extractCohorts.pl,
           possibly filtered and reordered with 10_filterAndReorderAll.pl, and 
           possibly gzipped (but not with PatientIDs)
---outdir : subdir where SAMPLE TSVs will be created, must not pre-exist
+--outdir : subdir where SAMPLE TSVs will be created (NOT gzipped), must not pre-exist
 --covdir : optional, if provided it must be a subdir containing per-sample 
            coverage files as produced by 00_coverage.pl
 --jobs [$jobs] : number of cohorts to process in parallel
@@ -262,8 +262,7 @@ while (my $inFile = readdir(INDIR)) {
     $header = join("\t",@header);
 
     # hash of filehandles open for writing, one for each sample
-    # from this cohort
-    # will be gzipped if infiles were
+    # from this cohort, never gzipped
     my %outFHs;
 
     ($cohort2samples{$cohort}) || 
@@ -271,10 +270,8 @@ while (my $inFile = readdir(INDIR)) {
     foreach my $sample (@{$cohort2samples{$cohort}}) {
         my $patient = $sample2patientR->{$sample};
         my $outFile = "$outDir/$sample.$patient.$cohort.$fileEnd";
-        ($gz) && ($outFile .= ".gz");
         my $outFull = " > $outFile";
-        ($gz) && ($outFull = " | gzip -c $outFull");
-        open (my $FH, $outFull) || die "E: $0 - cannot (gzip-?)open $outFile for writing (as $outFull)\n";
+        open (my $FH, $outFull) || die "E: $0 - cannot open $outFile for writing (as $outFull)\n";
 
         # grab global coverage data for $sample if a covDir was provided
         my $headerCov = "";

@@ -28,8 +28,8 @@
 # - $inDir must contain cohort or sample TSVs (possibly gzipped) as 
 #   produced by extractCohorts.pl or extractSamples.pl;
 # - $outDir doesn't exist, it will be created and filled with one TSV
-#   per infile (never gzipped), adding .canon to the filename if called
-#   with --canonical.
+#   per infile (gzipped if infiles were), adding .canon to the filename
+#   if called with --canonical.
 # This script can only apply filters on COUNTs and --canonical, other filters
 # from $filterBin should have been applied earlier (when we still had a single 
 # file for all cohorts).
@@ -152,7 +152,8 @@ while (my $inFile = readdir(INDIR)) {
     my $outFile = $fileStart ;
     ($canon) && ($outFile .= ".canon");
     $outFile .= ".csv";
-
+    ($gz) && ($outFile .= ".gz");
+    
     # filtering options
     my $com = "perl $filterBin";
     ($max_ctrl_hv) && ($com .= " --max_ctrl_hv=$max_ctrl_hv");
@@ -171,6 +172,7 @@ while (my $inFile = readdir(INDIR)) {
     # reorder columns if requested
     ($reorder) && ($com .= " | perl $reorderBin $verbose $favoriteTissues ");
 
+    ($gz) && ($com .= "| gzip -c ");
     $com .= " > $outDir/$outFile";
 
     # fail if any component of the pipe fails

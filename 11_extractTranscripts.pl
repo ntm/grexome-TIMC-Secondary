@@ -24,10 +24,10 @@
 # NTM
 
 # Takes as arguments: $inDir $outDir [$pathologies]
-# - $inDir must contain cohort TSVs as produced by extractCohorts.pl,
+# - $inDir must contain gzipped cohort TSVs as produced by extractCohorts.pl,
 #   possibly filtered/reordered by filterVariants.pl and reorderColumns.pl;
 # - $outDir doesn't exist, it will be created and filled with one TSV
-#   per infile, adding .Transcripts to the name;
+#   per infile (NOT gzipped), adding .Transcripts to the name;
 # - $pathologies (optional) is the pathologies metadata file.
 #
 # We then produce one TSV for each cohort.

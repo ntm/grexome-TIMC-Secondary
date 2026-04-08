@@ -26,9 +26,9 @@
 # Takes 2 arguments: $inDir $outDir
 # - $inDir must contain cohort TSVs as produced by extractCohorts.pl,
 #   possibly filtered and reordered by filterVariants.pl and reorderColumns.pl,
-#   possibly with patientIDs;
+#   possibly with patientIDs, possibly gzipped;
 # - $outDir doesn't exist, it will be created and filled with one TSV
-#   per infile named $cohort.final.csv
+#   per infile named $cohort.final.csv (NEVER gzipped)
 #
 # The outfiles are identical to the infiles except we remove lines where
 # COUNT_$cohort_HV == 0 AND COUNT_$cohort_HET == 0 : previous steps
@@ -63,17 +63,23 @@ warn "I $now: $0 - starting to run\n";
 
 while (my $inFile = readdir(INDIR)) {
     ($inFile =~ /^\./) && next;
-    my $cohort;
+    my ($cohort,$gz);
     if ($inFile =~ /^(\w+)\..*csv$/) {
         $cohort = $1;
+    }
+    elsif ($inFile =~ /^(\w+)\..*csv\.gz$/) {
+        $cohort = $1;
+        $gz = 1;
     }
     else {
         warn "W: $0 - cannot parse filename of inFile $inFile, skipping it\n";
         next;
     }
 
-    open(INFILE, "$inDir/$inFile") ||
-        die "E: $0 - cannot open infile $inDir/$inFile\n";
+    my $inFull = "$inDir/$inFile";
+    ($gz) && ($inFull = "gunzip -c $inFull | ");
+    open(INFILE, $inFull) ||
+        die "E: $0 - cannot (gunzip-?)open infile $inDir/$inFile (as $inFull)\n";
 
     my $outFile = "$cohort.final.csv" ;
     open(OUTFILE, "> $outDir/$outFile") ||
