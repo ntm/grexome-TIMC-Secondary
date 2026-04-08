@@ -424,7 +424,7 @@ sub parseSamples {
 # pathologyID is defined in pathologies.xlsx (ie sanity-checking).
 #
 # Return a hashref:
-# - key is a pathologyID (used as cohort identifier)
+# - key is a pathologyID
 # - value is a hashref, with keys==Genes and value==confidenceScore
 #
 # If the metadata files have errors, log as many as possible and die.
@@ -444,9 +444,9 @@ sub parseCandidateGenes {
         die "E in $subName: optional pathologies file $pathosFile was provided but doesn't exist\n";
 
 
-    # %knownCandidateGenes: key==$cohort, value is a hashref whose keys 
+    # %knownCandidateGenes: key==$pathoID, value is a hashref whose keys 
     # are gene names and values are the "Confidence score" from a $candidatesFile,
-    # or 5 if the gene is "Causal" for a $cohort patient in $samplesFile.
+    # or 5 if the gene is "Causal" for a $pathoID patient in $samplesFile.
     my %knownCandidateGenes = ();
 
 
@@ -521,14 +521,16 @@ sub parseCandidateGenes {
             
             ################ pathology
             if (! $patho) {
-                warn "E in $subName, parsing $candidatesFile row ",$row+1,": every row MUST have a pathologyID\n";
+                warn "E in $subName, parsing $candidatesFile row ", $row+1,
+                    ": every row MUST have a pathologyID\n";
                 $errorsFound++;
                 next;
             }
             $patho = $patho->unformatted();
             if ($pathosFile) {
                 if (! defined $pathologiesR->{$patho}) {
-                    warn "E in $subName, parsing $candidatesFile row ",$row+1,": pathologyID $patho is not defined in the provided $pathosFile\n";
+                    warn "E in $subName, parsing $candidatesFile row ", $row+1,
+                        ": pathologyID $patho is not defined in the provided $pathosFile\n";
                     $errorsFound++;
                     next;
                 }
@@ -536,7 +538,8 @@ sub parseCandidateGenes {
             else {
                 # require alphanumeric strings
                 if ($patho !~ /^\w+$/) {
-                    warn "E in $subName, parsing $candidatesFile row ",$row+1,": pathologyIDs must be alphanumeric strings, found \"$patho\"\n";
+                    warn "E in $subName, parsing $candidatesFile row ", $row+1,
+                        ": pathologyIDs must be alphanumeric strings, found \"$patho\"\n";
                     $errorsFound++;
                     next;
                 }
@@ -551,7 +554,8 @@ sub parseCandidateGenes {
             $gene = $gene->unformatted();
             # these are HUGO gene names -> must be alphanum+dashes but allow (and ignore) trailing spaces
             if ($gene !~ /^([\w-]+)\s*$/) {
-                warn "E in $subName, parsing $candidatesFile row ",$row+1,": Gene must be alphanumeric (dashes allowed), found \"$gene\"\n";
+                warn "E in $subName, parsing $candidatesFile row ", $row+1,
+                    ": Gene must be alphanumeric (dashes allowed), found \"$gene\"\n";
                 $errorsFound++;
                 next;
             }
@@ -559,14 +563,16 @@ sub parseCandidateGenes {
 
             ################ score
             if (! $score) {
-                warn "E in $subName, parsing $candidatesFile row ",$row+1,": every row MUST have a Confidence score\n";
+                warn "E in $subName, parsing $candidatesFile row ", $row+1,
+                    ": every row MUST have a Confidence score\n";
                 $errorsFound++;
                 next;
             }
             $score = $score->unformatted();
             # require alphanumeric strings
             if ($score !~ /^\w+$/) {
-                warn "E in $subName, parsing $candidatesFile row ",$row+1,": Confidence score must be alphanumeric, found \"$score\"\n";
+                warn "E in $subName, parsing $candidatesFile row ", $row+1,
+                    ": Confidence score must be alphanumeric, found \"$score\"\n";
                 $errorsFound++;
                 next;
             }
@@ -575,7 +581,8 @@ sub parseCandidateGenes {
             (defined $knownCandidateGenes{$patho}) ||
                 ($knownCandidateGenes{$patho} = {});
             if (defined $knownCandidateGenes{$patho}->{$gene}) {
-                warn "E in $subName, parsing $candidatesFile row ",$row+1,": this $gene - $patho association was already seen elsewhere\n";
+                warn "E in $subName, parsing $candidatesFile row ", $row+1,
+                    ": this $gene - $patho association was already seen elsewhere\n";
                 $errorsFound++;
                 next;
             }
