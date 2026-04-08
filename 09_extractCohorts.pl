@@ -469,7 +469,7 @@ warn "I $now: $0 - ALL DONE, completed successfully!\n";
 # - $tmpOutFilesR, ref to array of filehandles open for writing, one for each cohort,
 #   same indexes as @cohorts
 sub processBatch {
-    (@_ == 9) || die "E $0: processBatch needs 9 args\n";
+    (@_ == 10) || die "E $0: processBatch needs 9 args\n";
     my ($linesR,$knownCandidateGenesR,$sample2cohortR,$cohortsR,$sample2causalR,
         $ancestorsR,$compatR,$symbolCol,$genoColsR,$tmpOutFilesR) = @_;
 
