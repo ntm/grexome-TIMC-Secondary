@@ -23,11 +23,12 @@
 # 19/08/2019, but starting from extractCohorts.pl
 # NTM
 
-# Takes as arguments: $inDir $outDir [$pathologies]
+# Takes as arguments: $inDir $outDir $samplesFile [$pathologies]
 # - $inDir must contain gzipped cohort TSVs as produced by extractCohorts.pl,
 #   possibly filtered/reordered by filterVariants.pl and reorderColumns.pl;
 # - $outDir doesn't exist, it will be created and filled with one TSV
 #   per infile (NOT gzipped), adding .Transcripts to the name;
+# - $samplesFile is the samples metadata xlsx file;
 # - $pathologies (optional) is the pathologies metadata file.
 #
 # We then produce one TSV for each cohort.
@@ -71,7 +72,7 @@ use Getopt::Long;
 use POSIX qw(strftime);
 
 use lib "$RealBin";
-use grexome_metaParse qw(parsePathologies);
+use grexome_metaParse qw(parsePathologies parseSamples);
 
 
 # we use $0 in every stderr message but we really only want
@@ -102,6 +103,9 @@ my @countTypes = ("HV_HIGH","HV_MODHIGH","HV_MODER","BIALLELIC_HIGH","BIALLELIC_
 # inDir contains cohort TSVs, $outDir must not pre-exist, no defaults
 my ($inDir, $outDir);
 
+# metadata file with all samples
+my $samplesFile;
+
 # path+file of the pathologies XLSX file
 my $pathologies = "";
 
@@ -113,17 +117,22 @@ Arguments [defaults] (all can be abbreviated to shortest unambiguous prefixes):
 --indir string: subdir containing cohort TSVs as produced by extractCohorts.pl, 
                               possibly filtered/reordered by 10_filterAndReorderAll.pl;
 --outdir string: subdir where resulting Transcripts TSV files will be created, must not pre-exist
+--samples : samples metadata xlsx file, with path
 --pathologies [optional] : pathologies metadata xlsx file, with path
 --help : print this USAGE";
 
 GetOptions ("indir=s" => \$inDir,
             "outdir=s" => \$outDir,
+            "samples=s" => \$samplesFile,
             "pathologies=s" => \$pathologies,
             "help" => \$help)
     or die("E $0: Error in command line arguments\n$USAGE\n");
 
 # make sure required options were provided and sanity check them
 ($help) && die "$USAGE\n\n";
+
+($samplesFile) || die "E $0: you must provide a samples file\n$USAGE\n";
+(-f $samplesFile) || die "E $0: the supplied samples file doesn't exist:\n$samplesFile\n";
 
 ($inDir) ||
     die "E $0: you must provide an indir.\nUSAGE:$USAGE\n";
@@ -138,22 +147,26 @@ opendir(INDIR, $inDir) ||
     die "E $0: provided outDir $outDir already exists, remove it or choose another name.\n";
 mkdir($outDir) || die "E $0: cannot mkdir outDir $outDir\n";
 
-# If $pathologies was provided we want to parse (and check) it now, it is used
-# to populate $compatibleR
-# $compatibleR: hashref, key is a cohort name, value is a hashref
-# with keys == cohorts that are compatible with this cohort, value==1
-my $compatibleR;
+# parse useful info from samples metadata file:
+# just use the first hashref from parseSamples, ignoring pathologyIDs
+# hashref, key==sample id, value is the $cohort this sample belongs to (ie pathologyID)
+my ($sample2cohortR) = &parseSamples($samplesFile);
+
+# If $pathologies was provided, build 2 hashrefs: ($ancestorsR, $compatR),
+# keys are a pathologyID, values are hashrefs whose keys are the pathoIDs defined by:
+# - ancestorsR: the ancestors (ontology-wise) of this patho;
+# - compatR: the pathos that samples of this patho are "compatible" with;
+# all values are 1.
+my ($ancestorsR, $compatR);
 if ($pathologies) {
     (-f $pathologies) || die "E $0: the supplied pathologies file $pathologies doesn't exist\n";
-    # ancestorsR will be discarded
-    my $ancestorsR;
-    ($ancestorsR, $compatibleR) = &parsePathologies($pathologies);
+    ($ancestorsR, $compatR) = &parsePathologies($pathologies);
 }
-# else $compatibleR stays undef
+# else $ancestorsR and $compatR stay undef
+
 
 my $now = strftime("%F %T", localtime);
 warn "I $now: $0 - starting to run\n";
-
 
 #########################################################
 # pre-process some of the hard-coded stuff
@@ -409,7 +422,7 @@ while (my $inFile = readdir(INDIR)) {
             $samples =~ s/^\d+\/\d+~//;
             
             foreach my $sample (split(/,/,$samples)) {
-                # ignore [DP:AF] / [GQ:FR:BP] and possibly patientIDs
+                # ignore [DP:AF] / [GQ:FR] and possibly patientIDs
                 ($sample =~ /^([^(\[]+)/) ||
                     die "E $0: cannot grab sampleID from sample $sample\n";
                 my $sampleID = $1;
@@ -522,6 +535,7 @@ foreach my $transcript (@transcripts) {
 
         # COUNTSAMPLES_* values: 6 each for $cohort, OCs, COMPATs, NEGCTRLs
         my @counts = (0) x 24;
+
         foreach my $thisCohort (keys(%{$transcript2cohort2samples{$transcript}})) {
             if ($cohort eq $thisCohort) {
                 # update non-OC $cohort...
@@ -533,16 +547,32 @@ foreach my $transcript (@transcripts) {
                     $counts[6 + $i] += scalar(keys(%{$transcript2cohort2samplesOC{$transcript}->{$thisCohort}->[$i]}));
                 }
             }
+            elsif (defined $ancestorsR->{$thisCohort}->{$cohort}) {
+                # samples from $thisCohort implicitly belong to $cohort (and were already counted)
+                next;
+            }
             else {
-                # for COMPATs and NEGCTRLs we need to add non-OC and OC counts
-                # $indexInCounts is 12 if $thisCohort is compatible with $cohort and 18 if it's a NEGCTRL
+                # samples in thisCohort are COMPAT with or NEGCTRL for $cohort, but careful,
+                # they can be seen several times (because samples implicitly belong to the all
+                # ancestors of their explicit pathoID):
+                # - thisCohort can be COMPAT and contain samples that also belong to cohort (if
+                #   it's an ancestor of cohort);
+                # - samples can belong to several different COMPAT/NEGCTRL cohorts (if one
+                #   is ancestor of the other).
+                # To avoid counting redundantly, we only count samples that belong explicitely
+                # to $thisCohort (rather than implicitely because they are from a descendant
+                # of $thisCohort).
+                # counts for COMPATs start at index 12, for NEGCTRLs at index 18
                 my $indexInCounts = 18;
-                if ($compatibleR->{$cohort}->{$thisCohort}) {
+                if (defined $compatR->{$thisCohort}->{$cohort}) {
                     $indexInCounts = 12;
                 }
                 foreach my $i (0..5) {
-                    $counts[$indexInCounts + $i] += scalar(keys(%{$transcript2cohort2samples{$transcript}->{$thisCohort}->[$i]}));
-                    $counts[$indexInCounts + $i] += scalar(keys(%{$transcript2cohort2samplesOC{$transcript}->{$thisCohort}->[$i]}));
+                    # don't differentiate non-OC and OC counts, add them all
+                    foreach my $samp (keys(%{$transcript2cohort2samples{$transcript}->{$thisCohort}->[$i]}),
+                                      keys(%{$transcript2cohort2samplesOC{$transcript}->{$thisCohort}->[$i]})) {
+                        ($sample2cohortR->{$samp} eq $thisCohort) && ($counts[$indexInCounts + $i] += 1);
+                    }
                 }
             }
         }
@@ -613,17 +643,24 @@ foreach my $transcript (@transcripts) {
         my @negctrl = ();
         foreach my $thisCohort (keys(%cohort2header)) {
             ($cohort eq $thisCohort) && next;
-            # otherwise we want all BIALLELIC_MODHIGH (or better) samples from $thisCohort,
-            # including the OTHERCAUSE ones
+            # if $cohort is an ancestor if $thisCohort, samples from $thisCohort were already counted
+            (defined $ancestorsR->{$thisCohort}->{$cohort}) && next;
+
+            # otherwise we want all BIALLELIC_MODHIGH (or better) samples that explictely
+            # belong to $thisCohort, including OTHERCAUSE samples
             my @goodSamples;
             # build full $cohort_BIALLELIC_MODHIGH+: need indexes 0,1,3,4
             foreach my $i (0,1,3,4) {
-                push(@goodSamples, keys(%{$transcript2cohort2samples{$transcript}->{$thisCohort}->[$i]}));
+                foreach my $samp (keys(%{$transcript2cohort2samples{$transcript}->{$thisCohort}->[$i]})) {
+                    ($sample2cohortR->{$samp} eq $thisCohort) && push(@goodSamples, $samp);
+                }
             }
             # add OCs (it's complete, just grab list at index 4)
-            push(@goodSamples, keys(%{$transcript2cohort2samplesOC{$transcript}->{$thisCohort}->[4]}));
+            foreach my $samp (keys(%{$transcript2cohort2samplesOC{$transcript}->{$thisCohort}->[4]})) {
+                ($sample2cohortR->{$samp} eq $thisCohort) && push(@goodSamples, $samp);
+            }
 
-            if ($compatibleR->{$cohort}->{$thisCohort}) {
+            if ($compatR->{$cohort}->{$thisCohort}) {
                 push(@compat, @goodSamples); 
             }
             else {

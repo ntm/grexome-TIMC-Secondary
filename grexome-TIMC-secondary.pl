@@ -457,7 +457,7 @@ system($com) && die "E $0: step10-reorder failed\n";
 
 # STEP 11 - TRANSCRIPTS, before filtering
 $com = "perl $RealBin/11_extractTranscripts.pl --indir $tmpdir/Cohorts_Reordered/ ";
-$com .= "--outdir $tmpdir/Transcripts_noIDs/ ";
+$com .= "--outdir $tmpdir/Transcripts_noIDs/ --samples $samples ";
 ($pathologies) && ($com .= "--pathologies=$pathologies ");
 ($debug) && ($com .= "2> $outDir/step11-transcripts.err");
 system($com) && die "E $0: step11-transcripts failed\n";
