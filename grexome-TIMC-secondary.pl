@@ -257,8 +257,13 @@ else {
 my %subcFile2patho = ();
 if ($subcohortFile) {
     my ($sample2pathoR) = &parseSamples($samples);
+    my $ancestorsR;
+    if ($pathologies) {
+        ($ancestorsR) = &parsePathologies($pathologies);
+    }
 
-    # parse subcohortFile and separate sampleIDs by patho, save in hash:
+    # parse subcohortFile and separate sampleIDs by patho (including ancestor
+    # pathologyIDs if any), save in hash:
     # key == patho, value == \n-separated list of samples
     my %patho2subcSamps = ();
 
@@ -280,6 +285,13 @@ if ($subcohortFile) {
         my $patho = $sample2pathoR->{$samp};
         (defined $patho2subcSamps{$patho}) || ($patho2subcSamps{$patho} = "");
         $patho2subcSamps{$patho} .= "$samp\n";
+        if ($ancestorsR) {
+            # also add $samp to ancestors of $patho
+            foreach my $anc (keys %{$ancestorsR->{$patho}}) {
+                (defined $patho2subcSamps{$anc}) || ($patho2subcSamps{$anc} = "");
+                $patho2subcSamps{$anc} .= "$samp\n";
+            }
+        }
     }
     close(SUBC);
     
