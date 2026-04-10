@@ -621,8 +621,8 @@ sub parseCandidateGenes {
             ################ transmission, can be empty
             if ($transmission) {
                 $transmission = $transmission->unformatted();
-                # require alphanumerics or -
-                if ($transmission !~ /^([\w\-]+)$/) {
+                # require alphanumerics or -, ignore trailing spaces
+                if ($transmission !~ /^([\w\-]+)\s*$/) {
                     warn "E in $subName, parsing $candidatesFile row ", $row+1,
                         ": Transmission must be alphanumeric ('-' allowed), found \"$transmission\"\n";
                     $errorsFound++;
