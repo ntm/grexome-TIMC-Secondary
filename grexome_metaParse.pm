@@ -530,7 +530,7 @@ sub parseCandidateGenes {
         my ($colMin, $colMax) = $worksheet->col_range();
         my ($rowMin, $rowMax) = $worksheet->row_range();
         # check the column titles and grab indexes of our columns of interest
-        my ($pathoCol, $geneCol,$scoreCol) = (-1,-1,-1);
+        my ($pathoCol, $geneCol,$scoreCol,$transmiCol) = (-1,-1,-1);
         foreach my $col ($colMin..$colMax) {
             my $cell = $worksheet->get_cell($rowMin, $col);
             # if column has no header just ignore it
@@ -539,6 +539,7 @@ sub parseCandidateGenes {
             if ($val eq "pathologyID") { $pathoCol = $col; }
             elsif ($val eq "Gene") { $geneCol = $col; }
             elsif ($val eq "Confidence score") { $scoreCol = $col; }
+            elsif ($val =~ /^Transmission/) { $transmiCol = $col; }
         }
         ($pathoCol >= 0) ||
             die "E in $subName, parsing $candidatesFile: missing required column title: 'pathologyID'\n";
@@ -546,6 +547,8 @@ sub parseCandidateGenes {
             die "E in $subName, parsing $candidatesFile: missing required column title: 'Gene'\n";
         ($scoreCol >= 0) ||
             die "E in $subName, parsing $candidatesFile: missing required column title: 'Confidence score'\n";
+        ($transmiCol >= 0) ||
+            die "E in $subName, parsing $candidatesFile: missing required column title: 'Transmission...'\n";
         
         ################
         # parse data rows
@@ -553,9 +556,10 @@ sub parseCandidateGenes {
             my $patho = $worksheet->get_cell($row, $pathoCol);
             my $gene = $worksheet->get_cell($row, $geneCol);
             my $score = $worksheet->get_cell($row, $scoreCol);
+            my $transmission = $worksheet->get_cell($row, $transmiCol);
 
             # blank lines are allowed, silently skip them
-            if ((! $patho) && (! $gene) && (! $score)) {
+            if ((! $patho) && (! $gene) && (! $score) && (! $transmission)) {
                 next;
             }
             
@@ -617,6 +621,18 @@ sub parseCandidateGenes {
                 next;
             }
 
+            ################ transmission, can be empty
+            if ($transmission) {
+                $transmission = $transmission->unformatted();
+                # require alphanumerics or -
+                if ($transmission !~ /^([\w\-]+)$/) {
+                    warn "E in $subName, parsing $candidatesFile row ", $row+1,
+                        ": Transmission must be alphanumeric ('-' allowed), found \"$transmission\"\n";
+                    $errorsFound++;
+                    next;
+                }
+            }
+            
             ################ looks AOK, save data
             (defined $knownCandidateGenes{$patho}) ||
                 ($knownCandidateGenes{$patho} = {});
@@ -627,6 +643,7 @@ sub parseCandidateGenes {
                 next;
             }
             $knownCandidateGenes{$patho}->{$gene} = $score;
+            ($transmission) && ($knownCandidateGenes{$patho}->{$gene} .= ":$transmission");
         }
     }
     
