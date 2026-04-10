@@ -170,7 +170,6 @@ while (my $inFile = readdir(INDIR)) {
         $now = strftime("%F %T", localtime);
         die "E $now: $0 FAILED - some child died, no point going on\n";
     }
-    $pm->start && next;
     my ($cohort,$fileEnd,$gz);
     if ($inFile =~ (/^([^\.]+)\.(.*csv)$/)) {
         # $fileEnd allows for .canon etc...
@@ -182,8 +181,18 @@ while (my $inFile = readdir(INDIR)) {
     }
     else {
         warn "W $0: cannot parse filename of inFile $inDir/$inFile, skipping it\n";
-        $pm->finish;
+        next;
     }
+
+    if (! $cohort2samples{$cohort}) {
+        # $cohort can have implicit samples (that actually belong to a descendant
+        # in the pathology metadata file), but we only create samples files for
+        # the explicit (most-specific) pathologyID of each sample
+        warn "I: $0 - skipping $inFile, cohort $cohort has no samples in $samplesFile\n";
+        next;
+    }
+    
+    $pm->start && next;
 
     my $inFull = "$inDir/$inFile";
     ($gz) && ($inFull = "gunzip -c $inFull | ");
@@ -264,8 +273,6 @@ while (my $inFile = readdir(INDIR)) {
     # from this cohort, never gzipped
     my %outFHs;
 
-    ($cohort2samples{$cohort}) || 
-        die "E: $0 - cohort $cohort parsed from filename of infile $inFile is not in $samplesFile\n";
     foreach my $sample (@{$cohort2samples{$cohort}}) {
         my $patient = $sample2patientR->{$sample};
         my $outFile = "$outDir/$sample.$patient.$cohort.$fileEnd";
