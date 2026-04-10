@@ -55,9 +55,8 @@ our @EXPORT_OK = qw(parsePathologies parseSamples parseCandidateGenes);
 # a group may share common causal genes, so they are not used as negative controls
 # for one another.
 # A pathologyID with no_files==1 will never appear in the returned hashrefs,
-# cannot belong to a compatibility group, and must not appear in the samples
-# metadata XLSX; such no_files==1 pathoIDs are only useful for human-friendly
-# structuring of terms.
+# and must not appear in the samples metadata XLSX; such no_files==1 pathoIDs
+# are only useful for human-friendly structuring of terms.
 # A sample belonging to pathoID implicitly also belongs to all ancestors of pathoID,
 # and is compatible with all descendants of pathoID (in addition to any pathologyID
 # belonging to the same compatibility group as pathoID).
@@ -166,10 +165,8 @@ sub parsePathologies {
         # 'Compatibility group' must be a comma-separated list of group identifiers (alphanum strings)
         my $compats = $worksheet->get_cell($row, $compatCol);
         (defined $compats) || next;
-        if (defined $noFiles{$patho}) {
-            warn "E in $subName: pathoID $patho has no_files==1 but also belongs to compat groups, illegal\n";
-            $errorsFound++;
-        }
+        # ignore if no_files==1
+        ($noFiles{$patho}) && next;
         $compats = $compats->unformatted();
         foreach my $cg (split(/,/, $compats)) {
             if ($cg !~ /^\w+$/) {
