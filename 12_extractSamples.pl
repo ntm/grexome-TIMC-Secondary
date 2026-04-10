@@ -195,7 +195,8 @@ while (my $inFile = readdir(INDIR)) {
     my @header = split(/\t/,$header);
 
     # need $cohort_HV, $cohort_HET, $cohort_OTHERCAUSE_HV, $cohort_OTHERCAUSE_HET
-    # and also other genoData columns (will all be removed)
+    # and also other genoData columns (will all be removed except $cohort_HV and
+    # $cohort_OTHERCAUSE_HV)
     my ($hvCol,$hetCol,$hvColOC,$hetColOC) = (-1,-1,-1,-1);
     # $colsToRemove[$i] == 1 if column $i in infile must be removed
     my @colsToRemove;
@@ -205,11 +206,9 @@ while (my $inFile = readdir(INDIR)) {
         my $toRemove = 0;
         if ($header[$i] eq $cohort."_HV") {
             $hvCol = $i;
-            $toRemove = 1;
         }
         elsif ($header[$i] eq $cohort."_OTHERCAUSE_HV") {
             $hvColOC = $i;
-            $toRemove = 1;
         }
         elsif ($header[$i] eq $cohort."_HET") {
             $hetCol = $i;
