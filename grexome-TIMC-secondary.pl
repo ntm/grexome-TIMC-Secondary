@@ -624,19 +624,16 @@ close(FILES);
 # created $outDir/SubCohort/ and final Samples are renamed
 if ($subcohortFile) {
     mkdir("$outDir/SubCohort/Samples") || die "E $0: cannot mkdir $outDir/SubCohort/Samples\n";
-
-    foreach my $subcFile (keys(%subcFile2patho)) {
-        open(SUBC, "$subcFile") || die "E $0: cannot open subcFile $subcFile for reading\n";
-        while (my $samp = <SUBC>) {
-            chomp($samp);
-            my @infile = glob("$outDir/Samples/$samp.*");
-            (@infile == 1) || die "E $0: while symlinking Subcohort SampleFiles, found several files for $samp\n";
-            my $sampFile = basename($infile[0]);
-            symlink("../../Samples/$sampFile", "$outDir/SubCohort/Samples/$sampFile") ||
-                die "E $0: cannot symlink $sampFile for subcohort\n";
-        }
-        close(SUBC);
+    open(SUBC, "$subcohortFile") || die "E $0: cannot open subcFile $subcohortFile for reading\n";
+    while (my $samp = <SUBC>) {
+        chomp($samp);
+        my @infile = glob("$outDir/Samples/$samp.*");
+        (@infile == 1) || die "E $0: while symlinking Subcohort SampleFiles, found several files for $samp\n";
+        my $sampFile = basename($infile[0]);
+        symlink("../../Samples/$sampFile", "$outDir/SubCohort/Samples/$sampFile") ||
+            die "E $0: cannot symlink $sampFile for subcohort\n";
     }
+    close(SUBC);
 }
 
 
