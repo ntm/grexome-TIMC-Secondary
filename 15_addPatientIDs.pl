@@ -89,7 +89,7 @@ mkdir($outDir) || die "E $0: cannot mkdir outDir $outDir\n";
 
 my $now = strftime("%F %T", localtime);
 my $infoMess = "I $now: $0 - starting to run";
-($SOIsFile) && ($infoMess .= " for $SOIsFile";
+($SOIsFile) && ($infoMess .= " for $SOIsFile");
 warn "$infoMess\n";
 
 
