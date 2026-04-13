@@ -67,11 +67,14 @@ my $USAGE = "\nParse COHORT TSV files in inDir, and produce SAMPLE TSVs in outDi
 Filenames in outDir will include patientID/specimenID.
 If covDir is provided, the global coverage data (ALL_CANDIDATES and ALL_SAMPLED)
 for each sample is grabbed from covDir and appended at the end of the header line.
-For a sample, we only print lines from its cohort file and where it has an HV or 
-HET genotype: this genotype is printed in new columns GENOTYPE, DP:AF/GQ:FR and
-BREAKPOINTS (will only be populated for CNVs where we have split-read support,
-format is BP1-BP2-N where N is the number of supporting split-reads), inserted
-right after KNOWN_CANDIDATE_GENE.
+For a sample, we only print lines from its \"explicit\" cohort file (i.e. corresponding
+to the pathologyID defined in the samples metadata file, not any of this pathologyID's
+ancestors defined in the pathology metadata file, which the sample \"implicitly\"
+belongs to); and we only print lines where the sample has an HV or HET genotype:
+this genotype is printed in new columns GENOTYPE, DP:AF/GQ:FR and BREAKPOINTS
+(will only be populated for CNVs where we have split-read support, format is
+BP1-BP2-N where N is the number of supporting split-reads), inserted right after
+KNOWN_CANDIDATE_GENE.
 Immediately after DP:AF/GQ:FR and BREAKPOINTS we insert a new column BIALLELIC,
 value is one of:
   HIGH -> patient has >=2 HET or at >=1 HV HIGH variants;
@@ -139,12 +142,14 @@ warn "I $now: $0 - starting to run\n";
 # key==pathologyID, value is an arrayref of all samples with this patho
 my %cohort2samples = ();
 
-# key==sample, value is patientID if it exists, specimenID otherwise
+# hashref, key==sample, value is this sample's (explcit) pathoID
+my $sample2pathoR;
+# hashref, key==sample, value is patientID if it exists, specimenID otherwise
 my $sample2patientR;
 
 {
     my @parsed = &parseSamples($samplesFile);
-    my $sample2pathoR = $parsed[0];
+    $sample2pathoR = $parsed[0];
     $sample2patientR = $parsed[2];
 
     foreach my $sample (sort keys %$sample2pathoR) {
@@ -188,7 +193,6 @@ while (my $inFile = readdir(INDIR)) {
         # $cohort can have implicit samples (that actually belong to a descendant
         # in the pathology metadata file), but we only create samples files for
         # the explicit (most-specific) pathologyID of each sample
-        warn "I: $0 - skipping $inFile, cohort $cohort has no samples in $samplesFile\n";
         next;
     }
     
@@ -308,7 +312,7 @@ while (my $inFile = readdir(INDIR)) {
     }
 
     # now read the data
-    # in order to print NB_* we need:
+    # in order to print COUNT_* we need:
     # key == sample, values are arrayrefs of the beginnings and ends of lines
     # (respectively) that must be printed for this sample
     my %sample2lineStarts;
@@ -375,6 +379,10 @@ while (my $inFile = readdir(INDIR)) {
                     else {
                         die  "E $0: inFile $inFile has a sampleData (in a genoData) that I can't parse: $sampleData\n";
                     }
+
+                    # ignore sample if it is not explicitly in $cohort (ie belongs
+                    # to a descendant pathologyID)
+                    ($sample2pathoR->{$sample} eq $cohort) || next;
 
                     # initialize everything for this sample if needed
                     ($sample2lineStarts{$sample}) || ($sample2lineStarts{$sample} = []);
