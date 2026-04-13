@@ -88,7 +88,9 @@ mkdir($outDir) || die "E $0: cannot mkdir outDir $outDir\n";
 ($jobs >= 1) || die "E $0: optional --jobs must be an integer >= 1\n";
 
 my $now = strftime("%F %T", localtime);
-warn "I $now: $0 - starting to run\n";
+my $infoMess = "I $now: $0 - starting to run";
+($SOIsFile) && ($infoMess .= " for $SOIsFile";
+warn "$infoMess\n";
 
 
 #########################################################
