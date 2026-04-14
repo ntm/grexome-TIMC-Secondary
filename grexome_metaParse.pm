@@ -245,12 +245,14 @@ sub parsePathologies {
 # sanity-check for typoes), without no_files=1 (if we have a sample for
 # a pathologyID, we MUST make output files for this pathologyID).
 #
-# Return a list of 4 (or 5 if "Sex" column exists) hashrefs, the caller can use
-# whichever it needs:
+# Return a list of 5 (or 6 if "Sex" column exists) hashrefs (all
+# except obsoleteSpecimens, which is an arrayref), the caller
+# can use whichever it needs:
 # - sample2patho: key is sampleID, value is pathologyID
 # - sample2specimen: key is sampleID, value is specimenID
 # - sample2patient: key is sampleID, value is patientID if it exists, specimenID otherwise
 # - sample2causal: key is sampleID, value is causal gene if it exists (undef otherwise)
+# - obsoleteSpecimens: array of obsolete specimenIDs (defined by sampleID=="0")
 # - sample2sex (only if the sex column exists): key is sampleID, value is "M" or "F"
 #
 # If the metadata file has errors, log as many as possible and die.
@@ -272,6 +274,8 @@ sub parseSamples {
     my %sample2patient;
     # sample2causal: key is sampleID, value is causal gene if it exists (undef otherwise)
     my %sample2causal;
+    # obsoleteSpecimens: array of obsolete specimenIDs
+    my @obsoleteSpecimens = [];
     # sample2sex: key is sampleID, value is the sample's sex
     my %sample2sex;
 
@@ -334,14 +338,35 @@ sub parseSamples {
             next;
         }
         $sample = $sample->unformatted();
-        # skip "0" lines == obsolete samples
-        ($sample eq "0") && next;
         if (defined $sample2patho{$sample}) {
             warn "E in $subName: found 2 lines with same sampleID $sample\n";
             $errorsFound++;
             next;
         }
         
+        ################ sample2specimen
+        # immediately, so we process and then skip obsoletes ASAP
+        my $specimen = $worksheet->get_cell($row, $specimenCol);
+        if (! $specimen) {
+            warn "E in $subName, row ",$row+1,": every row MUST have a specimenID\n";
+            $errorsFound++;
+            next;
+        }
+        $specimen = $specimen->unformatted();
+        # require alphanumeric or dashes (really don't want spaces or shell metachars)
+        if ($specimen !~ /^[\w-]+$/) {
+            warn "E in $subName, row ",$row+1,": specimenIDs must be alphanumeric (dashes allowed), found \"$specimen\"\n";
+            $errorsFound++;
+            next;
+        }
+        if ($sample eq "0") {
+            push(@obsoleteSpecimens, $specimen);
+            # nothing more to do for this row
+            next;
+        }
+        # else, store in sample2specimen and keep going:
+        $sample2specimen{$sample} = $specimen;
+
         ################ sample2patho
         my $patho = $worksheet->get_cell($row, $pathoCol);
         if (! $patho) {
@@ -366,22 +391,6 @@ sub parseSamples {
             }
         }
         $sample2patho{$sample} = $patho;
-
-        ################ sample2specimen
-        my $specimen = $worksheet->get_cell($row, $specimenCol);
-        if (! $specimen) {
-            warn "E in $subName, row ",$row+1,": every row MUST have a specimenID\n";
-            $errorsFound++;
-            next;
-        }
-        $specimen = $specimen->unformatted();
-        # require alphanumeric or dashes (really don't want spaces or shell metachars)
-        if ($specimen !~ /^[\w-]+$/) {
-            warn "E in $subName, row ",$row+1,": specimenIDs must be alphanumeric (dashes allowed), found \"$specimen\"\n";
-            $errorsFound++;
-            next;
-        }
-        $sample2specimen{$sample} = $specimen;
 
         ################ sample2patient
         my $patient = $worksheet->get_cell($row, $patientCol);
@@ -437,10 +446,11 @@ sub parseSamples {
         die "E in $subName: encountered $errorsFound errors while parsing $samplesFile, please fix the file.\n";
     }
     elsif ($sexCol >= 0) {
-        return(\%sample2patho, \%sample2specimen, \%sample2patient, \%sample2causal, \%sample2sex);
+        return(\%sample2patho, \%sample2specimen, \%sample2patient, \%sample2causal, \@obsoleteSpecimens,
+               \%sample2sex);
     }
     else {
-        return(\%sample2patho, \%sample2specimen, \%sample2patient, \%sample2causal);
+        return(\%sample2patho, \%sample2specimen, \%sample2patient, \%sample2causal, \@obsoleteSpecimens);
     }
 }
 
