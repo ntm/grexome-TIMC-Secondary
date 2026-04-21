@@ -417,9 +417,12 @@ if ($debug) {
     $com = "cat $outDir/step6.out ";
 }
 
-# step 7 - immediately filter variants on IMPACT, BIOTYPE, CANONICAL and AFs (human-only)
+# step 7 - immediately filter variants on IMPACT, BIOTYPE, CANONICAL, COUNT_HR and AFs (human-only)
 $com .= " | perl $RealBin/07_filterVariants.pl --logtime --no_mod --no_pseudo --no_nmd ";
 ($canon) && ($com .= "--canonical ");
+# set min_hr to 20% of $numSamples
+my $min_hr = int($numSamples * 0.2);
+$com .= "--min_hr=$min_hr ";
 if (($species eq 'homo_sapiens') || ($species eq 'human')) {
     # global freq <= 1% in each dataset, and per-population freq <= 5%
     $com .= "--max_af_global 0.01 --max_af_perPop 0.05 ";
@@ -486,9 +489,6 @@ system($com) && die "E $0: step12-samples failed\n";
 # STEP 13a - COHORTS, filter variants on COUNTs
 $com = "perl $RealBin/10_filterAndReorderAll.pl --indir $tmpdir/Cohorts_Reordered/ ";
 $com .= "--outdir $tmpdir/Cohorts_Filtered/ ";
-# set min_hr to 20% of $numSamples
-my $min_hr = int($numSamples * 0.2);
-$com .= "--min_hr=$min_hr ";
 # hard-coded max_ctrl_hv:
 my $max_ctrl_hv = 3;
 # set max_ctrl_het to 2% of $numSamples (but always at least 2 * $max_ctrl_hv)
