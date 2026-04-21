@@ -556,6 +556,13 @@ sub processBatch {
             # otherwise examine content and apply filters
             my @thisData = split(/:/, $thisData) ;
 
+            # if FT exists and is not '.' or PASS, change to NOCALL
+            if ((defined $format{"FT"}) && (defined $thisData[$format{"FT"}]) &&
+                ($thisData[$format{"FT"}] ne '.') && ($thisData[$format{"FT"}] ne 'PASS')) {
+                push(@lineToPrint, './.') ;
+                next;
+            }
+
             # calculate $gq = max(GQ,GQX) making sure things are defined.
             # $gq stays at -1 if GQ and GQX are both undef or '.'
             my $gq = -1;
