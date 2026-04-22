@@ -24,7 +24,8 @@
 # NTM
 
 # Parses on stdin a TSV file produced by extractCohorts.pl or extractSamples.pl,
-# or even straight out of 05_vcf2tsv.pl (but then don't filter on COUNT*).
+# or even straight out of 05_vcf2tsv.pl (but then don't filter on COUNT*, except
+# min_hr is still allowed).
 # Applies a bunch of filters (see args), and prints to stdout
 # a similar file but where some lines have been filtered out.
 
@@ -123,11 +124,16 @@ foreach my $i (0..$#titles) {
 }
 
 # make sure all titles we need are present
-if (($max_ctrl_hv) || ($max_ctrl_het) || ($min_cohort_hv) || ($min_hr)) {
-    foreach my $t ("COUNT_NEGCTRL_HV","COUNT_NEGCTRL_HET","COUNT_COHORT_HV","COUNT_HR") {
+if (($max_ctrl_hv) || ($max_ctrl_het) || ($min_cohort_hv)) {
+    foreach my $t ("COUNT_NEGCTRL_HV","COUNT_NEGCTRL_HET","COUNT_COHORT_HV") {
         (defined $title2index{$t}) ||
-            die "E $0: title $t required by script but missing, some VEP columns changed?\n";
+            die "E $0: title $t required by script but missing, some columns changed?\n";
     }
+}
+if ($min_hr) {
+    # we will use COUNT_HR if available, HR otherwise (eg before extractCohorts has run)
+    (defined $title2index{"COUNT_HR"}) || (defined $title2index{"HR"}) ||
+        die "E $0: COUNT_HR or HR required by script but missing, some columns changed?\n";
 }
 if (($no_mod) || ($no_low)) {
     (defined $title2index{"IMPACT"}) ||
@@ -184,8 +190,16 @@ while(my $line = <STDIN>) {
     if ((defined $min_cohort_hv) && ($fields[$title2index{"COUNT_COHORT_HV"}] < $min_cohort_hv)) {
         next;
     }
-    if  ((defined $min_hr) && ($fields[$title2index{"COUNT_HR"}]  < $min_hr)) {
-        next;
+    if  (defined $min_hr) {
+        if (defined $title2index{"COUNT_HR"}) {
+            ($fields[$title2index{"COUNT_HR"}]  < $min_hr) && next;
+        }
+        else {
+            # COUNT_HR doesn't exist yet, count the samples in HR column
+            my @hrCount = ($fields[$title2index{"HR"}] =~ /,/g);
+            my $hrCount = 1 + scalar(@hrCount);
+            ($hrCount < $min_hr) && next;
+        }
     }
     if (defined $max_af_global) {
         my $keep = 1;
