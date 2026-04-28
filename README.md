@@ -84,6 +84,7 @@ Required columns:
    - pathologyID: the phenotype of each patient/sample, used to define the "cohorts". Must be listed
    in pathologies.xlsx if that file is provided.
    - Causal gene: contains the name of the gene when a causal variant is identified for a patient (can be empty).
+
 Optional column:
    - Sex: if this column exists each sample must be 'F' or 'M', ignored in grexome-TIMC-Secondary.
 
