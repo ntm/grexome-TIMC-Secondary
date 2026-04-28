@@ -1,3 +1,5 @@
+<h1 align="center"> grexome-TIMC-Secondary - exome pipeline from TIMC in Grenoble - secondary analyses</h1>
+
 Exome pipeline from TIMC in Grenoble - secondary analyses:
 from a single multi-sample GVCF or VCF file to a set of analysis-ready TSVs.
 
