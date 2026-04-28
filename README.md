@@ -74,7 +74,6 @@ arguments to grexome-TIMC-secondary.pl.
 
 1. **samples.xlsx**: REQUIRED, describes the samples. This metadata file (and the code that parses it,
 in grexome_metaParse.pm) is shared with the [grexome-TIMC-Primary](https://github.com/ntm/grexome-TIMC-Primary) pipeline.
-
 Required columns:
    - sampleID: unique identifier for each sample, these are typically created with a uniform naming
    scheme when new samples are integrated into the pipeline and are used internally throughout the pipeline.
@@ -85,7 +84,6 @@ Required columns:
    - pathologyID: the phenotype of each patient/sample, used to define the "cohorts". Must be listed
    in pathologies.xlsx if that file is provided.
    - Causal gene: contains the name of the gene when a causal variant is identified for a patient (can be empty).
-
 Optional column:
    - Sex: if this column exists each sample must be 'F' or 'M', ignored in grexome-TIMC-Secondary.
 
@@ -96,7 +94,6 @@ is compatible with all descendants of pathoID (in addition to any pathologyID be
 to the same compatibility group as pathoID).
 Each sample serves as negative control for every pathologyID that is neither an ancestor
 nor compatible with its own pathoID.
-
 Required columns:
    - pathologyID: unique identifier for the pathology/phenotype, must be an alphanumeric string (eg no whitespaces).
    - no_files: don't produce files for this pathologyID if value is 1 (otherwise leave empty or use 0).
@@ -109,7 +106,6 @@ Required columns:
 3. **candidateGenes.xlsx**: OPTIONAL, lists known candidate genes. This eases the identification of a patient's
 likely causal variant: variants impacting a known candidate gene can be easily selected.
 Several such files can be provided (comma-separated), to facilitate their maintenance.
-
 Required columns:
    - Gene: name of gene (should be the HGNC name, see www.genenames.org).
    - pathologyID: pathology/phenotype, as in the previous metadata files.
