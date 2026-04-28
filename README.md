@@ -11,71 +11,156 @@ from a single multi-sample GVCF or VCF file to a set of analysis-ready TSVs.
 
 *************
 ### DEPENDENCIES
-We try to keep external dependencies to a minimum. The only required perl modules are listed below. Most are standard core modules and should already be available on your system, a few will probably need to be installed from your distribution's standard repositories (or with cpanminus, or cpan...).
+We try to keep external dependencies to a minimum. The only required perl modules are listed below.
+Most are standard core modules and should already be available on your system, a few will probably
+need to be installed from your distribution's standard repositories (or with cpanminus, or cpan...).
+
 Standard core modules: Exporter, File::Basename, File::Copy, File::Path, File::Temp, FindBin, Getopt::Long, POSIX, Storable.
+
 Other modules: Parallel::ForkManager, Spreadsheet::XLSX.
+
 For example on RHEL7-RHEL10 and derivatives (including ALMA and Rocky) with the
 [EPEL repository](https://docs.fedoraproject.org/en-US/epel/) configured, all you need is:<br>
 `sudo yum install perl-Parallel-ForkManager perl-Spreadsheet-XLSX`
 
 
-In addition we use the excellent [Ensembl Variant Effect Predictor](https://www.ensembl.org/info/docs/tools/vep/script) ([VEP github](https://github.com/Ensembl/ensembl-vep)) for annotating variants. VEP must be installed along with the Ensembl cache (we use homo_sapiens_vep_115_GRCh38 cache as of 28/04/2026). We also use some VEP plugins (currently dbNSFP, dbscSNV, CADD, SpliceAI, AlphaMissense and pLI), they must be installed along with the associated datafiles. Plugins are easily installed via the VEP INSTALL.PL script, but you must follow each plugin's instructions for installing their datafiles. This can all be customized by editing &vepCommand() in 04_runVEP.pl and/or &vepPluginDataPath() in grexomeTIMCsec_config.pm.
+In addition we use the excellent [Ensembl Variant Effect Predictor](https://www.ensembl.org/info/docs/tools/vep/script)
+([VEP github](https://github.com/Ensembl/ensembl-vep)) for annotating variants. VEP must be installed
+along with the Ensembl cache (we use homo_sapiens_vep_115_GRCh38 cache as of 28/04/2026).
+
+We also use some VEP plugins (currently dbNSFP, dbscSNV, CADD, SpliceAI, AlphaMissense and pLI),
+they must be installed along with the associated datafiles. Plugins are easily installed via the
+VEP INSTALL.PL script, but you must follow each plugin's instructions for installing their datafiles.
+This can all be customized by editing &vepCommand() in 04_runVEP.pl and/or &vepPluginDataPath() in
+grexomeTIMCsec_config.pm.
 
 
 **************
 ### REQUIRED DATA
-Step 04_runVEP.pl relies on VEP for annotating variants and therefore requires a working VEP installation, including the VEP Ensembl cache and plugin data (see DEPENDENCIES above). VEP also needs the reference genome in fasta format for HGVS annotations, we use the same file as in our [primary pipeline](https://github.com/ntm/grexome-TIMC-Primary) (see REQUIRED DATA there).
-In adition, the pipeline (step 08_addGTEX.pl) uses gene expression data produced by the GTEx consortium, but the required file for Homo sapiens is included in the GTEX_Data/ of this git repo. If you work with another species, you need to download an appropriate expression data file adapting instructions in GTEX_Data/README, and update gtexDatafile() in grexomeTIMCsec_config.pm .
+Step 04_runVEP.pl relies on VEP for annotating variants and therefore requires a working VEP installation,
+including the VEP Ensembl cache and plugin data (see DEPENDENCIES above).
+VEP also needs the reference genome in fasta format for HGVS annotations, we use the same
+file as in our [primary pipeline](https://github.com/ntm/grexome-TIMC-Primary) (see REQUIRED DATA there).
+
+In adition, the pipeline (step 08_addGTEX.pl) uses gene expression data produced by the GTEx consortium,
+but the required file for Homo sapiens is included in the GTEX_Data/ of this git repo.
+If you work with another species, you need to download an appropriate expression data file adapting
+instructions in GTEX_Data/README, and update gtexDatafile() in grexomeTIMCsec_config.pm .
 
 
 **************
 ### CONFIGURATION
-Before using the pipeline you must customize (a copy of) the grexomeTIMCsec_config.pm file, which defines every install-specific variable (eg path+name of the reference human genome fasta file). Every subroutine in grexomeTIMCsec_config.pm is self-documented and most will need to be customized. To do this you should copy the file somewhere and edit the copy, then use --config. Otherwise you could just edit the distributed copy in-place, but this not as flexible and your customizations may cause conflicts that need to be resolved when you git pull to update.
-The top-of-file comments in grexomeTIMCsec_config.pm list the few other hard-coded things that we believe users may wish to tweak. If comments are unclear or if you believe something should be moved to *config.pm, please report it (open a github issue).
+Before using the pipeline you must customize (a copy of) the grexomeTIMCsec_config.pm file,
+which defines every install-specific variable (eg path+name of the reference human genome fasta file).
+Every subroutine in grexomeTIMCsec_config.pm is self-documented and most will need to be customized.
+To do this you should copy the file somewhere and edit the copy, then use `--config`.
+Otherwise you could just edit the distributed copy in-place, but this not as flexible and
+your customizations may cause conflicts that need to be resolved when you git pull to update.
+The top-of-file comments in grexomeTIMCsec_config.pm list the few other hard-coded things
+that we believe users may wish to tweak. If comments are unclear or if you believe something
+should be moved to *config.pm, please report it (open a github issue).
 
 
 ***************
 ### METADATA FILES
-The pipeline can use several xlsx or txt files containing metadata, some are REQUIRED and some are OPTIONAL. Examples are provided in the Documentation/ subdirectory, these can serve as starting points. All columns present in the Documentation/ example files (and listed below) are required by the pipeline (except "Sex" in samples.xlsx, which is optional), don't change their names! You can add new columns and/or change the order of columns to your taste, just don't touch the pre-existing column names. The filenames can also be modified, you provide them as arguments to grexome-TIMC-secondary.pl.
+The pipeline can use several xlsx or txt files containing metadata, some are REQUIRED
+and some are OPTIONAL.
+Examples are provided in the Documentation/ subdirectory, these can serve as starting points.
+All columns present in the Documentation/ example files (and listed below) are required by the
+pipeline (except "Sex" in samples.xlsx, which is optional), don't change their names!
+You can add new columns and/or change the order of columns to your taste, just don't touch
+the pre-existing column names. The filenames can also be modified, you provide them as
+arguments to grexome-TIMC-secondary.pl.
 
-1. samples.xlsx: REQUIRED, describes the samples. This metadata file (and the code that parses it, in grexome_metaParse.pm) is shared with the [grexome-TIMC-Primary](https://github.com/ntm/grexome-TIMC-Primary) pipeline.
+1. **samples.xlsx**: REQUIRED, describes the samples. This metadata file (and the code that parses it,
+in grexome_metaParse.pm) is shared with the [grexome-TIMC-Primary](https://github.com/ntm/grexome-TIMC-Primary) pipeline.
+
 Required columns:
-- sampleID: unique identifier for each sample, these are typically created with a uniform naming scheme when new samples are integrated into the pipeline and are used internally throughout the pipeline. Rows with sampleID=="0" are ignored, this allows to retain metadata info about obsolete samples.
-- specimenID: external identifier for each sample, typically related to the BAM or FASTQ filenames.
-- patientID: a more user-friendly identifier for each sample - can be empty, but if it isn't it will be used instead of specimenID as external sample identifier.
-- pathologyID: the phenotype of each patient/sample, used to define the "cohorts". Must be listed in pathologies.xlsx if that file is provided.
-- Causal gene: contains the name of the gene when a causal variant is identified for a patient (can be empty).
+   - sampleID: unique identifier for each sample, these are typically created with a uniform naming
+   scheme when new samples are integrated into the pipeline and are used internally throughout the pipeline.
+   Rows with sampleID=="0" are ignored, this allows to retain metadata info about obsolete samples.
+   - specimenID: external identifier for each sample, typically related to the BAM or FASTQ filenames.
+   - patientID: a more user-friendly identifier for each sample - can be empty, but if it isn't it will
+   be used instead of specimenID as external sample identifier.
+   - pathologyID: the phenotype of each patient/sample, used to define the "cohorts". Must be listed
+   in pathologies.xlsx if that file is provided.
+   - Causal gene: contains the name of the gene when a causal variant is identified for a patient (can be empty).
+
 Optional column:
-- Sex: if this column exists each sample must be 'F' or 'M', ignored in grexome-TIMC-Secondary.
+   - Sex: if this column exists each sample must be 'F' or 'M', ignored in grexome-TIMC-Secondary.
 
-2. pathologies.xlsx: OPTIONAL, defines the pathologies/phenotypes and allows to specify "compatible" phenotypes. Required columns:
-- pathologyID: unique identifier for the pathology/phenotype, must be an alphanumeric string (eg no whitespaces).
-- Compatibility groups: possibily empty, comma-separated list of "compatibility group identifiers" ie CGIDs (alphanumeric strings). Pathologies that belong to a common CGID are considered "compatible" and are not used as negative controls for each other.
+2. **pathologies.xlsx**: OPTIONAL, defines the pathologies/phenotypes and allows to structure them as a DAG
+and to specify "compatible" phenotypes.
+A sample belonging to a pathoID implicitly also belongs to all ancestors of pathoID, and
+is compatible with all descendants of pathoID (in addition to any pathologyID belonging
+to the same compatibility group as pathoID).
+Each sample serves as negative control for every pathologyID that is neither an ancestor
+nor compatible with its own pathoID.
 
-3. candidateGenes.xlsx: OPTIONAL, lists known candidate genes. This eases the identification of a patient's likely causal variant: variants impacting a known candidate gene can be easily selected. Several such files can be provided (comma-separated), to facilitate their maintenance. Required columns:
-- Gene: name of gene (should be the HGNC name, see www.genenames.org).
-- pathologyID: pathology/phenotype, as in the previous metadata files.
-- Confidence score: indicates how confident you are that LOF variants in this gene are causal for this pathology. We recommend using integers between 1 and 5, 5 meaning the gene is definitely causal while 1 is a lower-confidence candidate.
+Required columns:
+   - pathologyID: unique identifier for the pathology/phenotype, must be an alphanumeric string (eg no whitespaces).
+   - no_files: don't produce files for this pathologyID if value is 1 (otherwise leave empty or use 0).
+   - is_a: comma-separated list of parent pathologyIDs (possibly empty).
+   - compatibility groups: possibily empty, comma-separated list of "compatibility group identifiers" ie CGIDs
+   (alphanumeric strings). Pathologies that belong to a common CGID are considered "compatible" and are not used
+   as negative controls for each other.
 
-4. "sub-cohort" files (e.g. Documentation/subCohort_Darwin.txt): OPTIONAL. A subCohort file is a simple text file that lists some samples by their sampleID (same as in patient_summary.xlsx), one sample per line. This allows to produce Cohorts and Transcripts files corresponding to subsets of samples. Typically the subsets are samples that were provided by collaborators, and this allows to send them the results concerning their patients.
+
+3. **candidateGenes.xlsx**: OPTIONAL, lists known candidate genes. This eases the identification of a patient's
+likely causal variant: variants impacting a known candidate gene can be easily selected.
+Several such files can be provided (comma-separated), to facilitate their maintenance.
+
+Required columns:
+   - Gene: name of gene (should be the HGNC name, see www.genenames.org).
+   - pathologyID: pathology/phenotype, as in the previous metadata files.
+   - Confidence score: indicates how confident you are that LOF variants in this gene are causal for this pathology.
+   We suggest using integers between 1 and 5, 5 meaning the gene is definitely causal while 1 is a lower-confidence candidate.
+   - Transmission: what is the transmission mechanism, e.g. we use AR (autosomal recessive) or AD (autosomal dominant).
+   Value can be empty but column must exist.
+
+4. **"sub-cohort"** files (e.g. Documentation/subCohort_Darwin.txt): OPTIONAL. A subCohort file is a simple text
+file that lists some samples by their sampleID (same as in samples.xlsx), one sample per line.
+This allows to produce Cohorts and Transcripts files corresponding to subsets of samples.
+Typically the subsets are samples that were provided by collaborators, and this allows to share with them
+the results concerning their patients.
 
 
 **************
 ### EXAMPLE USAGE
-perl grexome-TIMC-Secondary/grexome-TIMC-secondary.pl --samples=Grexome_Metadata/samples.xlsx --pathologies=Grexome_Metadata/pathologies.xlsx --candidateGenes=Grexome_Metadata/candidateGenes.xlsx --subcohort=Grexome_Metadata/darwin.txt  --infile=GVCFs_Merged/grexomes_merged.g.vcf.gz --outdir=SecondaryAnalyses_TEST --config=mySecConfig.pm  2> grexomeTIMCsec_TEST.log &
+`perl grexome-TIMC-Secondary/grexome-TIMC-secondary.pl --samples=Grexome_Metadata/samples.xlsx --pathologies=Grexome_Metadata/pathologies.xlsx --candidateGenes=Grexome_Metadata/candidateGenes.xlsx --subcohort=Grexome_Metadata/darwin.txt  --infile=GVCFs_Merged/grexomes_merged.g.vcf.gz --outdir=SecondaryAnalyses_TEST --config=mySecConfig.pm  2> grexomeTIMCsec_TEST.log &`
 
-This will create the provided workdir (SecondaryAnalyses_TEST/) , copy the samples.xlsx, pathologies.xlsx and candidateGenes.xlsx files into it, and populate it with subdirs Cohorts/ Cohorts_Canonical/ Samples/ Transcripts/ and optionally SubCohorts/ (if --subcohort is provided), as well as qc_causal.txt (see below).
+This will create the provided workdir (SecondaryAnalyses_TEST/) , copy the samples.xlsx, pathologies.xlsx
+and candidateGenes.xlsx files into it, and populate it with subdirs Cohorts/ Cohorts_Canonical/ Samples/
+Transcripts/ and optionally SubCohorts/ (if `--subcohort` is provided), as well as qc_causal.txt (see below).
+
 The subdirectories provide three different viewpoints on the analysis results, corresponding to three use-cases:
 - Cohorts/ for identifying candidate causal variants;
-- Cohorts_Canonical/ is the same as Cohorts/ but restricted to canonical transcripts (useful because Cohorts files with ALL transcripts can get too large for working comofortably with calc/excel), it is not created if you use the --canonical switch because in that case Cohorts/ is already resctricted to canonical transcripts;
+- Cohorts_Canonical/ is the same as Cohorts/ but restricted to canonical transcripts (useful because Cohorts
+files with ALL transcripts can get too large for working comofortably with calc/excel), it is not created if
+you use the `--canonical` switch because in that case Cohorts/ is already resctricted to canonical transcripts;
 - Transcripts/ for identifying candidate causal genes;
 - Samples/ for analyzing each sample/patient.
-All results are presented in tsv-formatted text files (can be opened in libreoffice-calc or MS-excel). The formats and columns are documented in Documentation/grexome_userManual.pdf . If anything is unclear please provide feedback so we can improve this manual, eg as an issue on github.
-The qc_causal.txt file contains statistics (useful for quality-control) concerning the samples that have a listed "causal gene" in the samples metadata file. It also identifies any likely causal variants for new or undiagnosed patients (ie severe biallelic variants impacting a known candidateGene for the patient's pathology).
 
-In our hands on a dual-CPU Centos 7 system (two Intel Xeon Silver 4114 CPUs), the above command takes ~2 hours to analyze a GVCF containing ~500 exomes.
-NOTE that this timing is observed with a vepCacheFile that was previously populated by running the pipeline on a GVCF containing the first 490 of these 500 exomes; a "fresh" run with empty vepCacheFile would take longer. Indeed, our main use-case is the N+1 case: we regularly receive new samples, which we analyze using our [grexome-TIMC-Primary](https://github.com/ntm/grexome-TIMC-Primary) pipeline. In this way we produce individual single-sample GVCFs and then merge them into our "master" multi-sample GVCF. This master GVCF is fed as --infile to grexome-TIMC-secondary.pl, but since the pipeline uses an internal cache for VEP annotations (see &vepCacheFile() in *config.pm), VEP actually only runs on variants detected in the newest samples and never seen before. VEP being in our hands the pipeline's main bottleneck, this cachefile strategy is very effective.
+All results are presented in tsv-formatted text files (can be opened in libreoffice-calc or MS-excel).
+The formats and columns are documented in Documentation/grexome_userManual.pdf . If anything is
+unclear please provide feedback so we can improve this manual, eg as an issue on github.
+
+The qc_causal.txt file contains statistics (useful for quality-control) concerning the samples that have
+a listed "causal gene" in the samples metadata file. It also identifies any likely causal variants for
+new or undiagnosed patients (ie severe biallelic variants impacting a known candidateGene for the patient's pathology).
+
+In our hands on a Centos 9 server purchased early 2024 (AMD EPYC 9354P 32-Core CPU with 256GB RAM but no SSDs,
+only mechanical HDDs), the pipeline takes ~1h15m to analyze a Strelka GVCF containing ~1600 exomes.
+NOTE that this timing is observed with a vepCacheFile that was previously populated by running
+the pipeline on a GVCF containing the first 1510 of these 1600 exomes; a "fresh" run with empty
+vepCacheFile would take longer. Indeed, our main use-case is the N+1 case: we regularly receive
+new samples, which we analyze using our [grexome-TIMC-Primary](https://github.com/ntm/grexome-TIMC-Primary)
+pipeline. In this way we produce individual single-sample GVCFs and then merge them into our "master"
+multi-sample GVCF. This master GVCF is fed as `--infile` to grexome-TIMC-secondary.pl, but since
+the pipeline uses an internal cache for VEP annotations (see &vepCacheFile() in *config.pm),
+VEP actually only runs on variants detected in the newest samples and never seen before.
+VEP being in our hands the pipeline's main bottleneck, this cachefile strategy is very effective.
 
 *******************
 ### OTHER REPO CONTENT
-grexome-TIMC-secondary_runAll.pl is an install-specific wrapper for running grexome-TIMC-Secondary.pl in parallel on GVCFs produced with Strelka and GATK. It can't be re-used as-is (eg metadata files and paths are hard-coded), but it serves as a good full-blown example, since this is how we use the pipeline routinely.
+`grexome-TIMC-secondary_runAll.pl` is an install-specific wrapper for running grexome-TIMC-Secondary.pl in parallel on GVCFs produced with Strelka and GATK. It can't be re-used as-is (eg metadata files and paths are hard-coded), but it serves as a good full-blown example, since this is how we use the pipeline routinely.
