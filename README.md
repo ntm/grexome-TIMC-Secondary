@@ -3,12 +3,12 @@ from a single multi-sample GVCF or VCF file to a set of analysis-ready TSVs.
 
 
 *************
-**INSTALLATION:**
+###INSTALLATION
 `git clone https://github.com/ntm/grexome-TIMC-Secondary.git`
 
 
 *************
-**DEPENDENCIES:**
+###DEPENDENCIES
 We try to keep external dependencies to a minimum. The only required perl modules are listed below. Most are standard core modules and should already be available on your system, a few will probably need to be installed from your distribution's standard repositories (or with cpanminus, or cpan...).
 Standard core modules: Exporter, File::Basename, File::Copy, File::Path, File::Temp, FindBin, Getopt::Long, POSIX, Storable.
 Other modules: Parallel::ForkManager, Spreadsheet::XLSX.
@@ -21,19 +21,19 @@ In addition we use the excellent [Ensembl Variant Effect Predictor](https://www.
 
 
 **************
-**REQUIRED DATA:**
+###REQUIRED DATA
 Step 04_runVEP.pl relies on VEP for annotating variants and therefore requires a working VEP installation, including the VEP Ensembl cache and plugin data (see DEPENDENCIES above). VEP also needs the reference genome in fasta format for HGVS annotations, we use the same file as in our [primary pipeline](https://github.com/ntm/grexome-TIMC-Primary) (see REQUIRED DATA there).
 In adition, the pipeline (step 08_addGTEX.pl) uses gene expression data produced by the GTEx consortium, but the required file for Homo sapiens is included in the GTEX_Data/ of this git repo. If you work with another species, you need to download an appropriate expression data file adapting instructions in GTEX_Data/README, and update gtexDatafile() in grexomeTIMCsec_config.pm .
 
 
 **************
-**CONFIGURATION:**
+###CONFIGURATION
 Before using the pipeline you must customize (a copy of) the grexomeTIMCsec_config.pm file, which defines every install-specific variable (eg path+name of the reference human genome fasta file). Every subroutine in grexomeTIMCsec_config.pm is self-documented and most will need to be customized. To do this you should copy the file somewhere and edit the copy, then use --config. Otherwise you could just edit the distributed copy in-place, but this not as flexible and your customizations may cause conflicts that need to be resolved when you git pull to update.
 The top-of-file comments in grexomeTIMCsec_config.pm list the few other hard-coded things that we believe users may wish to tweak. If comments are unclear or if you believe something should be moved to *config.pm, please report it (open a github issue).
 
 
 ***************
-**METADATA FILES:**
+###METADATA FILES
 The pipeline can use several xlsx or txt files containing metadata, some are REQUIRED and some are OPTIONAL. Examples are provided in the Documentation/ subdirectory, these can serve as starting points. All columns present in the Documentation/ example files (and listed below) are required by the pipeline (except "Sex" in samples.xlsx, which is optional), don't change their names! You can add new columns and/or change the order of columns to your taste, just don't touch the pre-existing column names. The filenames can also be modified, you provide them as arguments to grexome-TIMC-secondary.pl.
 
 1. samples.xlsx: REQUIRED, describes the samples. This metadata file (and the code that parses it, in grexome_metaParse.pm) is shared with the [grexome-TIMC-Primary](https://github.com/ntm/grexome-TIMC-Primary) pipeline.
@@ -59,7 +59,7 @@ Optional column:
 
 
 **************
-**EXAMPLE USAGE:**
+###EXAMPLE USAGE
 perl grexome-TIMC-Secondary/grexome-TIMC-secondary.pl --samples=Grexome_Metadata/samples.xlsx --pathologies=Grexome_Metadata/pathologies.xlsx --candidateGenes=Grexome_Metadata/candidateGenes.xlsx --subcohort=Grexome_Metadata/darwin.txt  --infile=GVCFs_Merged/grexomes_merged.g.vcf.gz --outdir=SecondaryAnalyses_TEST --config=mySecConfig.pm  2> grexomeTIMCsec_TEST.log &
 
 This will create the provided workdir (SecondaryAnalyses_TEST/) , copy the samples.xlsx, pathologies.xlsx and candidateGenes.xlsx files into it, and populate it with subdirs Cohorts/ Cohorts_Canonical/ Samples/ Transcripts/ and optionally SubCohorts/ (if --subcohort is provided), as well as qc_causal.txt (see below).
@@ -75,5 +75,5 @@ In our hands on a dual-CPU Centos 7 system (two Intel Xeon Silver 4114 CPUs), th
 NOTE that this timing is observed with a vepCacheFile that was previously populated by running the pipeline on a GVCF containing the first 490 of these 500 exomes; a "fresh" run with empty vepCacheFile would take longer. Indeed, our main use-case is the N+1 case: we regularly receive new samples, which we analyze using our [grexome-TIMC-Primary](https://github.com/ntm/grexome-TIMC-Primary) pipeline. In this way we produce individual single-sample GVCFs and then merge them into our "master" multi-sample GVCF. This master GVCF is fed as --infile to grexome-TIMC-secondary.pl, but since the pipeline uses an internal cache for VEP annotations (see &vepCacheFile() in *config.pm), VEP actually only runs on variants detected in the newest samples and never seen before. VEP being in our hands the pipeline's main bottleneck, this cachefile strategy is very effective.
 
 *******************
-**OTHER REPO CONTENT:**
+###OTHER REPO CONTENT
 grexome-TIMC-secondary_runAll.pl is an install-specific wrapper for running grexome-TIMC-Secondary.pl in parallel on GVCFs produced with Strelka and GATK. It can't be re-used as-is (eg metadata files and paths are hard-coded), but it serves as a good full-blown example, since this is how we use the pipeline routinely.
