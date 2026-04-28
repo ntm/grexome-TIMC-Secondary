@@ -85,8 +85,8 @@ Required columns:
    in pathologies.xlsx if that file is provided.
    - Causal gene: contains the name of the gene when a causal variant is identified for a patient (can be empty).
 
-Optional column:
-   - Sex: if this column exists each sample must be 'F' or 'M', ignored in grexome-TIMC-Secondary.
+   Optional column:
+            - Sex: if this column exists each sample must be 'F' or 'M', ignored in grexome-TIMC-Secondary.
 
 2. **pathologies.xlsx**: OPTIONAL, defines the pathologies/phenotypes and allows to structure them as a DAG
 and to specify "compatible" phenotypes.
