@@ -26,7 +26,7 @@ For example on RHEL7-RHEL10 and derivatives (including ALMA and Rocky) with the
 
 In addition we use the excellent [Ensembl Variant Effect Predictor](https://www.ensembl.org/info/docs/tools/vep/script)
 ([VEP github](https://github.com/Ensembl/ensembl-vep)) for annotating variants. VEP must be installed
-along with the Ensembl cache (we use homo_sapiens_vep_115_GRCh38 cache as of 28/04/2026).
+along with the Ensembl cache (we use homo_sapiens_vep_116_GRCh38 cache as of 13/07/2026).
 
 We also use some VEP plugins (currently dbNSFP, dbscSNV, CADD, SpliceAI, AlphaMissense and pLI),
 they must be installed along with the associated datafiles. Plugins are easily installed via the
