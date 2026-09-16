@@ -1,4 +1,26 @@
 #################################
+16/09/2026
+NTM
+
+I noticed today that Expression Atlas has GTEX v8 data from:
+Glinos DA, Garborcauskas G, Hoffman P, Ehsan N, Jiang L et al. (2022)
+Transcriptome variation in human tissues revealed by long-read sequencing.
+
+Getting data from:
+https://www.ebi.ac.uk/gxa/experiments-content/E-GTEX-8/resources/ExperimentDownloadSupplier.RnaSeqBaseline/tpmss.tsv
+
+Comparing tissues:
+head -n 5 E-MTAB-5214-query-results.tpms.tsv | tail -n 1 | perl -ne 's/\t/\n/g ; print' | sort  > told
+head -n 5 E-GTEX-8-query-results.tpmss.tsv | tail -n 1 | perl -ne 's/\t/\n/g ; print' | sort  > told
+diff told tnew
+=> some differences but nothing that will affect us.
+
+Updating gtexDatafile() in grexomeTIMCsec_config.pm.
+
+DONE.
+
+
+#################################
 15/06/2022
 NTM
 

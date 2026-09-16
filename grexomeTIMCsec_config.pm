@@ -147,7 +147,7 @@ sub gtexDatafile {
     (@_ == 1) || die "E: grexDatafile needs one arg";
     my ($secPath) = @_;
     # actual file name should only change when we update our GTEX data
-    my $gtex = "$secPath/GTEX_Data/E-MTAB-5214-query-results.tpms.tsv";
+    my $gtex = "$secPath/GTEX_Data/E-GTEX-8-query-results.tpmss.tsv";
     (-f $gtex) && return($gtex);
     die "E: no gtexDatafile found. Please download the GTEx file, see $secPath/GTEX_Data/README";
 }
