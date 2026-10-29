@@ -215,7 +215,7 @@ while (my $line =<STDIN>) {
         }
 
         # create SpliceAI_DS with max of the 4 SpliceAI* scores
-        if ($thisCsq{"SpliceAI_pred_DS_AG"} ne "") {
+        if ((defined $thisCsq{"SpliceAI_pred_DS_AG"}) && ($thisCsq{"SpliceAI_pred_DS_AG"} ne "")) {
             $thisCsq{"SpliceAI_DS"} = $thisCsq{"SpliceAI_pred_DS_AG"};
             foreach my $f ("SpliceAI_pred_DS_AL", "SpliceAI_pred_DS_DG", "SpliceAI_pred_DS_DL") {
                 ($thisCsq{$f} > $thisCsq{"SpliceAI_DS"}) && ($thisCsq{"SpliceAI_DS"} = $thisCsq{$f});
@@ -304,16 +304,16 @@ while (my $line =<STDIN>) {
                 ($thisCsq{"SpliceAI_DS"} > $spliceAI_cutoff) && ($passed++);
             }
             # CADD-Splice
-            if ($thisCsq{"CADD_PHRED"} ne "") {
+            if ((defined $thisCsq{"CADD_PHRED"}) && ($thisCsq{"CADD_PHRED"} ne "")) {
                 $totalPreds++;
                 ($thisCsq{"CADD_PHRED"} > $cadd_cutoff) && ($passed++);
             }
             # dbscSNV
-            if ($thisCsq{"ada_score"} ne "") {
+            if ((defined $thisCsq{"ada_score"}) && ($thisCsq{"ada_score"} ne "")) {
                 $totalPreds++;
                 ($thisCsq{"ada_score"} > 0.6) && ($passed++);
             }
-            if ($thisCsq{"rf_score"} ne "") {
+            if ((defined $thisCsq{"rf_score"}) && ($thisCsq{"rf_score"} ne "")) {
                 $totalPreds++;
                 ($thisCsq{"rf_score"} > 0.6) && ($passed++);
             }
