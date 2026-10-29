@@ -581,7 +581,7 @@ if ($subcohortFile) {
 #
 # NOTE: not doing this for SUBCOHORT, files should be small enough
 if (! $canon) {
-    $com = "perl $RealBin/11_filterAndReorderAll.pl --indir $outDir/Cohorts/ --outdir $outDir/Cohorts_Canonical/ --canon ";
+    $com = "perl $RealBin/10_filterAndReorderAll.pl --indir $outDir/Cohorts/ --outdir $outDir/Cohorts_Canonical/ --canon ";
     ($debug) && ($com .= "2> $outDir/step16-cohortsCanonical.err");
     system($com) && die "E $0: step16-cohortsCanonical failed\n";
 }
