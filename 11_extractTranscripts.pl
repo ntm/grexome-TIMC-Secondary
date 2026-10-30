@@ -169,24 +169,6 @@ my $now = strftime("%F %T", localtime);
 warn "I $now: $0 - starting to run\n";
 
 #########################################################
-# pre-process some of the hard-coded stuff
-
-# build hashes from @keptColumns*:
-# %keptCols for common data, %keptColsSpecific for cohort-specific data,
-# keys == a keptColumn* title, value== the column index where we want it in the output
-my %keptCols;
-foreach my $i (0..$#keptColumns) {
-    $keptCols{$keptColumns[$i]} = $i;
-}
-my %keptColsSpecific;
-foreach my $col (@keptColumnsSpecific) {
-    ($keptCols{$col}) || 
-        die "E $0: column $col is in keptColsSpecific but not in keptColumns, add it there\n";
-    $keptColsSpecific{$col} = $keptCols{$col};
-    delete($keptCols{$col});
-}
-
-#########################################################
 
 # Accumulators for all the data we want to print:
 # lines describing each transcript in a given infile can be interspersed,
@@ -263,6 +245,27 @@ while (my $inFile = readdir(INDIR)) {
     # elsif $destColsSpec[$i] it is the column where it goes in transcript2cohort2start
     my @destCols = ();
     my @destColsSpec = ();
+
+    # splice out columnns from @keptColumns if absent from @headers
+    foreach my $kci (reverse(0..$#keptColumns)) {
+        if (grep(($_ eq $keptColumns[$kci]), @headers) == 0) {
+            splice(@keptColumns, $kci, 1);
+        }
+    }
+    # build hashes from @keptColumns*:
+    # %keptCols for common data, %keptColsSpecific for cohort-specific data,
+    # keys == a keptColumn* title, value== the column index where we want it in the output
+    my %keptCols;
+    foreach my $i (0..$#keptColumns) {
+        $keptCols{$keptColumns[$i]} = $i;
+    }
+    my %keptColsSpecific;
+    foreach my $col (@keptColumnsSpecific) {
+        ($keptCols{$col}) || 
+            die "E $0: column $col is in keptColsSpecific but not in keptColumns, add it there\n";
+        $keptColsSpecific{$col} = $keptCols{$col};
+        delete($keptCols{$col});
+    }
 
     # new headers
     my $newHeaders = join("\t",@keptColumns);
