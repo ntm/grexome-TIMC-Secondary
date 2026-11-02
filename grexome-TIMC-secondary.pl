@@ -602,9 +602,14 @@ while (my $f = <FILES>) {
     }
     else {
         my $new = $f;
+        my $hasCanon = 0;
+        # remove .canon if present (for homogeneous processing)
+        ($new =~ s/\.canon\.csv$/.csv/) && ($hasCanon = 1);
         # remove .final and .patientIDs suffixes if present
         $new =~ s/\.patientIDs\.csv$/.csv/;
         $new =~ s/\.final\.csv$/.csv/;
+        # re-append .canon if needed
+        ($hasCanon) && ($new =~ s/\.csv$/.canon.csv/);
         # append $caller if it was auto-detected
         if ($caller) {
             ($new =~ s/\.csv$/.$caller.csv/) ||
